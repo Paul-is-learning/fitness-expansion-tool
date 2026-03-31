@@ -265,33 +265,107 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 </style>
 </head>
 <body>
-<div class="app" id="app">
+<!-- ================================================================
+     LOGIN PAGE — Premium landing with animated effects
+     ================================================================ -->
+<div id="loginPage" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#08080f;display:flex;align-items:center;justify-content:center;overflow:hidden">
+  <!-- Animated background -->
+  <div style="position:absolute;inset:0;overflow:hidden">
+    <!-- Gradient orbs -->
+    <div style="position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(212,160,23,.15) 0%,transparent 70%);top:-200px;right:-100px;animation:orbFloat 8s ease-in-out infinite"></div>
+    <div style="position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(212,160,23,.08) 0%,transparent 70%);bottom:-150px;left:-100px;animation:orbFloat 10s ease-in-out infinite reverse"></div>
+    <div style="position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(212,160,23,.06) 0%,transparent 70%);top:40%;left:20%;animation:orbFloat 12s ease-in-out infinite 2s"></div>
+    <!-- Grid lines -->
+    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(212,160,23,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(212,160,23,.03) 1px,transparent 1px);background-size:60px 60px;animation:gridMove 20s linear infinite"></div>
+    <!-- Diagonal gold lines -->
+    <div style="position:absolute;top:0;left:30%;width:1px;height:100%;background:linear-gradient(to bottom,transparent,rgba(212,160,23,.15),transparent);transform:rotate(15deg);transform-origin:top;animation:linePulse 4s ease-in-out infinite"></div>
+    <div style="position:absolute;top:0;right:25%;width:1px;height:100%;background:linear-gradient(to bottom,transparent,rgba(212,160,23,.1),transparent);transform:rotate(-10deg);transform-origin:top;animation:linePulse 5s ease-in-out infinite 1s"></div>
+  </div>
+  <style>
+    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.05)}}
+    @keyframes gridMove{0%{transform:translate(0,0)}100%{transform:translate(60px,60px)}}
+    @keyframes linePulse{0%,100%{opacity:.3}50%{opacity:1}}
+    @keyframes logoGlow{0%,100%{filter:drop-shadow(0 0 20px rgba(212,160,23,.3))}50%{filter:drop-shadow(0 0 40px rgba(212,160,23,.6))}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes borderGlow{0%,100%{border-color:rgba(212,160,23,.2)}50%{border-color:rgba(212,160,23,.5)}}
+    #loginPage input:focus{border-color:#d4a017!important;box-shadow:0 0 0 3px rgba(212,160,23,.2)!important;outline:none}
+    #loginPage input::placeholder{color:#64748b}
+    #loginBtn{background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;border:none;font-weight:800;letter-spacing:.5px;cursor:pointer;transition:all .3s}
+    #loginBtn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(212,160,23,.4)}
+    #loginBtn:active{transform:translateY(0)}
+    .login-error{color:#ef4444;font-size:11px;text-align:center;margin-top:8px;display:none}
+  </style>
+  <!-- Login card -->
+  <div style="position:relative;z-index:1;width:420px;max-width:90vw;animation:slideUp .8s ease-out">
+    <!-- Logos -->
+    <div style="text-align:center;margin-bottom:40px">
+      <!-- Fitness Park logo -->
+      <div style="animation:logoGlow 3s ease-in-out infinite;margin-bottom:24px">
+        <svg viewBox="0 0 320 50" xmlns="http://www.w3.org/2000/svg" style="height:48px;width:auto">
+          <text x="50%" y="32" text-anchor="middle" font-family="Arial Black,Impact,sans-serif" font-weight="900" font-size="36" fill="#ffffff" font-style="italic" letter-spacing="-1">FITNESS PARK</text>
+          <rect x="62" y="38" width="196" height="4" rx="2" fill="#d4a017"/>
+          <text x="50%" y="49" text-anchor="middle" font-family="Arial,sans-serif" font-weight="600" font-size="7" fill="rgba(255,255,255,.5)" letter-spacing="4">SE DEPASSER - SE SURPASSER</text>
+        </svg>
+      </div>
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:16px;margin:0 auto 24px;width:200px">
+        <div style="flex:1;height:1px;background:linear-gradient(to right,transparent,rgba(212,160,23,.4))"></div>
+        <span style="font-size:9px;color:rgba(212,160,23,.6);letter-spacing:3px;font-weight:600">POWERED BY</span>
+        <div style="flex:1;height:1px;background:linear-gradient(to left,transparent,rgba(212,160,23,.4))"></div>
+      </div>
+      <!-- Isseo logo -->
+      <svg viewBox="0 0 130 36" xmlns="http://www.w3.org/2000/svg" style="height:28px;width:auto;opacity:.7">
+        <text x="50%" y="24" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="400" font-size="30" fill="rgba(255,255,255,.8)" letter-spacing="1">Isseo</text>
+        <text x="50%" y="34" text-anchor="middle" font-family="Arial,sans-serif" font-weight="400" font-size="5.5" fill="rgba(255,255,255,.35)" letter-spacing="3">DEVELOPPER &amp; VALORISER</text>
+      </svg>
+    </div>
+    <!-- Card -->
+    <div style="background:rgba(15,20,35,.85);backdrop-filter:blur(20px);border:1px solid rgba(212,160,23,.2);border-radius:16px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:borderGlow 4s ease-in-out infinite">
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-size:18px;font-weight:800;color:white;letter-spacing:-.3px">Expansion Intelligence</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">Romania — Master Franchise Analytics</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>
+        <input type="email" id="loginEmail" placeholder="votre@email.com" style="width:100%;padding:12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s">
+      </div>
+      <div style="margin-bottom:24px">
+        <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">MOT DE PASSE</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" style="width:100%;padding:12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button id="loginBtn" onclick="doLogin()" style="width:100%;padding:14px;border-radius:10px;font-size:14px;font-family:var(--font)">
+        CONNEXION
+      </button>
+      <div class="login-error" id="loginError">Email ou mot de passe incorrect</div>
+      <div style="text-align:center;margin-top:16px;font-size:10px;color:#475569">
+        Acces reserve aux membres du projet
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="text-align:center;margin-top:24px;font-size:9px;color:#334155">
+      &copy; 2026 Isseo x Fitness Park — Expansion Intelligence Platform v2.0
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
 <!-- ================================================================
      SIDEBAR
      ================================================================ -->
 <div class="sidebar">
   <div class="sidebar-header">
-    <div class="logo-area">
-      <!-- Fitness Park logo (primary) -->
-      <div class="logo-fp">
-        <svg viewBox="0 0 320 50" xmlns="http://www.w3.org/2000/svg">
-          <text x="0" y="32" font-family="Arial Black,Impact,sans-serif" font-weight="900" font-size="36" fill="#e1e5eb" font-style="italic" letter-spacing="-1">FITNESS PARK</text>
-          <rect x="0" y="38" width="196" height="3.5" rx="1" fill="#f0c132"/>
-          <text x="20" y="49" font-family="Arial,sans-serif" font-weight="600" font-size="7.5" fill="#8899b0" letter-spacing="3.5">SE DEPASSER - SE SURPASSER</text>
-        </svg>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <svg viewBox="0 0 320 50" xmlns="http://www.w3.org/2000/svg" style="height:30px;width:auto;flex-shrink:0">
+        <text x="0" y="32" font-family="Arial Black,Impact,sans-serif" font-weight="900" font-size="36" fill="#e1e5eb" font-style="italic" letter-spacing="-1">FITNESS PARK</text>
+        <rect x="0" y="38" width="196" height="3.5" rx="1" fill="#f0c132"/>
+        <text x="20" y="49" font-family="Arial,sans-serif" font-weight="600" font-size="7.5" fill="#8899b0" letter-spacing="3.5">SE DEPASSER - SE SURPASSER</text>
+      </svg>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <div class="version-badge">v2.0</div>
+        <div onclick="showUserPanel()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;cursor:pointer;flex-shrink:0" id="userAvatar" title="Gestion utilisateurs">P</div>
       </div>
-      <div class="logo-sep"></div>
-      <!-- Isseo logo (secondary / parent company) -->
-      <div class="logo-isseo">
-        <svg viewBox="0 0 110 32" xmlns="http://www.w3.org/2000/svg">
-          <text x="2" y="22" font-family="Georgia,'Times New Roman',serif" font-weight="400" font-size="28" fill="#c8cdd5" letter-spacing="0">Isseo</text>
-          <text x="6" y="30" font-family="Arial,sans-serif" font-weight="400" font-size="5" fill="#64748b" letter-spacing="3">DEVELOPPER &amp; VALORISER</text>
-        </svg>
-      </div>
-      <div class="version-badge">v2.0</div>
-      <div onclick="showUserPanel()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;cursor:pointer;margin-left:8px;flex-shrink:0" id="userAvatar" title="Gestion utilisateurs">P</div>
     </div>
-    <div class="logo-sub">Expansion Intelligence Platform <span>Romania</span></div>
+    <div style="font-size:9.5px;color:var(--gray2);margin-bottom:10px">Expansion Intelligence Platform <span style="font-weight:600;color:var(--gray);letter-spacing:.3px">Romania</span></div>
     <div class="search-wrap">
       <div class="search-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div>
       <input type="text" id="searchInput" placeholder="Rechercher une adresse a Bucarest...">
@@ -2741,12 +2815,69 @@ function updCache(){el('cacheInfo').textContent=`Cache: ${Object.keys(opCache).l
 function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').style.display='none'}
 
 // ================================================================
-// USER MANAGEMENT — Viewer / Admin roles
+// AUTH & USER MANAGEMENT
 // ================================================================
+
+// Password hash (simple but sufficient for client-side)
+function simpleHash(str){let h=0;for(let i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0}return Math.abs(h).toString(36)}
+
+// Users with passwords stored in localStorage
 let currentUser = JSON.parse(localStorage.getItem('fpCurrentUser')||'null');
 let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
 
-// Check URL for invite token
+// Seed default admin if no users exist
+if(userList.length === 0) {
+  userList = [
+    {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
+  ];
+  localStorage.setItem('fpUsers', JSON.stringify(userList));
+}
+
+// Login function
+function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pw = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+
+  if(!email || !pw) { errEl.style.display='block'; errEl.textContent='Veuillez remplir tous les champs'; return; }
+
+  const user = userList.find(u => u.email.toLowerCase() === email);
+  if(!user) { errEl.style.display='block'; errEl.textContent='Email non reconnu — demandez une invitation'; return; }
+  if(user.pwHash && user.pwHash !== simpleHash(pw)) { errEl.style.display='block'; errEl.textContent='Mot de passe incorrect'; return; }
+
+  // Success
+  currentUser = user;
+  localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('app').style.display='';
+  if(document.getElementById('userAvatar')) document.getElementById('userAvatar').textContent = (user.name||user.email)[0].toUpperCase();
+  init();
+  applyRole();
+}
+
+// Check if already logged in
+function checkAuth() {
+  if(currentUser && userList.find(u=>u.email===currentUser.email)) {
+    document.getElementById('loginPage').style.display='none';
+    document.getElementById('app').style.display='';
+    if(document.getElementById('userAvatar')) document.getElementById('userAvatar').textContent = (currentUser.name||currentUser.email)[0].toUpperCase();
+    init();
+    applyRole();
+  }
+  // Pre-fill email if returning user
+  if(currentUser?.email && document.getElementById('loginEmail')) {
+    document.getElementById('loginEmail').value = currentUser.email;
+  }
+}
+
+// Logout
+function doLogout() {
+  currentUser = null;
+  localStorage.removeItem('fpCurrentUser');
+  window.location.reload();
+}
+
+// Check URL for invite token (auto-login from invite link)
 (function checkInvite(){
   const params = new URLSearchParams(window.location.search);
   const invite = params.get('invite');
@@ -2767,16 +2898,7 @@ let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
   }
 })();
 
-// Default admin if no users
-if(userList.length === 0) {
-  const defaultAdmin = {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul'};
-  userList.push(defaultAdmin);
-  localStorage.setItem('fpUsers', JSON.stringify(userList));
-  if(!currentUser) {
-    currentUser = defaultAdmin;
-    localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
-  }
-}
+// Old default admin seeding removed — handled in AUTH section above
 
 function isAdmin() { return !currentUser || currentUser.role === 'admin'; }
 
@@ -2790,11 +2912,12 @@ function showUserPanel() {
       <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px">INVITER UN UTILISATEUR</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <input type="email" id="inviteEmail" placeholder="email@example.com" style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;font-family:var(--font)">
+        <input type="text" id="invitePw" placeholder="Mot de passe" style="width:100px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;font-family:var(--font)">
         <select id="inviteRole" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
           <option value="viewer">Viewer</option>
           <option value="admin">Admin</option>
         </select>
-        <button class="btn btn-sm btn-primary" onclick="inviteUser()">Inviter</button>
+        <button class="btn btn-sm btn-primary" onclick="inviteUser()">Ajouter</button>
       </div>
       <div id="inviteLink" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;word-break:break-all;color:var(--cyan);margin-bottom:8px"></div>
       <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;margin-top:12px">UTILISATEURS (${userList.length})</div>
@@ -2828,7 +2951,7 @@ function showUserPanel() {
       </div>
       ${adminBtns}
       <div style="margin-top:16px;display:flex;gap:8px">
-        <button class="btn" style="flex:1" onclick="switchUser()">Changer d'utilisateur</button>
+        <button class="btn" style="flex:1;color:var(--red)" onclick="doLogout()">Deconnexion</button>
         <button class="btn" style="flex:1" onclick="document.getElementById('userPanel').remove()">Fermer</button>
       </div>
     </div>
@@ -2838,12 +2961,14 @@ function showUserPanel() {
 
 function inviteUser() {
   const email = document.getElementById('inviteEmail')?.value?.trim();
+  const pw = document.getElementById('invitePw')?.value?.trim();
   const role = document.getElementById('inviteRole')?.value || 'viewer';
   if(!email || !email.includes('@')) return alert('Email invalide');
+  if(!pw || pw.length<4) return alert('Mot de passe requis (min 4 caracteres)');
 
   // Add to user list
   if(!userList.find(u=>u.email===email)) {
-    userList.push({email, role, name:email.split('@')[0]});
+    userList.push({email, role, name:email.split('@')[0], pwHash:simpleHash(pw)});
     localStorage.setItem('fpUsers', JSON.stringify(userList));
   }
 
@@ -2888,10 +3013,9 @@ function applyRole() {
 }
 
 // ================================================================
-// BOOT
+// BOOT — Check auth first
 // ================================================================
-init();
-applyRole();
+checkAuth();
 </script>
 </body>
 </html>
