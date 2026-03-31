@@ -579,6 +579,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         </div>
         <div id="siteAnalysisContent"></div>
       </div>
+      <div class="card" id="captageCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127919;</span> Potentiel de captage</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Modele de captage</strong><br><b style="color:#f97316">Captifs</b> = membres actuels des concurrents qui switcheraient vers FP (prix + proximite + positionnement).<br><b style="color:var(--green)">Natifs</b> = population non-inscrite en salle qui rejoindrait FP (nouvelle offre = nouvelle demande).<br><br>Le total donne les <b>membres theoriques a terme</b> pour un club FP a cet emplacement.<div class="tip-source">Calibre sur benchmark FP France + data WC Romania</div></div></span>
+        </div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>Rayon de captage</span><span id="captageRadiusVal" style="font-weight:700">3 km</span></div>
+          <input type="range" id="captageRadiusSlider" min="1000" max="5000" step="500" value="3000" style="width:100%;accent-color:#f97316" oninput="updateCaptageRadius()">
+          <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gray2)"><span>1 km</span><span>2 km</span><span>3 km</span><span>4 km</span><span>5 km</span></div>
+        </div>
+        <div id="captageContent"></div>
+      </div>
       <div class="card" id="cannibalizationCard" style="display:none">
         <div class="card-header">
           <div class="card-title"><span class="icon">&#9888;</span> Risque de cannibalisation</div>
@@ -2609,6 +2621,207 @@ function showOverlapAnalysis() {
 }
 
 // ================================================================
+// CAPTAGE ENGINE — Member capture potential model
+// ================================================================
+// FP positioning: premium low-cost, 22-28 EUR/month
+// Capture rates by competitor segment (% of their members who would switch to FP)
+const CAPTURE_RATES = {
+  premium: {rate:0.08, reason:'Prix WC 46-145EUR → FP 22-28EUR = forte incitation prix, mais perte services premium (piscine, spa)'},
+  'mid-premium': {rate:0.12, reason:'Positionnement similaire (Downtown ~35EUR), FP offre meilleur rapport qualite/prix'},
+  mid: {rate:0.15, reason:'Stay Fit/18GYM ~30-36EUR, FP moins cher avec image internationale'},
+  lowcost: {rate:0.05, reason:'Deja moins cher que FP, faible migration vers le haut'},
+  independent: {rate:0.10, reason:'Clients fideles mais sensibles a une offre structuree'},
+  crossfit: {rate:0.03, reason:'Niche tres specifique, faible transferabilite'},
+  boutique: {rate:0.02, reason:'Experience unique non substituable'},
+};
+
+// Distance decay: capture rate decreases with distance
+function distanceDecay(dist) {
+  if(dist < 500) return 1.0;    // same street = max capture
+  if(dist < 1000) return 0.85;
+  if(dist < 1500) return 0.65;
+  if(dist < 2000) return 0.45;
+  if(dist < 3000) return 0.25;
+  if(dist < 4000) return 0.12;
+  return 0.05;
+}
+
+// Native demand: people not currently in any gym who would join FP
+function calcNativeDemand(popTarget, currentPenetration, fpAttractivite) {
+  // Romania penetration: ~5% national, ~8-12% urban Bucharest
+  // Target penetration with FP entering: +1.5-3% uplift (new offer creates new demand)
+  const upliftPct = fpAttractivite * 0.03; // 0 to 3% new penetration from FP
+  const nativePool = popTarget * (1 - currentPenetration/100); // people NOT in a gym
+  const nativeCapture = nativePool * upliftPct;
+  return {
+    pool: Math.round(nativePool),
+    uplift: Math.round(upliftPct * 100 * 10) / 10,
+    captured: Math.round(nativeCapture)
+  };
+}
+
+// Full captage analysis for a point
+function runCaptageAnalysis(lat, lng, captageRadius) {
+  captageRadius = captageRadius || 3000;
+
+  // 1. Find all competitors in radius
+  const comps = getDemoInRadius(lat, lng, captageRadius);
+
+  // 2. Calculate capture from each competitor
+  const captageDetails = comps.map(c => {
+    const dist = haversine(lat, lng, c.lat, c.lng);
+    const baseRate = (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).rate;
+    const decay = distanceDecay(dist);
+    const effectiveRate = baseRate * decay;
+    const rv = getReviewData(c.name);
+    const mA = c.members || 0;
+    const mB = rv ? Math.round(rv.r * REVIEWS_MULT) : 0;
+    const membersEst = mB > 0 ? Math.round((mA + mB) / 2) : mA;
+    const captured = Math.round(membersEst * effectiveRate);
+
+    return {
+      name: c.name,
+      segment: c.segment,
+      color: c.color,
+      dist: Math.round(dist),
+      membersA: mA,
+      membersB: mB,
+      membersEst,
+      baseRate: Math.round(baseRate * 100),
+      decay: Math.round(decay * 100),
+      effectiveRate: Math.round(effectiveRate * 100 * 10) / 10,
+      captured,
+      reason: (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).reason
+    };
+  }).sort((a, b) => b.captured - a.captured);
+
+  // 3. Total captifs
+  const totalCaptifs = captageDetails.reduce((a, c) => a + c.captured, 0);
+  const totalMembersZone = captageDetails.reduce((a, c) => a + c.membersEst, 0);
+
+  // 4. Native demand
+  const sector = findSector(lat, lng);
+  const popGranular = estimatePopInRadiusGranular(lat, lng, captageRadius);
+  const currentPenetration = popGranular.target > 0 ? (totalMembersZone / popGranular.target) * 100 : 0;
+
+  // FP attractivite: based on SAZ flux + jeunesse scores (0 to 1)
+  const saz = calcSAZ(lat, lng, sector, comps);
+  const fpAttract = ((saz.flux || 0) + (saz.jeunesse || 0)) / 200; // 0 to 1
+
+  const native = calcNativeDemand(popGranular.target, currentPenetration, fpAttract);
+
+  // 5. Total members theoriques
+  const totalTheorique = totalCaptifs + native.captured;
+
+  // 6. Scenarios
+  const pessimiste = Math.round(totalTheorique * 0.6);
+  const realiste = totalTheorique;
+  const optimiste = Math.round(totalTheorique * 1.4);
+
+  return {
+    captageRadius,
+    comps: captageDetails,
+    totalCaptifs,
+    totalMembersZone,
+    native,
+    currentPenetration: Math.round(currentPenetration * 10) / 10,
+    popTarget: popGranular.target,
+    fpAttract: Math.round(fpAttract * 100),
+    totalTheorique,
+    pessimiste,
+    realiste,
+    optimiste,
+    saz,
+    breakeven2800: totalTheorique >= 2800 ? 'OUI' : totalTheorique >= 2000 ? 'POSSIBLE' : 'NON',
+    breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
+  };
+}
+
+// Render captage analysis in a container
+function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
+  const r = runCaptageAnalysis(lat, lng, captageRadius);
+  const c = el(containerId);
+  if(!c) return;
+
+  const recoColor = r.totalTheorique >= 4000 ? 'var(--green)' : r.totalTheorique >= 2800 ? 'var(--yellow)' : 'var(--red)';
+  const recoText = r.totalTheorique >= 4000 ? 'EXCELLENT' : r.totalTheorique >= 2800 ? 'VIABLE' : r.totalTheorique >= 2000 ? 'RISQUE' : 'INSUFFISANT';
+
+  c.innerHTML = `
+    <div style="text-align:center;padding:12px 0;margin-bottom:12px;background:var(--bg);border-radius:8px">
+      <div style="font-size:9px;font-weight:700;color:var(--gray2);margin-bottom:4px">MEMBRES THEORIQUES A TERME</div>
+      <div style="font-size:42px;font-weight:900;color:${recoColor};line-height:1">${fmt(r.realiste)}</div>
+      <div style="font-size:11px;color:var(--gray2);margin-top:2px">Rayon captage: ${r.captageRadius/1000} km</div>
+      <div style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:10px;font-weight:700;margin-top:6px;color:${recoColor};border:1px solid ${recoColor}30;background:${recoColor}10">${recoText}</div>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:8px;text-align:center;border-left:3px solid #f97316">
+        <div style="font-size:8px;font-weight:700;color:#f97316">CAPTIFS</div>
+        <div style="font-size:20px;font-weight:900;color:#f97316">${fmt(r.totalCaptifs)}</div>
+        <div style="font-size:8px;color:var(--gray2)">vols concurrents</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:8px;text-align:center;border-left:3px solid var(--green)">
+        <div style="font-size:8px;font-weight:700;color:var(--green)">NATIFS</div>
+        <div style="font-size:20px;font-weight:900;color:var(--green)">${fmt(r.native.captured)}</div>
+        <div style="font-size:8px;color:var(--gray2)">nouvelle demande</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:6px">SCENARIOS</div>
+      <div class="metric-row" style="color:var(--red)"><span class="metric-label">Pessimiste (x0.6)</span><span class="metric-value">${fmt(r.pessimiste)} mbr</span></div>
+      <div class="metric-row" style="color:var(--yellow)"><span class="metric-label"><b>Realiste</b></span><span class="metric-value" style="font-weight:800">${fmt(r.realiste)} mbr</span></div>
+      <div class="metric-row" style="color:var(--green)"><span class="metric-label">Optimiste (x1.4)</span><span class="metric-value">${fmt(r.optimiste)} mbr</span></div>
+      <div class="metric-row"><span class="metric-label">Breakeven A1 (2,800)</span><span class="metric-value" style="color:${r.breakeven2800==='OUI'?'var(--green)':r.breakeven2800==='POSSIBLE'?'var(--yellow)':'var(--red)'};font-weight:700">${r.breakeven2800}</span></div>
+      <div class="metric-row"><span class="metric-label">Objectif maturite (4,000)</span><span class="metric-value" style="color:${r.breakeven4000==='OUI'?'var(--green)':r.breakeven4000==='POSSIBLE'?'var(--yellow)':'var(--red)'};font-weight:700">${r.breakeven4000}</span></div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px">CAPTAGE CONCURRENTS — ${r.comps.length} clubs dans ${r.captageRadius/1000}km</div>
+      <div class="metric-row"><span class="metric-label">Membres total zone</span><span class="metric-value">${fmt(r.totalMembersZone)}</span></div>
+      <div class="metric-row"><span class="metric-label">Penetration actuelle</span><span class="metric-value">${r.currentPenetration}%</span></div>
+      <div class="metric-row"><span class="metric-label">Total captes</span><span class="metric-value" style="color:#f97316;font-weight:700">${fmt(r.totalCaptifs)}</span></div>
+      <div style="max-height:200px;overflow-y:auto;margin-top:6px">
+        ${r.comps.slice(0,15).map(comp => `
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(71,85,115,.1);font-size:10px">
+            <div style="width:6px;height:6px;border-radius:50%;background:${comp.color};flex-shrink:0"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${comp.name}</div>
+              <div style="color:var(--gray2);font-size:9px">${comp.segment} | ${(comp.dist/1000).toFixed(1)}km | ~${fmt(comp.membersEst)} mbr</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-weight:800;color:#f97316">+${comp.captured}</div>
+              <div style="color:var(--gray2);font-size:8px">${comp.effectiveRate}% taux</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">DEMANDE NATIVE — Nouveaux pratiquants</div>
+      <div class="metric-row"><span class="metric-label">Pop. cible 15-45 dans rayon</span><span class="metric-value">${fmt(r.popTarget)}</span></div>
+      <div class="metric-row"><span class="metric-label">Non-inscrits (pool natif)</span><span class="metric-value">${fmt(r.native.pool)}</span></div>
+      <div class="metric-row"><span class="metric-label">Attractivite FP (flux+jeunesse)</span><span class="metric-value">${r.fpAttract}%</span></div>
+      <div class="metric-row"><span class="metric-label">Uplift penetration FP</span><span class="metric-value">+${r.native.uplift}%</span></div>
+      <div class="metric-row"><span class="metric-label">Natifs captes</span><span class="metric-value" style="color:var(--green);font-weight:700">${fmt(r.native.captured)}</span></div>
+    </div>
+
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;color:var(--gray)">
+      <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">METHODOLOGIE CAPTAGE</div>
+      <div style="line-height:1.6">
+        <b>Captifs</b> = Σ (membres_concurrent × taux_capture × decay_distance)<br>
+        Taux par segment : Premium 8%, Mid-premium 12%, Mid 15%, Low-cost 5%<br>
+        Decay : <500m=100%, 1km=85%, 2km=45%, 3km=25%, >4km=5%<br><br>
+        <b>Natifs</b> = Pop_non_inscrite × uplift_FP<br>
+        Uplift = attractivite_zone × 3% (nouvelle offre cree nouvelle demande)<br><br>
+        <b>Calibration</b> : WC 84k mbr / 45 clubs. Reviews x8.5. Surface ratio 0.85-1.5/m2
+      </div>
+    </div>
+  `;
+}
+
+// ================================================================
 // CUSTOM SITES MANAGEMENT
 // ================================================================
 let addingSite = false;
@@ -2766,6 +2979,26 @@ async function runSiteAnalysis(site) {
       <div class="metric-row"><span class="metric-label">Breakeven (2,800 mbr A1)</span><span class="metric-value" style="color:${scenarios.breakeven==='OUI'?'var(--green)':scenarios.breakeven==='POSSIBLE'?'var(--yellow)':'var(--red)'}"><b>${scenarios.breakeven}</b></span></div>
     </div>
   `;
+
+  // Trigger captage analysis
+  showCaptageForPoint(lat, lng);
+}
+
+let lastCaptagePoint = null;
+
+function updateCaptageRadius() {
+  const r = parseInt(el('captageRadiusSlider').value);
+  el('captageRadiusVal').textContent = (r/1000) + ' km';
+  if(lastCaptagePoint) {
+    renderCaptageAnalysis('captageContent', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
+  }
+}
+
+function showCaptageForPoint(lat, lng) {
+  lastCaptagePoint = {lat, lng};
+  el('captageCard').style.display = 'block';
+  const r = parseInt(el('captageRadiusSlider')?.value || 3000);
+  renderCaptageAnalysis('captageContent', lat, lng, r);
 }
 
 function updateCannibalization() {
