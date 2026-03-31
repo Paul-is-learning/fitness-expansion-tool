@@ -417,6 +417,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         </div>
       </div>
 
+      <!-- Brand filter (Explorer tab) -->
+      <div class="card" id="brandFilterExplorer">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127919;</span> Filtrer concurrents</div>
+          <button class="btn btn-sm" onclick="toggleAllBrands(true)">Tout</button>
+          <button class="btn btn-sm" onclick="toggleAllBrands(false)">Aucun</button>
+        </div>
+        <div id="brandFiltersExplorer" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+
       <!-- Catchment -->
       <div class="card">
         <div class="card-header">
@@ -1918,14 +1928,14 @@ function buildBrandFilters(comps) {
   });
   Object.keys(brands).forEach(b => { if(brandVisibility[b]===undefined) brandVisibility[b]=true; });
 
-  const container = el('brandFilters');
-  if(!container) return;
-  container.innerHTML = Object.entries(brands).sort((a,b)=>b[1].count-a[1].count).map(([name, data]) => {
+  const html = Object.entries(brands).sort((a,b)=>b[1].count-a[1].count).map(([name, data]) => {
     const on = brandVisibility[name] !== false;
     return `<button class="btn btn-sm" style="font-size:9px;padding:3px 8px;${on?'background:'+data.color+'30;border-color:'+data.color+';color:white':'opacity:.35;text-decoration:line-through'}" onclick="toggleBrand('${name}')">
       <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${data.color};margin-right:3px"></span>${name} (${data.count})
     </button>`;
   }).join('');
+  // Write to both containers (Explorer + Concurrence tabs)
+  ['brandFilters','brandFiltersExplorer'].forEach(id=>{const c=el(id);if(c)c.innerHTML=html});
 }
 
 function toggleBrand(name) {
@@ -2364,7 +2374,9 @@ async function loadAllCompetitors() {
   if(demo) comps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
   else comps=await fetchAllBucharest();
   allComps=comps;
+  lastDisplayedComps=comps;
   showCompsOnMap(comps);
+  buildBrandFilters(comps);
   if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
   setStatus('ok',`${comps.length} concurrents charges`);
 }
@@ -2840,7 +2852,9 @@ function toggleDemoMode() {
   setStatus(demo?'warn':'ok',demo?'Mode demo actif':'APIs connectees');
   if(demo) {
     allComps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
+    lastDisplayedComps=allComps;
     showCompsOnMap(allComps);
+    buildBrandFilters(allComps);
     if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
   }
 }
