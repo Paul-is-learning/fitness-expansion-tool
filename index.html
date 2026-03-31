@@ -794,6 +794,27 @@ const COMP_DB = [
   {name:'WoW',segment:'independent',avgSize:500,avgMembers:400,threat:'low',color:'#22c55e',price:'~15',clubs:1,brand:'local'},
 ];
 
+// GOOGLE REVIEWS DATABASE — Method B for member estimation
+// Calibrated multiplier: 8.5x (reviews -> members)
+// Calibration: WC network 84,000 members / 45 clubs / avg 219 reviews = 8.5x
+// Sources: top-rated.online, citymaps.ro, wheree.com, Google Maps (March 2026)
+const REVIEWS_MULT = 8.5;
+const REVIEWS_DB = {
+"World Class Charles de Gaulle":{r:285,g:4.3},"World Class Downtown":{r:520,g:4.1},"World Class At The Grand":{r:346,g:4.2},"World Class Atlantis":{r:180,g:4.4},"World Class Caro":{r:210,g:4.0},"World Class InCity":{r:310,g:3.9},"World Class Upground":{r:150,g:4.1},"World Class One Cotroceni":{r:120,g:4.5},"World Class Planet":{r:95,g:4.3},"World Class Cosmopolis":{r:65,g:4.6},"World Class Asmita Gardens":{r:248,g:3.8},"World Class Mega Mall":{r:380,g:3.9},"World Class Militari Shopping":{r:527,g:3.6},"World Class Otopeni":{r:110,g:4.0},"World Class Park Lake":{r:350,g:3.8},"World Class Titan":{r:443,g:3.7},"World Class AFI Cotroceni":{r:290,g:3.9},"World Class AFI Tech":{r:85,g:4.2},"World Class America House":{r:195,g:4.0},"World Class Bucuresti Mall":{r:320,g:3.8},"World Class Campus 6":{r:75,g:4.3},"World Class Expo Park":{r:140,g:4.1},"World Class Jiului":{r:90,g:4.0},"World Class Jolie Ville":{r:130,g:4.2},"World Class Lujerului":{r:260,g:3.7},"World Class Plaza Romania":{r:310,g:3.8},"World Class Sudului":{r:180,g:3.9},"World Class Titan Park":{r:155,g:4.1},"World Class Sema Park":{r:95,g:4.2},"World Class Veranda":{r:220,g:3.8},"World Class Oregon Park":{r:105,g:4.1},"World Class Eroii Revolutiei":{r:70,g:4.3},"World Class Promenada":{r:280,g:4.0},"World Class Pipera Plaza":{r:115,g:4.1},
+"Stay Fit Romana":{r:180,g:4.2},"Stay Fit Titulescu":{r:250,g:4.0},"Stay Fit Domenii":{r:120,g:4.1},"Stay Fit Colosseum":{r:210,g:3.9},"Stay Fit Jiului":{r:85,g:4.0},"Stay Fit Dorobanti":{r:95,g:4.3},"Stay Fit Crangasi":{r:140,g:4.0},"Stay Fit Teiul Doamnei":{r:110,g:4.1},"Stay Fit Pantelimon":{r:170,g:3.8},"Stay Fit Esplanada":{r:130,g:3.9},"Stay Fit Pipera":{r:90,g:4.2},"Stay Fit Pallady":{r:100,g:3.9},"Stay Fit Vitan":{r:160,g:4.0},"Stay Fit Cocor":{r:200,g:3.8},"Stay Fit Fizicienilor":{r:115,g:4.0},"Stay Fit Petre Ispirescu":{r:80,g:3.9},"Stay Fit Rahova":{r:95,g:3.8},"Stay Fit Liberty":{r:145,g:4.1},"Stay Fit Grand Arena":{r:125,g:3.9},"Stay Fit Prosper":{r:90,g:4.0},"Stay Fit Ghencea":{r:40,g:4.5},
+"18GYM Green Gate":{r:60,g:4.2},"18GYM Mihai Bravu":{r:55,g:4.0},"18GYM Pantelimon":{r:45,g:4.1},"18GYM Chiajna":{r:35,g:4.0},"18GYM Monaco Towers":{r:50,g:4.3},"18GYM Pipera":{r:40,g:4.1},
+"Downtown Fitness Vitan":{r:320,g:4.5},"Downtown Fitness Mihai Bravu":{r:180,g:4.4},"Downtown Fitness Mihalache":{r:250,g:4.3},"Downtown Fitness Matei Basarab":{r:85,g:4.6},"Downtown Fitness Obor":{r:210,g:4.4},
+"Nr1 Fitness Militari":{r:120,g:4.2},"Nr1 Fitness Pipera":{r:65,g:4.1},"Nr1 Fitness Ghencea":{r:80,g:4.0},"Nr1 Fitness Pantelimon":{r:55,g:4.1},"Nr1 Fitness Titan":{r:95,g:4.2},
+"CrossFit Columna (Uzina)":{r:85,g:4.7},"CrossFit Nord BVS":{r:45,g:4.6},"CrossFit ROA":{r:30,g:4.5},"Replay CrossFit":{r:35,g:4.6},"Groove Box":{r:25,g:4.4},
+"Absolute Gym Ghencea":{r:110,g:4.3},"Absolute Gym Titan":{r:75,g:4.1},"Absolute Gym Militari":{r:60,g:4.0},
+"SalsaFit AFI Cotroceni":{r:90,g:4.2},"WoWGym Fundeni":{r:70,g:4.0},"Sweat Concept Promenada":{r:45,g:4.5},"Best Fitness Gym":{r:55,g:4.1}
+};
+
+// Get review data for a club
+function getReviewData(name) {
+  return REVIEWS_DB[name] || null;
+}
+
 // Target sites from BP
 const TARGETS = [
   {name:'Hala Laminor',lat:44.4258,lng:26.1492,phase:1,sector:3,area:'1,300-2,300 m2',rent:'12->14 EUR/m2',status:'Shell securise',opening:'Q2-2027',note:'Remplacement World Class | 86,300m2 GLA mixed-use | Metro Republica | 1.5M hab. dans 30min | 1,325 parkings',capex:1176000},
@@ -1562,8 +1583,13 @@ function dedup(list){const r=[];list.forEach(c=>{if(!r.some(x=>Math.abs(x.lat-c.
 function getDemoInRadius(lat,lng,r){
   return VERIFIED_CLUBS.filter(c=>haversine(lat,lng,c.lat,c.lng)<=r).map(c=>{
     const m=matchDB(c.name);
+    const rv=getReviewData(c.name);
+    const mA=c.members||0;
+    const mB=rv?Math.round(rv.r*REVIEWS_MULT):0;
+    const membersAvg=mB>0?Math.round((mA+mB)/2):mA;
     return{...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),
-      threat:segThreat(c.segment),brand:m?.brand||'local',price:m?.price||'?'};
+      threat:segThreat(c.segment),brand:m?.brand||'local',price:m?.price||'?',
+      membersA:mA,membersB:mB,members:membersAvg};
   });
 }
 function segColor(s){return{premium:'#ef4444','mid-premium':'#f97316',mid:'#f97316',lowcost:'#eab308',independent:'#22c55e',crossfit:'#22c55e',boutique:'#8b5cf6',aggregator:'#eab308'}[s]||'#22c55e'}
@@ -1980,15 +2006,24 @@ function showCompsOnMap(comps) {
     const mk=L.marker([c.lat,c.lng],{icon});
     const tierColors={W:'#a855f7',Platinum:'#e2e8f0',Gold:'#fbbf24',Silver:'#94a3b8',Bronze:'#cd7f32'};
     const tierLabel=c.tier?`<div class="ps"><span>Tier</span><span class="pv" style="color:${tierColors[c.tier]||'#fff'};font-weight:800">${c.tier}</span></div>`:'';
+    const rv=getReviewData(c.name);
+    const mA=c.members||0; // Method A: surface x ratio
+    const mB=rv?Math.round(rv.r*REVIEWS_MULT):0; // Method B: reviews x 8.5
+    const mAvg=mB>0?Math.round((mA+mB)/2):mA; // Average of both methods
     mk.bindPopup(`<h3>${c.name}</h3>
       <div class="ps"><span>Segment</span><span class="pv" style="color:${c.color}">${c.segment}</span></div>
       ${tierLabel}
-      <div class="ps"><span>Taille</span><span class="pv">${c.size?c.size+' m2':'N/A'} ${c.est?'<span style="color:var(--yellow);font-size:9px">est.</span>':''}</span></div>
-      <div class="ps"><span>Membres est.</span><span class="pv">${c.members?fmt(c.members):'N/A'} ${c.est?'<span style="color:var(--yellow);font-size:9px">est.</span>':''}</span></div>
+      <div class="ps"><span>Surface</span><span class="pv">${c.size?c.size+' m2':'N/A'} ${c.sv?'<span style="color:var(--green);font-size:8px">verifie</span>':'<span style="color:var(--yellow);font-size:8px">est.</span>'}</span></div>
+      <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.2)">
+        <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:3px">ESTIMATION MEMBRES (2 methodes)</div>
+        <div class="ps"><span>A: Surface x ratio</span><span class="pv">${fmt(mA)}</span></div>
+        ${rv?`<div class="ps"><span>B: Reviews x 8.5 (${rv.r} avis, ${rv.g}★)</span><span class="pv">${fmt(mB)}</span></div>
+        <div class="ps"><span><b>Moyenne A+B</b></span><span class="pv" style="font-weight:800;color:var(--cyan)">${fmt(mAvg)}</span></div>`
+        :`<div class="ps"><span>B: Reviews</span><span class="pv" style="color:var(--gray2)">N/A</span></div>`}
+      </div>
       ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km</span></div>`:''}
       ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100</span></div>`:''}
       <div class="ps"><span>Prix</span><span class="pv">${c.price||'?'} EUR/mois</span></div>
-      <div style="margin-top:4px;font-size:9px;color:var(--gray2)">Source: ${c.source==='overpass'?'Overpass API':'Base verifiee mars 2026'}</div>
     `);
     compCluster.addLayer(mk);
   });
