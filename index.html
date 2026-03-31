@@ -2769,7 +2769,7 @@ let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
 
 // Default admin if no users
 if(userList.length === 0) {
-  const defaultAdmin = {email:'paul@isseo.fr',role:'admin',name:'Paul'};
+  const defaultAdmin = {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul'};
   userList.push(defaultAdmin);
   localStorage.setItem('fpUsers', JSON.stringify(userList));
   if(!currentUser) {
