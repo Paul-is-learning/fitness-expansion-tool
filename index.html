@@ -1253,7 +1253,11 @@ function analyzeCustomSite(id) {
   const site = customSites.find(s=>s.id===id);
   if(!site) return;
   map.flyTo([site.lat,site.lng],15);
-  setTimeout(()=>onMapClick({latlng:{lat:site.lat,lng:site.lng}}),500);
+  // Run both map analysis AND detailed site analysis
+  setTimeout(()=>{
+    onMapClick({latlng:{lat:site.lat,lng:site.lng}});
+    runSiteAnalysis(site);
+  },500);
 }
 
 // Find nearest cartier for a point
@@ -1404,7 +1408,10 @@ let poiLayer = L.layerGroup();
 // ================================================================
 // INIT
 // ================================================================
+let mapInitialized = false;
 function init() {
+  if(mapInitialized) return;
+  mapInitialized = true;
   map = L.map('map',{center:BUCHAREST,zoom:12,zoomControl:false,attributionControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
   L.control.attribution({position:'bottomright',prefix:false}).addTo(map).addAttribution('&copy; OSM &copy; CARTO');
@@ -3044,15 +3051,16 @@ async function runSiteAnalysis(site) {
   const sector = findSector(lat,lng);
   const cartier = findCartier(lat,lng);
 
-  // Get competitors in 3km radius
+  // Always use verified database first (83 clubs, works offline)
   let comps = getDemoInRadius(lat,lng,3000);
+  // Try to enrich with Overpass if not in demo mode (non-blocking)
   if(!demo) {
-    const overpassComps = await fetchOverpass(lat,lng,3000);
-    const merged = [...comps];
-    overpassComps.forEach(oc=>{
-      if(!merged.some(vc=>haversine(vc.lat,vc.lng,oc.lat,oc.lng)<150)) merged.push(oc);
-    });
-    comps = merged;
+    try {
+      const overpassComps = await fetchOverpass(lat,lng,3000);
+      overpassComps.forEach(oc=>{
+        if(!comps.some(vc=>haversine(vc.lat,vc.lng,oc.lat,oc.lng)<150)) comps.push(oc);
+      });
+    } catch(e) { console.log('Overpass skipped, using verified DB only'); }
   }
 
   const popGranular = estimatePopInRadiusGranular(lat,lng,radius);
@@ -3135,6 +3143,12 @@ async function runSiteAnalysis(site) {
 
   // Trigger captage analysis
   showCaptageForPoint(lat, lng);
+
+  // Scroll to results
+  setTimeout(()=>{
+    const card = el('siteAnalysisCard');
+    if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+  },200);
 }
 
 let lastCaptagePoint = null;
