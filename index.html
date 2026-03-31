@@ -1201,14 +1201,14 @@ const CARTIERE = [
   {name:'Gorjului-Razoare',lat:44.4300,lng:26.0100,sector:6,pop:16000,price:1350,young:.43,desc:'Metro M1 Gorjului'},
 ];
 
-// Custom sites management
-let customSites = JSON.parse(sessionStorage.getItem('customSites')||'[]');
+// Custom sites management — use localStorage (persists across sessions)
+let customSites = JSON.parse(localStorage.getItem('fpCustomSites')||'[]');
 
 function addCustomSite(lat,lng,name,notes) {
   const id = Date.now();
   const site = {id,lat,lng,name:name||'Site '+customSites.length,notes:notes||'',status:'prospect',rating:null,analysisData:null};
   customSites.push(site);
-  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+  localStorage.setItem('fpCustomSites',JSON.stringify(customSites));
   renderCustomSites();
   addCustomSiteMarker(site);
   return site;
@@ -1216,14 +1216,14 @@ function addCustomSite(lat,lng,name,notes) {
 
 function removeCustomSite(id) {
   customSites = customSites.filter(s=>s.id!==id);
-  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+  localStorage.setItem('fpCustomSites',JSON.stringify(customSites));
   renderCustomSites();
   refreshCustomMarkers();
 }
 
 function qualifyCustomSite(id,status,rating) {
   const site = customSites.find(s=>s.id===id);
-  if(site){site.status=status;site.rating=rating;sessionStorage.setItem('customSites',JSON.stringify(customSites));renderCustomSites()}
+  if(site){site.status=status;site.rating=rating;localStorage.setItem('fpCustomSites',JSON.stringify(customSites));renderCustomSites()}
 }
 
 let customMarkersLayer = L.layerGroup();
@@ -1251,13 +1251,26 @@ function refreshCustomMarkers() {
 
 function analyzeCustomSite(id) {
   const site = customSites.find(s=>s.id===id);
-  if(!site) return;
-  map.flyTo([site.lat,site.lng],15);
-  // Run both map analysis AND detailed site analysis
-  setTimeout(()=>{
-    onMapClick({latlng:{lat:site.lat,lng:site.lng}});
-    runSiteAnalysis(site);
-  },500);
+  if(!site) {console.error('Site not found:',id,customSites);alert('Site introuvable. Rechargez la page.');return}
+
+  // Show loading state
+  const card = el('siteAnalysisCard');
+  if(card) {card.style.display='block'; el('siteAnalysisContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--gray2)"><div class="spinner" style="margin:0 auto 10px"></div>Analyse en cours...</div>';}
+
+  // Fly to site on map
+  map.flyTo([site.lat,site.lng],14);
+
+  // Run map click + detailed analysis with delay for map to settle
+  setTimeout(async ()=>{
+    try {
+      // Trigger map analysis (SAZ overlay, competitors, etc)
+      await onMapClick({latlng:{lat:site.lat,lng:site.lng}});
+    } catch(e) {console.log('Map click error:',e)}
+    // Run detailed site analysis (always, even if map click fails)
+    try {
+      await runSiteAnalysis(site);
+    } catch(e) {console.error('Site analysis error:',e); el('siteAnalysisContent').innerHTML='<div style="color:var(--red);padding:10px">Erreur analyse: '+e.message+'</div>';}
+  },800);
 }
 
 // Find nearest cartier for a point
@@ -3070,7 +3083,7 @@ async function runSiteAnalysis(site) {
 
   // Save analysis to site
   site.analysisData = {saz,comps:comps.length,popGranular,poi,scenarios,cartier:cartier?.name,sector:sector?.name};
-  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+  localStorage.setItem('fpCustomSites',JSON.stringify(customSites));
 
   // Display analysis
   const card = el('siteAnalysisCard');
@@ -3132,12 +3145,20 @@ async function runSiteAnalysis(site) {
     </div>
 
     <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">SCENARIOS DE REVENUE — Panier 24,68EUR HT/mois</div>
-      <div class="metric-row"><span class="metric-label">Penetration estimee</span><span class="metric-value">${scenarios.penetration}%</span></div>
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">PROJECTION MEMBRES & CA — Panier 24,68EUR HT/mois</div>
+      <div class="metric-row"><span class="metric-label">Penetration estimee zone</span><span class="metric-value">${scenarios.penetration}% ${scenarios.fluxBonus?'(flux x'+(scenarios.fluxBonus/100).toFixed(1)+')':''}</span></div>
+      <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">RAMP-UP PAR ANNEE (selon BP V17)</div>
+      <div class="metric-row"><span class="metric-label">A1 — Ramp 70%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.7))} mbr | ${Math.round(scenarios.realistic.members*0.7*24.68*12/1000)}k EUR</span></div>
+      <div class="metric-row"><span class="metric-label">A2 — Ramp 90%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.9))} mbr | ${Math.round(scenarios.realistic.members*0.9*24.68*12/1000)}k EUR</span></div>
+      <div class="metric-row" style="font-weight:700"><span class="metric-label">A3 — Maturite 100%</span><span class="metric-value" style="color:var(--cyan)">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR</span></div>
+      <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">SCENARIOS A MATURITE (A3+)</div>
       <div class="metric-row" style="color:var(--red)"><span class="metric-label">Pessimiste</span><span class="metric-value">${fmt(scenarios.pessimistic.members)} mbr | ${scenarios.pessimistic.ca}k EUR/an</span></div>
-      <div class="metric-row" style="color:var(--yellow)"><span class="metric-label">Realiste</span><span class="metric-value" style="font-weight:800">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR/an</span></div>
+      <div class="metric-row" style="color:var(--yellow)"><span class="metric-label"><b>Realiste</b></span><span class="metric-value" style="font-weight:800">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR/an</span></div>
       <div class="metric-row" style="color:var(--green)"><span class="metric-label">Optimiste</span><span class="metric-value">${fmt(scenarios.optimistic.members)} mbr | ${scenarios.optimistic.ca}k EUR/an</span></div>
-      <div class="metric-row"><span class="metric-label">Breakeven (2,800 mbr A1)</span><span class="metric-value" style="color:${scenarios.breakeven==='OUI'?'var(--green)':scenarios.breakeven==='POSSIBLE'?'var(--yellow)':'var(--red)'}"><b>${scenarios.breakeven}</b></span></div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+        <div class="metric-row"><span class="metric-label">Breakeven A1 (2,800 mbr x 70% = 1,960)</span><span class="metric-value" style="color:${Math.round(scenarios.realistic.members*0.7)>=1960?'var(--green)':'var(--red)'}"><b>${Math.round(scenarios.realistic.members*0.7)>=1960?'OUI':'NON'}</b></span></div>
+        <div class="metric-row"><span class="metric-label">Objectif BP maturite (4,000 mbr)</span><span class="metric-value" style="color:${scenarios.realistic.members>=4000?'var(--green)':scenarios.realistic.members>=3000?'var(--yellow)':'var(--red)'}"><b>${scenarios.realistic.members>=4000?'OUI':scenarios.realistic.members>=3000?'POSSIBLE':'NON'}</b></span></div>
+      </div>
     </div>
   `;
 
