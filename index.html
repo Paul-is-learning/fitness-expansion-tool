@@ -1287,24 +1287,58 @@ function estimatePopInRadiusGranular(lat,lng,r) {
 }
 
 // Revenue scenario modeling per zone
-function revenueScenarios(popTarget,nbCompetitors,avgPrice) {
-  // Market penetration assumptions calibrated on Romania (5% national, 8-12% urban)
-  const basePenetration = avgPrice > 2000 ? 0.10 : avgPrice > 1500 ? 0.08 : avgPrice > 1000 ? 0.06 : 0.04;
-  const competitorImpact = nbCompetitors > 0 ? Math.max(0.3, 1 - nbCompetitors * 0.06) : 1;
+function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
+  // REVISED penetration model — FP is a NEW premium low-cost concept in Romania
+  // FP advantage: international franchise, best price/quality ratio, brand new equipment
+  // Romania fitness penetration: 5% national → 10-15% urban Bucharest potential
+  // FP at 22-28 EUR/month = BELOW all mid-range competitors = massive market creation
 
-  const pessimistic = Math.round(popTarget * basePenetration * competitorImpact * 0.6);
-  const realistic = Math.round(popTarget * basePenetration * competitorImpact);
-  const optimistic = Math.round(popTarget * basePenetration * competitorImpact * 1.4);
+  // Base penetration by income zone (price proxy)
+  let basePenetration;
+  if(avgPrice > 2000) basePenetration = 0.15;      // premium area: high willingness to pay
+  else if(avgPrice > 1500) basePenetration = 0.12;  // medium-high
+  else if(avgPrice > 1000) basePenetration = 0.10;  // medium
+  else basePenetration = 0.07;                       // lower income
 
-  // Cap at FP target: 4000 members
-  const capMembers = n => Math.min(n, 5000);
-  const monthlyARPU = 24.68; // EUR HT from BP
+  // FLUX BONUS: foot traffic generators multiply penetration
+  // A club in a 86,000m2 mall with metro access is NOT the same as a standalone
+  let fluxBonus = 1.0;
+  if(lat && lng) {
+    const poi = poisInRadius(lat, lng, 1500);
+    // Mall proximity = massive walk-in traffic
+    if(poi.malls.length > 0) fluxBonus += 0.3;
+    // Office workers = lunchtime/afterwork members
+    if(poi.totalEmployees > 10000) fluxBonus += 0.25;
+    else if(poi.totalEmployees > 3000) fluxBonus += 0.15;
+    // University students = high conversion 18-25
+    if(poi.totalStudents > 10000) fluxBonus += 0.2;
+    else if(poi.totalStudents > 3000) fluxBonus += 0.1;
+    // Metro station within 500m = accessibility boost
+    const nearMetro = METRO.some(m => haversine(lat,lng,m.lat,m.lng) < 500);
+    if(nearMetro) fluxBonus += 0.15;
+  }
+
+  // FP brand premium: international franchise entering underserved market = demand creation
+  const brandPremium = 1.25; // FP creates 25% more demand than local brand would
+
+  // Competition adjustment: less aggressive than before (FP ADDS to market, not just steals)
+  const competitorImpact = nbCompetitors > 0 ? Math.max(0.5, 1 - nbCompetitors * 0.03) : 1;
+
+  const effectivePenetration = basePenetration * fluxBonus * brandPremium * competitorImpact;
+
+  const realistic = Math.round(popTarget * effectivePenetration);
+  const pessimistic = Math.round(realistic * 0.65);
+  const optimistic = Math.round(realistic * 1.4);
+
+  const capMembers = n => Math.min(n, 6000);
+  const monthlyARPU = 24.68;
 
   return {
     pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
     realistic: {members:capMembers(realistic), ca:Math.round(capMembers(realistic)*monthlyARPU*12/1000)},
     optimistic: {members:capMembers(optimistic), ca:Math.round(capMembers(optimistic)*monthlyARPU*12/1000)},
-    penetration: (basePenetration*competitorImpact*100).toFixed(1),
+    penetration: (effectivePenetration*100).toFixed(1),
+    fluxBonus: Math.round(fluxBonus*100),
     breakeven: capMembers(realistic) >= 2800 ? 'OUI' : capMembers(realistic) >= 2000 ? 'POSSIBLE' : 'NON'
   };
 }
@@ -3024,7 +3058,7 @@ async function runSiteAnalysis(site) {
   const popGranular = estimatePopInRadiusGranular(lat,lng,radius);
   const poi = poisInRadius(lat,lng,3000);
   const saz = calcSAZ(lat,lng,sector,comps);
-  const scenarios = revenueScenarios(popGranular.target, comps.length, popGranular.avgPrice);
+  const scenarios = revenueScenarios(popGranular.target, comps.length, popGranular.avgPrice, lat, lng);
 
   // Save analysis to site
   site.analysisData = {saz,comps:comps.length,popGranular,poi,scenarios,cartier:cartier?.name,sector:sector?.name};
