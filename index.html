@@ -1,0 +1,2897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FP Romania — Expansion Intelligence Platform</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+/* ================================================================
+   DESIGN SYSTEM — Dark Premium / Romania accent
+   ================================================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#06080f;--bg2:#0c1021;--card:#111827;--card2:#1a2234;--card3:#1e293b;
+  --accent:#d4a017;--accent2:#e6b422;--accent-glow:rgba(212,160,23,.25);
+  --white:#f1f5f9;--gray:#8899b0;--gray2:#64748b;--border:rgba(71,85,115,.35);
+  --green:#10b981;--green2:#059669;--yellow:#f59e0b;--orange:#f97316;--blue:#3b82f6;--purple:#8b5cf6;
+  --red:#ef4444;--cyan:#06b6d4;
+  --radius:10px;--shadow:0 4px 24px rgba(0,0,0,.45);
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',monospace;
+}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hidden;height:100vh;-webkit-font-smoothing:antialiased}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:420px 1fr;height:100vh;transition:grid-template-columns .35s ease}
+.app.panel-open{grid-template-columns:420px 1fr 440px}
+
+/* SIDEBAR */
+.sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:1001;position:relative}
+.sidebar::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(to bottom,var(--accent),transparent 30%,transparent 70%,var(--accent))}
+
+.sidebar-header{padding:16px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:linear-gradient(135deg,var(--card) 0%,rgba(212,160,23,.04) 100%)}
+.logo-area{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.logo-fp{flex-shrink:0}
+.logo-fp svg{height:28px;width:auto}
+.logo-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.logo-isseo{flex-shrink:0;opacity:.55;transition:opacity .2s}
+.logo-isseo:hover{opacity:.8}
+.logo-isseo svg{height:18px;width:auto}
+.logo-sub{font-size:9.5px;color:var(--gray2);margin-top:4px;display:flex;align-items:center;gap:8px}
+.logo-sub span{font-weight:600;color:var(--gray);letter-spacing:.3px}
+.version-badge{font-size:9px;background:rgba(212,160,23,.15);color:var(--accent);padding:2px 6px;border-radius:4px;font-weight:600;margin-left:auto;align-self:flex-start}
+
+/* Search */
+.search-wrap{position:relative}
+.search-wrap input{width:100%;padding:10px 14px 10px 38px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:12.5px;outline:none;transition:all .2s;font-family:var(--font)}
+.search-wrap input::placeholder{color:var(--gray2)}
+.search-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;opacity:.4}
+.search-icon svg{width:16px;height:16px;fill:none;stroke:var(--gray);stroke-width:2}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card2);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;z-index:9999;display:none;box-shadow:var(--shadow)}
+.search-results.active{display:block}
+.search-result-item{padding:10px 14px;cursor:pointer;font-size:11.5px;border-bottom:1px solid var(--border);transition:.15s}
+.search-result-item:hover{background:var(--accent-glow);color:white}
+.search-result-item:last-child{border-bottom:none}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
+.tab{flex:1;padding:11px 6px;text-align:center;font-size:10.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray2);transition:all .2s;text-transform:uppercase;letter-spacing:.5px;position:relative}
+.tab:hover{color:var(--white);background:rgba(255,255,255,.02)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab.active::after{content:'';position:absolute;bottom:-1px;left:20%;right:20%;height:2px;background:var(--accent);filter:blur(4px)}
+.tab-badge{position:absolute;top:4px;right:calc(50% - 24px);width:6px;height:6px;border-radius:50%;background:var(--accent);display:none}
+.tab-badge.visible{display:block}
+
+.sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden}
+.sidebar-body::-webkit-scrollbar{width:5px}
+.sidebar-body::-webkit-scrollbar-track{background:transparent}
+.sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.sidebar-body::-webkit-scrollbar-thumb:hover{background:var(--gray2)}
+
+.tab-panel{display:none;padding:16px 18px}
+.tab-panel.active{display:block}
+
+/* Cards */
+.card{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:border-color .2s}
+.card:hover{border-color:rgba(71,85,115,.55)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray);letter-spacing:.6px;display:flex;align-items:center;gap:7px}
+.card-title .icon{font-size:13px;opacity:.7}
+
+/* Badges */
+.badge{font-size:9.5px;padding:2px 7px;border-radius:4px;font-weight:600;letter-spacing:.2px}
+.badge-red{background:rgba(212,160,23,.15);color:var(--red)}
+.badge-green{background:rgba(16,185,129,.15);color:var(--green)}
+.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-purple{background:rgba(139,92,246,.15);color:var(--purple)}
+.badge-cyan{background:rgba(6,182,212,.15);color:var(--cyan)}
+.badge-est{background:rgba(245,158,11,.12);color:var(--yellow);font-size:8.5px;padding:1px 5px;border-radius:3px;font-weight:500}
+
+/* Buttons */
+.btn{padding:7px 14px;border-radius:7px;border:1px solid var(--border);background:var(--card3);color:var(--white);font-size:11px;cursor:pointer;transition:all .2s;font-weight:500;font-family:var(--font)}
+.btn:hover{border-color:rgba(212,160,23,.4);background:rgba(212,160,23,.08)}
+.btn.active{background:var(--accent);border-color:var(--accent);box-shadow:0 2px 8px rgba(212,160,23,.3)}
+.btn-primary{background:linear-gradient(135deg,#d4a017,#b8860b);border-color:transparent;box-shadow:0 2px 10px rgba(212,160,23,.3)}
+.btn-primary:hover{background:linear-gradient(135deg,#e6b422,#d4a017);box-shadow:0 4px 16px rgba(212,160,23,.4)}
+.btn-sm{padding:5px 10px;font-size:10px}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--gray)}
+.btn-ghost:hover{color:var(--white);background:rgba(255,255,255,.05)}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Toggle */
+.layer-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(71,85,115,.2)}
+.layer-row:last-child{border-bottom:none}
+.toggle{width:38px;height:21px;background:var(--card3);border:1px solid var(--border);border-radius:11px;cursor:pointer;position:relative;transition:all .25s;flex-shrink:0}
+.toggle.on{background:var(--accent);border-color:var(--accent)}
+.toggle::after{content:'';width:15px;height:15px;background:white;border-radius:50%;position:absolute;top:2px;left:2px;transition:all .25s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on::after{left:19px}
+.layer-label{font-size:12px;cursor:pointer;flex:1;user-select:none}
+.layer-hint{font-size:9.5px;color:var(--gray2);display:block;margin-top:1px}
+
+/* Radius pills */
+.radius-pills{display:flex;gap:5px}
+.radius-pill{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;transition:all .2s;font-family:var(--font);font-weight:500}
+.radius-pill.active{background:var(--accent);border-color:var(--accent);color:white;box-shadow:0 2px 8px rgba(212,160,23,.25)}
+
+/* Score display */
+.saz-hero{text-align:center;padding:16px 0}
+.saz-number{font-size:52px;font-weight:900;line-height:1;letter-spacing:-2px;background:linear-gradient(135deg,var(--white),var(--gray));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.saz-number.good{background:linear-gradient(135deg,#22c55e,#10b981);-webkit-background-clip:text}
+.saz-number.medium{background:linear-gradient(135deg,#f59e0b,#d97706);-webkit-background-clip:text}
+.saz-number.bad{background:linear-gradient(135deg,#e6b422,#d4a017);-webkit-background-clip:text}
+.saz-sublabel{font-size:11px;color:var(--gray2);margin-top:2px}
+.reco-chip{display:inline-block;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;margin-top:8px;letter-spacing:.5px}
+.reco-go{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.reco-caution{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.reco-nogo{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+
+/* Metric rows */
+.metric-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(71,85,115,.15);font-size:12px}
+.metric-row:last-child{border-bottom:none}
+.metric-label{flex:1;color:var(--gray)}
+.metric-value{font-weight:700;font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+.metric-bar{flex:0 0 80px;height:5px;background:var(--bg);border-radius:3px;overflow:hidden}
+.metric-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.22,.61,.36,1)}
+.metric-weight{font-size:9px;color:var(--gray2);min-width:28px;text-align:right}
+
+/* Competitor item */
+.comp-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;margin-bottom:6px;background:var(--bg2);border:1px solid transparent;cursor:pointer;transition:all .2s}
+.comp-card:hover{border-color:var(--border);background:var(--card3);transform:translateX(2px)}
+.comp-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px currentColor}
+.comp-body{flex:1;min-width:0}
+.comp-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.comp-meta{font-size:10px;color:var(--gray2);margin-top:1px}
+.comp-threat{font-size:20px;font-weight:900;flex-shrink:0;width:36px;text-align:center;font-variant-numeric:tabular-nums}
+
+/* Sector list */
+.sector-row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:8px;cursor:pointer;transition:all .2s;margin-bottom:4px}
+.sector-row:hover{background:var(--card3)}
+.sector-num{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.sector-body h4{font-size:12.5px;font-weight:600;line-height:1.3}
+.sector-body p{font-size:10.5px;color:var(--gray2);line-height:1.3}
+.sector-saz{font-size:18px;font-weight:800;margin-left:auto;flex-shrink:0;width:32px;text-align:center}
+
+/* Target site card */
+.target-card{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all .2s;margin-bottom:6px;background:var(--bg2);border-left:3px solid var(--accent)}
+.target-card:hover{background:var(--card3)}
+.target-card.phase2{border-left-color:var(--blue)}
+.target-phase{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0}
+.target-body h4{font-size:12px;font-weight:600}
+.target-body p{font-size:10px;color:var(--gray2);line-height:1.4}
+.target-status{font-size:9.5px;font-weight:600;margin-top:2px}
+
+/* Dashboard table */
+.dash-table{width:100%;border-collapse:collapse;font-size:11px}
+.dash-table th{background:var(--bg2);padding:9px 8px;text-align:left;font-weight:600;color:var(--gray2);text-transform:uppercase;font-size:9.5px;letter-spacing:.4px;position:sticky;top:0;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--border);transition:.2s}
+.dash-table th:hover{color:var(--white)}
+.dash-table td{padding:8px;border-bottom:1px solid rgba(71,85,115,.15);font-variant-numeric:tabular-nums}
+.dash-table tr{transition:background .15s}
+.dash-table tr:hover td{background:rgba(212,160,23,.04)}
+.reco-go-text{color:var(--green);font-weight:700}.reco-caution-text{color:var(--yellow);font-weight:700}.reco-nogo-text{color:var(--red);font-weight:700}
+
+/* Chart container */
+.chart-wrap{position:relative;margin:8px 0}
+.chart-wrap canvas{max-width:100%}
+
+/* Didactic tooltip */
+.info-tip{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.06);color:var(--gray2);font-size:9px;font-weight:700;cursor:help;margin-left:4px;border:1px solid var(--border);position:relative;flex-shrink:0}
+.info-tip:hover .tip-content{display:block}
+.tip-content{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--gray);font-weight:400;width:240px;box-shadow:var(--shadow);z-index:9999;line-height:1.5;text-transform:none;letter-spacing:0}
+.tip-content::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--border)}
+.tip-content strong{color:var(--white);font-weight:600}
+.tip-content .tip-source{font-size:9px;color:var(--gray2);margin-top:4px;border-top:1px solid var(--border);padding-top:4px}
+
+/* Methodology panel */
+.method-panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px}
+.method-title{font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.method-text{font-size:11px;color:var(--gray);line-height:1.6}
+.method-formula{font-family:var(--mono);font-size:10.5px;background:var(--card);padding:8px 10px;border-radius:6px;margin:6px 0;color:var(--cyan);border:1px solid rgba(6,182,212,.15)}
+.method-weight{display:inline-block;background:rgba(6,182,212,.1);color:var(--cyan);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;font-family:var(--mono)}
+
+/* MAP */
+.map-area{position:relative}
+#map{width:100%;height:100vh}
+
+/* Map overlays */
+.map-overlay-tr{position:absolute;top:14px;right:14px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+.map-overlay-bl{position:absolute;bottom:14px;left:14px;z-index:999;pointer-events:auto}
+.map-box{background:rgba(6,8,15,.92);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:var(--radius);padding:14px;min-width:220px;box-shadow:var(--shadow)}
+.map-box-title{font-size:10px;font-weight:700;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.map-stat{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:3px 0}
+.map-stat-v{font-weight:700;font-variant-numeric:tabular-nums}
+
+/* Loading */
+.loading{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(6,8,15,.88);backdrop-filter:blur(4px);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+.loading.on{display:flex}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-label{margin-top:14px;font-size:12px;color:var(--gray)}
+.loading-sub{font-size:10px;color:var(--gray2);margin-top:4px}
+
+/* Status bar */
+.status-bar{padding:8px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--gray2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:var(--bg2)}
+.status-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px}
+.status-dot.ok{background:var(--green);box-shadow:0 0 6px rgba(16,185,129,.5)}
+.status-dot.warn{background:var(--yellow);animation:pulse 1.5s infinite}
+.status-dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Demo banner */
+.demo-bar{background:linear-gradient(90deg,rgba(245,158,11,.12),rgba(245,158,11,.05));border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:8px 14px;font-size:11px;color:var(--yellow);margin-bottom:12px;display:none;align-items:center;gap:6px}
+.demo-bar.on{display:flex}
+
+/* Right panel */
+.right-panel{background:var(--card);border-left:1px solid var(--border);overflow-y:auto;padding:20px;display:none}
+.right-panel::-webkit-scrollbar{width:5px}
+.right-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Site card sections */
+.sc-section{margin-bottom:18px}
+.sc-section h3{font-size:12px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.notes-area{width:100%;min-height:80px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--white);font-size:12px;resize:vertical;font-family:var(--font);transition:border-color .2s}
+.notes-area:focus{outline:none;border-color:var(--accent)}
+
+/* Export button */
+.export-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;background:var(--card3);border:1px solid var(--border);border-radius:7px;color:var(--white);font-size:10.5px;cursor:pointer;transition:all .2s;font-family:var(--font);font-weight:500}
+.export-btn:hover{border-color:var(--accent);background:rgba(212,160,23,.08)}
+
+/* Leaflet overrides */
+.leaflet-popup-content-wrapper{background:var(--card)!important;color:var(--white)!important;border-radius:var(--radius)!important;border:1px solid var(--border)!important;box-shadow:var(--shadow)!important}
+.leaflet-popup-tip{background:var(--card)!important}
+.leaflet-popup-content{margin:12px 16px!important;font-size:12px!important;line-height:1.5!important;font-family:var(--font)!important}
+.leaflet-popup-content h3{font-size:14px;margin-bottom:8px;color:var(--accent);font-weight:700}
+.leaflet-popup-content .ps{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(71,85,115,.15)}
+.leaflet-popup-content .ps:last-child{border-bottom:none}
+.leaflet-popup-content .pv{font-weight:700}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(212,160,23,.25)!important}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:var(--accent)!important;color:white!important;font-weight:700!important;font-family:var(--font)!important}
+
+/* Responsive */
+@media(max-width:1200px){.app{grid-template-columns:360px 1fr}.app.panel-open{grid-template-columns:360px 1fr 380px}}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeUp .3s ease-out}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<!-- ================================================================
+     SIDEBAR
+     ================================================================ -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo-area">
+      <!-- Fitness Park logo (primary) -->
+      <div class="logo-fp">
+        <svg viewBox="0 0 320 50" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="32" font-family="Arial Black,Impact,sans-serif" font-weight="900" font-size="36" fill="#e1e5eb" font-style="italic" letter-spacing="-1">FITNESS PARK</text>
+          <rect x="0" y="38" width="196" height="3.5" rx="1" fill="#f0c132"/>
+          <text x="20" y="49" font-family="Arial,sans-serif" font-weight="600" font-size="7.5" fill="#8899b0" letter-spacing="3.5">SE DEPASSER - SE SURPASSER</text>
+        </svg>
+      </div>
+      <div class="logo-sep"></div>
+      <!-- Isseo logo (secondary / parent company) -->
+      <div class="logo-isseo">
+        <svg viewBox="0 0 110 32" xmlns="http://www.w3.org/2000/svg">
+          <text x="2" y="22" font-family="Georgia,'Times New Roman',serif" font-weight="400" font-size="28" fill="#c8cdd5" letter-spacing="0">Isseo</text>
+          <text x="6" y="30" font-family="Arial,sans-serif" font-weight="400" font-size="5" fill="#64748b" letter-spacing="3">DEVELOPPER &amp; VALORISER</text>
+        </svg>
+      </div>
+      <div class="version-badge">v2.0</div>
+      <div onclick="showUserPanel()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;cursor:pointer;margin-left:8px;flex-shrink:0" id="userAvatar" title="Gestion utilisateurs">P</div>
+    </div>
+    <div class="logo-sub">Expansion Intelligence Platform <span>Romania</span></div>
+    <div class="search-wrap">
+      <div class="search-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div>
+      <input type="text" id="searchInput" placeholder="Rechercher une adresse a Bucarest...">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="explore">Explorer</div>
+    <div class="tab" data-tab="compete">Concurrence</div>
+    <div class="tab" data-tab="mysites">Mes Sites</div>
+    <div class="tab" data-tab="dash">Dashboard</div>
+    <div class="tab" data-tab="site">Fiche Site</div>
+  </div>
+
+  <div class="sidebar-body">
+    <!-- ============ EXPLORE TAB ============ -->
+    <div class="tab-panel active" id="tab-explore">
+      <div class="demo-bar" id="demoBanner">
+        <span style="font-size:14px">&#9888;&#65039;</span>
+        <span>Mode Demo — Donnees fictives pour presentation offline</span>
+      </div>
+
+      <!-- Layers -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127760;</span> Couches cartographiques</div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle on" id="tglSectors" onclick="toggleLayer('sectors')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('sectors')">Secteurs & SAZ</div><span class="layer-hint">Score d'attractivite par secteur</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglCompetitors" onclick="toggleLayer('competitors')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('competitors')">Concurrents</div><span class="layer-hint">Detection temps reel via Overpass API</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglHeatmap" onclick="toggleLayer('heatmap')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('heatmap')">Heatmap concurrence</div><span class="layer-hint">Zones saturees vs opportunites</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglTransport" onclick="toggleLayer('transport')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('transport')">Metro & transports</div><span class="layer-hint">Stations metro M1-M5 Bucharest</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglPois" onclick="toggleLayer('pois')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('pois')">Universites, malls, bureaux</div><span class="layer-hint">14 universites, 13 malls, 5 poles bureaux</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglCartiere" onclick="toggleLayer('cartiere')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('cartiere')">Quartiers (cartiere)</div><span class="layer-hint">50 quartiers colores par score jeunesse</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglHeatDensity" onclick="toggleLayer('heatDensity')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('heatDensity')">Heatmap densite pop.</div><span class="layer-hint">Densite population par quartier</span></div>
+        </div>
+        <div class="layer-row">
+          <div class="toggle" id="tglHeatYouth" onclick="toggleLayer('heatYouth')"></div>
+          <div><div class="layer-label" onclick="toggleLayer('heatYouth')">Heatmap jeunesse</div><span class="layer-hint">Universites + quartiers jeunes</span></div>
+        </div>
+      </div>
+
+      <!-- Catchment -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#9898;</span> Zone de chalandise</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Zone de chalandise</strong><br>Definit le rayon d'analyse autour du point selectionne. Le rayon standard en fitness urbain est de <strong>2 km</strong> (zone de commodite). Un club premium attire jusqu'a 5 km.<div class="tip-source">Source : Benchmark FP France</div></div></span>
+        </div>
+        <div class="radius-pills">
+          <div class="radius-pill" data-r="1000" onclick="setRadius(1000)">1 km</div>
+          <div class="radius-pill active" data-r="2000" onclick="setRadius(2000)">2 km</div>
+          <div class="radius-pill" data-r="3000" onclick="setRadius(3000)">3 km</div>
+          <div class="radius-pill" data-r="5000" onclick="setRadius(5000)">5 km</div>
+        </div>
+        <p style="font-size:11px;color:var(--gray2);margin-top:10px">&#128073; Cliquez sur la carte pour analyser un point</p>
+      </div>
+
+      <!-- SAZ Weight Sliders -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#9881;</span> Poids SAZ (ajustables)</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Personnalisation du scoring</strong><br>Ajustez les poids des 3 piliers selon votre strategie. Le total doit faire 100%. Cliquez "Reset" pour revenir a 33/33/34.<div class="tip-source">Modifiez les curseurs et re-cliquez sur la carte pour recalculer</div></div></span>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--cyan)">Flux</span><span id="wFluxVal" style="font-weight:700">33%</span></div>
+          <input type="range" id="wFlux" min="0" max="80" value="33" style="width:100%;accent-color:#06b6d4" oninput="updateWeights()">
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--purple)">Densite</span><span id="wDensVal" style="font-weight:700">33%</span></div>
+          <input type="range" id="wDens" min="0" max="80" value="33" style="width:100%;accent-color:#8b5cf6" oninput="updateWeights()">
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--green)">Jeunesse</span><span id="wJeuVal" style="font-weight:700">34%</span></div>
+          <input type="range" id="wJeu" min="0" max="80" value="34" style="width:100%;accent-color:#10b981" oninput="updateWeights()">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="resetWeights()">Reset 33/33/34</button>
+          <button class="btn btn-sm" onclick="setPresetWeights(50,25,25)">Flux-first</button>
+          <button class="btn btn-sm" onclick="setPresetWeights(25,50,25)">Densite-first</button>
+        </div>
+      </div>
+
+      <!-- Sectors -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127463;</span> Secteurs Bucarest</div>
+          <span class="info-tip">?<div class="tip-content"><strong>6 secteurs administratifs</strong><br>Bucarest est divise en 6 <em>sectoare</em>, chacun avec sa mairie et ses statistiques propres. La population cible 15-45 ans est estimee a ~43% de la pop. totale (INS 2022).<div class="tip-source">Source : INS Romania / recensamantromania.ro</div></div></span>
+        </div>
+        <div id="sectorList"></div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">&#9889;</span> Actions</div></div>
+        <div class="btn-group">
+          <button class="btn" onclick="toggleDemoMode()">Mode Demo</button>
+          <button class="btn" onclick="loadAllCompetitors()">Charger concurrents</button>
+          <button class="btn btn-primary" onclick="analyzeAllSectors()">Analyser tout</button>
+          <button class="btn" onclick="showOverlapAnalysis()">Overlap sites</button>
+        </div>
+      </div>
+
+      <!-- BP Target Sites -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128205;</span> Sites cibles BP</div>
+          <span class="badge badge-red">Phase 1-2</span>
+        </div>
+        <div id="targetSites"></div>
+      </div>
+
+      <!-- Methodology -->
+      <div class="method-panel">
+        <div class="method-title">&#128218; Methodologie SAZ v3 — 3 piliers</div>
+        <div class="method-text">Le SAZ repose sur les <strong>3 criteres cles de succes</strong> d'un club fitness a fort traffic :</div>
+        <div class="method-formula">SAZ = FLUX<span class="method-weight">33%</span> + DENSITE<span class="method-weight">33%</span> + JEUNESSE<span class="method-weight">33%</span></div>
+        <div class="method-text" style="margin-top:6px">
+          <strong style="color:var(--cyan)">FLUX</strong> = Metro<span class="method-weight">30%</span> + Malls<span class="method-weight">25%</span> + Bureaux<span class="method-weight">25%</span> + Universites<span class="method-weight">10%</span> + Pietons<span class="method-weight">10%</span><br>
+          <strong style="color:var(--purple)">DENSITE</strong> = Pop. cible<span class="method-weight">30%</span> + Densite/km2<span class="method-weight">25%</span> + Pouvoir achat<span class="method-weight">25%</span> + Concurrence inv.<span class="method-weight">20%</span><br>
+          <strong style="color:var(--green)">JEUNESSE</strong> = Universites<span class="method-weight">40%</span> + Age quartier<span class="method-weight">30%</span> + Nvx residentiels<span class="method-weight">20%</span> + Prix immo<span class="method-weight">10%</span>
+        </div>
+        <div class="method-text" style="margin-top:6px">Sources: INS Census 2021, Metrorex (750k pax/jour), imobiliare.ro, Overpass API, worldclass.ro, stayfit.ro. Donnees estimees = <span class="badge-est">est.</span></div>
+      </div>
+    </div>
+
+    <!-- ============ COMPETITION TAB ============ -->
+    <div class="tab-panel" id="tab-compete">
+      <div class="card" id="compSummaryCard">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128200;</span> Synthese concurrentielle</div>
+        </div>
+        <div id="compSummary"><p style="font-size:12px;color:var(--gray2);padding:10px 0">Cliquez sur un point de la carte ou lancez "Charger concurrents" pour demarrer l'analyse.</p></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127919;</span> Concurrents detectes</div>
+          <span class="badge badge-blue" id="compCountBadge">0</span>
+        </div>
+        <div id="compList" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127856;</span> Repartition par segment</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Segmentation concurrentielle</strong><br><strong style="color:#ef4444">Premium</strong>: World Class, Anytime (>40EUR/mois)<br><strong style="color:#f97316">Mid-range</strong>: BeFIT, 18GYM, Superfit (25-35EUR)<br><strong style="color:#eab308">Low-cost</strong>: Basic-Fit, SmartFit (<20EUR)<br><strong style="color:#22c55e">Independant</strong>: Salles locales<div class="tip-source">Source : worldclass.ro, stayfit.ro, befit.ro (mars 2025)</div></div></span>
+        </div>
+        <div class="chart-wrap" style="height:180px"><canvas id="segmentChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128202;</span> Gap Analysis par secteur</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Gap Analysis</strong><br>Compare la <strong>population cible</strong> (15-45 ans) a la <strong>densite concurrentielle</strong> de chaque secteur. Les secteurs avec un ratio pop/concurrents eleve representent des <strong>zones blanches</strong> (opportunites). Un ratio faible indique une saturation.<div class="tip-source">Calcul : (Pop_cible / Nb_concurrents) normalise</div></div></span>
+        </div>
+        <div class="chart-wrap" style="height:240px"><canvas id="gapChart"></canvas></div>
+      </div>
+
+      <div class="method-panel">
+        <div class="method-title">&#128736; Score de menace (0-100)</div>
+        <div class="method-text">Chaque concurrent est score selon :</div>
+        <div class="method-formula">Menace = Proximite<span class="method-weight">40%</span> + Taille<span class="method-weight">25%</span> + Positionnement<span class="method-weight">20%</span> + Notoriete<span class="method-weight">15%</span></div>
+        <div class="method-text" style="margin-top:6px"><500m = menace max (100) | >3km = menace min (10). Les enseignes premium sur le meme segment cible que FP (low-cost premium) sont les plus menacantes.</div>
+      </div>
+    </div>
+
+    <!-- ============ MES SITES TAB ============ -->
+    <div class="tab-panel" id="tab-mysites">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#9733;</span> Mes sites d'implantation</div>
+          <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()">+ Ajouter</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray2);margin-bottom:10px">Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.</p>
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <input type="text" id="newSiteAddr" placeholder="Adresse (ex: Bd. Iuliu Maniu 100)" style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
+          <button class="btn btn-sm" onclick="addSiteByAddress()">Geocoder</button>
+        </div>
+        <div id="customSitesList"></div>
+      </div>
+      <div class="card" id="siteAnalysisCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128202;</span> Analyse detaillee du site</div>
+        </div>
+        <div id="siteAnalysisContent"></div>
+      </div>
+      <div class="card" id="cannibalizationCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#9888;</span> Risque de cannibalisation</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Cannibalisation</strong><br>Mesure le risque de chevauchement des zones de chalandise entre vos sites. Distance critique: <strong>&lt;1.5km = critique</strong>, 1.5-3km = significatif, 3-5km = modere, &gt;5km = faible.<div class="tip-source">Benchmark: distance minimum entre 2 clubs meme enseigne = 2.5km en zone dense</div></div></span>
+        </div>
+        <div id="cannibalizationContent"></div>
+      </div>
+      <div class="method-panel">
+        <div class="method-title">&#128218; Statuts de qualification</div>
+        <div class="method-text">
+          <span style="color:#8b5cf6">&#9733; Prospect</span> — Site identifie, non analyse<br>
+          <span style="color:#d4a017">&#9733; Shortlist</span> — Analyse positive, a approfondir<br>
+          <span style="color:#10b981">&#9733; Valide</span> — Site confirme pour negociation<br>
+          <span style="color:#ef4444">&#9733; Rejete</span> — Ecarte apres analyse
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DASHBOARD TAB ============ -->
+    <div class="tab-panel" id="tab-dash">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin:0"><span class="icon">&#128203;</span> Zones analysees</div>
+        <button class="export-btn" onclick="exportCSV()">&#128229; Export CSV</button>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:14px;border-radius:8px;border:1px solid var(--border)">
+        <table class="dash-table" id="dashTable">
+          <thead><tr>
+            <th onclick="sortTable(0)">Zone</th>
+            <th onclick="sortTable(1)">Pop.</th>
+            <th onclick="sortTable(2)">15-45</th>
+            <th onclick="sortTable(3)">SAZ &#9650;</th>
+            <th onclick="sortTable(4)">Conc.</th>
+            <th onclick="sortTable(5)">+ proche</th>
+            <th onclick="sortTable(6)">Pot. CA</th>
+            <th onclick="sortTable(7)">Reco</th>
+          </tr></thead>
+          <tbody id="dashBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128176;</span> Trajectoire financiere reseau</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Projections BP V17</strong><br>CA Enseigne et EBITDA consolides sur 10 ans. Hypotheses : 40 clubs a maturite (18 propres + 22 franchises), panier moyen 24,68EUR/mois, cible 4000 adherents/club.<div class="tip-source">Source : BP MF FP V17 — Isseo</div></div></span>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="finChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#128209;</span> Parametres cles BP</div>
+          <span class="badge badge-yellow">V17</span>
+        </div>
+        <div class="metric-row"><span class="metric-label">CAPEX / club (hors leasing)</span><span class="metric-value">1 176k EUR</span></div>
+        <div class="metric-row"><span class="metric-label">dont fit-out (600EUR/m2 x 1400m2)</span><span class="metric-value" style="color:var(--gray)">840k</span></div>
+        <div class="metric-row"><span class="metric-label">dont equipement (40%)</span><span class="metric-value" style="color:var(--gray)">336k</span></div>
+        <div class="metric-row"><span class="metric-label">Leasing equipement (60% / 5 ans)</span><span class="metric-value">101k/an</span></div>
+        <div class="metric-row"><span class="metric-label">Cible adherents / club (maturite A3)</span><span class="metric-value">4 000</span></div>
+        <div class="metric-row"><span class="metric-label">Panier moyen mensuel HT</span><span class="metric-value">24,68 EUR</span></div>
+        <div class="metric-row"><span class="metric-label">Ramp-up A1 / A2</span><span class="metric-value">70% / 90%</span></div>
+        <div class="metric-row"><span class="metric-label">Loyer + charges / club / an</span><span class="metric-value">236 400 EUR</span></div>
+        <div class="metric-row"><span class="metric-label">FTP (4 ETP, A1)</span><span class="metric-value">85 890 EUR</span></div>
+        <div class="metric-row"><span class="metric-label">Redevance MF -> FP France</span><span class="metric-value">6% CA HT</span></div>
+        <div class="metric-row"><span class="metric-label">Spread net franchise</span><span class="metric-value">+3% CA</span></div>
+        <div class="metric-row"><span class="metric-label">Reseau maturite (A8)</span><span class="metric-value">40 clubs</span></div>
+        <div class="metric-row"><span class="metric-label">dont propres / franchises</span><span class="metric-value">18 / 22</span></div>
+        <div class="metric-row"><span class="metric-label">EBITDA maturite (A9)</span><span class="metric-value" style="color:var(--green)">~10,4M EUR</span></div>
+        <div class="metric-row"><span class="metric-label">ROI Y10 (CF cumule / CAPEX)</span><span class="metric-value" style="color:var(--green)">73%</span></div>
+        <div class="metric-row"><span class="metric-label">WACC / g / Multiple sortie</span><span class="metric-value">12% / 2% / 8x</span></div>
+        <div class="metric-row"><span class="metric-label">CIT / TVA Roumanie</span><span class="metric-value">16% / 21%</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127942;</span> Pricing benchmark Roumanie</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Positionnement prix</strong><br>FP se positionne en <strong>premium low-cost</strong> entre 20-28EUR/mois, sous BeFIT (30EUR) et tres loin de World Class (46-145EUR). Le marche roumain a une penetration de ~5% vs 10-15% en Europe de l'Ouest.<div class="tip-source">Source : Pitch MF FP x Isseo, mars 2025</div></div></span>
+        </div>
+        <div class="chart-wrap" style="height:160px"><canvas id="pricingChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ============ SITE CARD TAB ============ -->
+    <div class="tab-panel" id="tab-site">
+      <div id="siteCardContent">
+        <div style="text-align:center;padding:50px 20px;color:var(--gray2)">
+          <div style="font-size:40px;margin-bottom:12px;opacity:.5">&#128205;</div>
+          <p style="font-size:13px;line-height:1.6">Cliquez sur un point de la carte<br>pour generer une fiche de due diligence</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div><span class="status-dot ok" id="statusDot"></span><span id="statusText">APIs connectees</span></div>
+    <div id="cacheInfo">Cache: 0 req</div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MAP
+     ================================================================ -->
+<div class="map-area">
+  <div id="map"></div>
+  <div class="loading" id="loader">
+    <div class="spinner"></div>
+    <div class="loading-label" id="loaderText">Chargement...</div>
+    <div class="loading-sub" id="loaderSub">Requete Overpass API en cours</div>
+  </div>
+  <div class="map-overlay-tr">
+    <div class="map-box" id="pointBox" style="display:none">
+      <div class="map-box-title">Point selectionne</div>
+      <div id="pointBoxContent"></div>
+    </div>
+    <div class="map-box" id="sazBox" style="display:none">
+      <div class="map-box-title">Score Attractivite (SAZ)
+        <span class="info-tip" style="margin-left:auto">?<div class="tip-content"><strong>Comment lire le SAZ</strong><br><strong style="color:var(--green)">70-100</strong> : Zone GO — fort potentiel<br><strong style="color:var(--yellow)">45-69</strong> : Prudence — analyse approfondie requise<br><strong style="color:var(--red)">0-44</strong> : No-Go — conditions defavorables<div class="tip-source">Seuils calibres sur benchmark FP France</div></div></span>
+      </div>
+      <div id="sazBoxContent"></div>
+    </div>
+  </div>
+  <div class="map-overlay-bl">
+    <div class="map-box" style="padding:8px 12px;font-size:10px;color:var(--gray2);min-width:auto">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px"></span>Premium</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f97316;margin-right:3px"></span>Mid-range</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#eab308;margin-right:3px"></span>Low-cost</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:3px"></span>Independant</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4a017;border:2px solid white;margin-right:3px"></span>Site cible FP</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="right-panel" id="rightPanel"></div>
+</div>
+
+<script>
+// ================================================================
+// CORE CONFIG
+// ================================================================
+const BUCHAREST = [44.4268, 26.1025];
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+const NOMINATIM = 'https://nominatim.openstreetmap.org';
+
+let map, circle, radius = 2000;
+let compCluster = L.markerClusterGroup({maxClusterRadius:40,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
+let transportLayer = L.layerGroup();
+let heatLayer = null;
+let sectorPolys = {};
+let selectedPt = null;
+let analysisCache = {};
+let opCache = {};
+let demo = false;
+let zones = [];
+let allComps = [];
+let curComps = [];
+let sectorSAZ = {};
+
+// ================================================================
+// BUCHAREST SECTORS — Enhanced data
+// ================================================================
+const SECTORS = [
+  {id:1,name:'Secteur 1',center:[44.4787,26.0655],pop:217367,area:68,
+   youngPct:.43,income:'high',incomeIdx:90,rentProxy:2200,commerceIdx:85,transportIdx:90,sportIdx:82,
+   desc:'Aviatorilor, Dorobanti, Floreasca, Baneasa',color:'#22c55e',
+   details:'Quartier le plus aise de Bucarest. Sieges d\'ambassades, quartier d\'affaires Floreasca-Barbu Vacarescu. Population CSP+ dominante. Forte presence World Class.',
+   polygon:[[44.50,26.02],[44.52,26.04],[44.52,26.10],[44.49,26.12],[44.46,26.10],[44.44,26.10],[44.43,26.08],[44.44,26.05],[44.46,26.02]]},
+  {id:2,name:'Secteur 2',center:[44.4400,26.1350],pop:291557,area:32,
+   youngPct:.44,income:'medium-high',incomeIdx:65,rentProxy:1200,commerceIdx:60,transportIdx:75,sportIdx:68,
+   desc:'Obor, Pantelimon, Colentina, Tei',color:'#3b82f6',
+   details:'Secteur dense et mixte. Marche Obor (plus grand de Bucarest). Zone en gentrification autour du lac Tei. Bonne desserte metro M1.',
+   polygon:[[44.49,26.12],[44.48,26.15],[44.47,26.19],[44.44,26.19],[44.42,26.16],[44.43,26.12],[44.43,26.10],[44.44,26.10],[44.46,26.10]]},
+  {id:3,name:'Secteur 3',center:[44.4150,26.1550],pop:374737,area:34,
+   youngPct:.44,income:'medium',incomeIdx:50,rentProxy:1000,commerceIdx:55,transportIdx:70,sportIdx:58,
+   desc:'Titan, Dristor, Vitan, Hala Laminor',color:'#eab308',
+   details:'Secteur le plus peuple de Bucarest. Forte densite residentielle (grands ensembles). Quartier Titan en pleine transformation avec le projet Hala Laminor (86,300m2). Metro M1+M3.',
+   polygon:[[44.44,26.10],[44.43,26.10],[44.43,26.12],[44.42,26.16],[44.40,26.19],[44.38,26.18],[44.38,26.14],[44.40,26.10],[44.43,26.08]]},
+  {id:4,name:'Secteur 4',center:[44.3900,26.1100],pop:268018,area:34,
+   youngPct:.42,income:'medium-low',incomeIdx:40,rentProxy:850,commerceIdx:45,transportIdx:65,sportIdx:48,
+   desc:'Berceni, Tineretului, Piata Sudului',color:'#f97316',
+   details:'Zone residentielle sud en croissance rapide. Grand Arena Shopping est le principal pole commercial. Desserte metro M2. Potentiel de croissance demographique eleve.',
+   polygon:[[44.43,26.08],[44.40,26.10],[44.38,26.14],[44.36,26.12],[44.36,26.08],[44.38,26.05],[44.40,26.05],[44.43,26.06]]},
+  {id:5,name:'Secteur 5',center:[44.4100,26.0600],pop:240288,area:30,
+   youngPct:.40,income:'low',incomeIdx:25,rentProxy:700,commerceIdx:35,transportIdx:55,sportIdx:35,
+   desc:'Rahova, Ferentari, Cotroceni, 13 Septembrie',color:'#ef4444',
+   details:'Secteur contraste : quartier universitaire Cotroceni (CSP+) vs Ferentari (quartier defavorise). Mixite sociale forte. Opportunite limitee au segment Cotroceni uniquement.',
+   polygon:[[44.43,26.06],[44.40,26.05],[44.38,26.05],[44.38,26.00],[44.40,25.98],[44.43,25.98],[44.44,26.02],[44.44,26.05],[44.43,26.08]]},
+  {id:6,name:'Secteur 6',center:[44.4400,26.0100],pop:324994,area:38,
+   youngPct:.43,income:'medium-high',incomeIdx:62,rentProxy:1100,commerceIdx:58,transportIdx:72,sportIdx:65,
+   desc:'Militari, Drumul Taberei, Crangasi',color:'#8b5cf6',
+   details:'Second bassin de population. Militari Residence = plus grand quartier residentiel recent d\'Europe (~40,000 habitants). Metro M5 recemment ouvert. Fort potentiel sous-exploite en fitness.',
+   polygon:[[44.44,26.05],[44.44,26.02],[44.43,25.98],[44.44,25.96],[44.47,25.96],[44.48,25.99],[44.48,26.02],[44.46,26.02],[44.44,26.05]]}
+];
+
+// ================================================================
+// COMPETITORS DATABASE — Verified March 2026, cross-referenced sources
+// Sources: worldclass.ro, stayfit.ro, 18gym.ro, downtownfitness.ro,
+//          absolutegym.ro, salsafitgym.ro, Overpass API, Nominatim geocoding
+// Total: 83 verified clubs in Bucharest metro area
+// ================================================================
+const COMP_DB = [
+  {name:'World Class',segment:'premium',avgSize:1500,avgMembers:2000,threat:'high',color:'#ef4444',price:'46-145',clubs:34,brand:'international'},
+  {name:'Stay Fit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~30',clubs:28,brand:'local'},
+  {name:'StayFit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~30',clubs:28,brand:'local'},
+  {name:'18GYM',segment:'mid',avgSize:500,avgMembers:600,threat:'medium',color:'#f97316',price:'~36',clubs:6,brand:'local'},
+  {name:'Downtown Fitness',segment:'mid-premium',avgSize:700,avgMembers:800,threat:'medium',color:'#f97316',price:'~35',clubs:5,brand:'local'},
+  {name:'Nr1 Fitness',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~25',clubs:5,brand:'international'},
+  {name:'BeFIT',segment:'mid-premium',avgSize:900,avgMembers:1200,threat:'medium',color:'#f97316',price:'~28',clubs:1,brand:'local'},
+  {name:'Absolute',segment:'independent',avgSize:400,avgMembers:400,threat:'low',color:'#22c55e',price:'~20',clubs:3,brand:'local'},
+  {name:'SalsaFit',segment:'mid',avgSize:500,avgMembers:400,threat:'low',color:'#22c55e',price:'~20',clubs:1,brand:'local'},
+  {name:'CrossFit',segment:'crossfit',avgSize:280,avgMembers:180,threat:'low',color:'#22c55e',price:'~40',clubs:5,brand:'local'},
+  {name:'WoW',segment:'independent',avgSize:500,avgMembers:400,threat:'low',color:'#22c55e',price:'~15',clubs:1,brand:'local'},
+];
+
+// Target sites from BP
+const TARGETS = [
+  {name:'Hala Laminor',lat:44.4258,lng:26.1492,phase:1,sector:3,area:'1,300-2,300 m2',rent:'12->14 EUR/m2',status:'Shell securise',opening:'Q2-2027',note:'Remplacement World Class | 86,300m2 GLA mixed-use | Metro Republica | 1.5M hab. dans 30min | 1,325 parkings',capex:1176000},
+  {name:'Unirea Shopping Center',lat:44.4268,lng:26.1008,phase:1,sector:3,area:'~1,400 m2',rent:'A negocier (Colliers)',status:'En discussion',opening:'2027-2028',note:'Centre commercial historique | Metro Unirii (M1+M2+M3) | Restructuration prevue 3 ans | Cible RDC + visibilite rue',capex:1176000},
+  {name:'Militari Shopping',lat:44.4310,lng:25.9855,phase:1,sector:6,area:'~1,400 m2',rent:'11 EUR/m2 (base Brico)',status:'A confirmer',opening:'Q1-2027',note:'Plus grand bassin population peri-urbaine ouest | Militari Residence ~40k hab. | Livraison Q1 2027',capex:1176000},
+  {name:'Grand Arena',lat:44.3795,lng:26.1355,phase:2,sector:4,area:'~1,400 m2',rent:'TBD',status:'Interet proprietaire',opening:'2028',note:'Zone residentielle sud en forte croissance | Position existante Stayfit ou nouvelle cellule RDC+R1',capex:1176000},
+  {name:'Baneasa Shopping City',lat:44.5040,lng:26.0810,phase:2,sector:1,area:'~1,400 m2',rent:'>20 EUR/m2',status:'2 options en discussion',opening:'2028',note:'Quartier residentiel premium nord | Option A: cote hypermarche | Option B: attendre extension',capex:1176000}
+];
+
+// ================================================================
+// VERIFIED CLUBS DATABASE — 83 clubs, geocoded via Nominatim + manual corrections
+// All coordinates verified against official websites & Google Maps
+// ================================================================
+const VERIFIED_CLUBS = [
+  // === WORLD CLASS (34 clubs) — Source: worldclass.ro/harta-cluburi ===
+  {name:'World Class Charles de Gaulle',lat:44.464661,lng:26.083435,segment:'premium',size:2500,members:3000,tier:'W'},
+  {name:'World Class Downtown',lat:44.441133,lng:26.094974,segment:'premium',size:2200,members:2800,tier:'Platinum'},
+  {name:'World Class At The Grand',lat:44.425619,lng:26.076877,segment:'premium',size:2000,members:2500,tier:'Platinum'},
+  {name:'World Class Atlantis',lat:44.490200,lng:26.096500,segment:'premium',size:2000,members:2400,tier:'Platinum'},
+  {name:'World Class Caro',lat:44.462500,lng:26.097800,segment:'premium',size:1800,members:2200,tier:'Gold'},
+  {name:'World Class InCity',lat:44.419762,lng:26.133465,segment:'premium',size:1600,members:2000,tier:'Gold'},
+  {name:'World Class Upground',lat:44.471500,lng:26.113000,segment:'premium',size:1500,members:1800,tier:'Gold'},
+  {name:'World Class One Cotroceni',lat:44.425580,lng:26.063884,segment:'premium',size:1800,members:2200,tier:'Gold'},
+  {name:'World Class Planet',lat:44.486500,lng:26.120000,segment:'premium',size:1600,members:1900,tier:'Gold'},
+  {name:'World Class Cosmopolis',lat:44.530000,lng:26.115000,segment:'premium',size:1400,members:1600,tier:'Gold'},
+  {name:'World Class Asmita Gardens',lat:44.406933,lng:26.125157,segment:'premium',size:1500,members:1800,tier:'Silver'},
+  {name:'World Class Mega Mall',lat:44.438000,lng:26.155000,segment:'premium',size:1900,members:2400,tier:'Silver'},
+  {name:'World Class Militari Shopping',lat:44.436707,lng:25.982650,segment:'premium',size:1500,members:1800,tier:'Silver'},
+  {name:'World Class Otopeni',lat:44.549000,lng:26.068000,segment:'premium',size:1200,members:1400,tier:'Silver'},
+  {name:'World Class Park Lake',lat:44.420665,lng:26.149631,segment:'premium',size:1700,members:2100,tier:'Silver'},
+  {name:'World Class Titan',lat:44.421288,lng:26.180037,segment:'premium',size:1400,members:1700,tier:'Silver'},
+  {name:'World Class AFI Cotroceni',lat:44.431500,lng:26.052000,segment:'premium',size:1300,members:1600,tier:'Bronze'},
+  {name:'World Class AFI Tech',lat:44.418486,lng:26.076583,segment:'premium',size:1100,members:1300,tier:'Bronze'},
+  {name:'World Class America House',lat:44.452426,lng:26.082141,segment:'premium',size:1200,members:1500,tier:'Bronze'},
+  {name:'World Class Bucuresti Mall',lat:44.420584,lng:26.126701,segment:'premium',size:1500,members:1800,tier:'Bronze'},
+  {name:'World Class Campus 6',lat:44.434945,lng:26.052869,segment:'premium',size:1100,members:1300,tier:'Bronze'},
+  {name:'World Class Expo Park',lat:44.473385,lng:26.054899,segment:'premium',size:1200,members:1400,tier:'Bronze'},
+  {name:'World Class Jiului',lat:44.483219,lng:26.043323,segment:'premium',size:1100,members:1200,tier:'Bronze'},
+  {name:'World Class Jolie Ville',lat:44.492000,lng:26.095000,segment:'premium',size:1300,members:1500,tier:'Bronze'},
+  {name:'World Class Lujerului',lat:44.433245,lng:26.036784,segment:'premium',size:1400,members:1700,tier:'Bronze'},
+  {name:'World Class Plaza Romania',lat:44.428482,lng:26.035172,segment:'premium',size:1500,members:1800,tier:'Bronze'},
+  {name:'World Class Sudului',lat:44.393660,lng:26.119899,segment:'premium',size:1200,members:1400,tier:'Bronze'},
+  {name:'World Class Titan Park',lat:44.424282,lng:26.161355,segment:'premium',size:1100,members:1300,tier:'Bronze'},
+  {name:'World Class Sema Park',lat:44.442909,lng:26.048414,segment:'premium',size:1300,members:1500,tier:'Bronze'},
+  {name:'World Class Veranda',lat:44.452127,lng:26.129041,segment:'premium',size:1400,members:1700,tier:'Bronze'},
+  {name:'World Class Oregon Park',lat:44.481235,lng:26.105868,segment:'premium',size:1100,members:1300,tier:'Bronze'},
+  {name:'World Class Eroii Revolutiei',lat:44.401021,lng:26.099529,segment:'premium',size:1200,members:1400,tier:'Bronze'},
+  {name:'World Class Promenada',lat:44.477523,lng:26.103549,segment:'premium',size:1500,members:1900,tier:'Bronze'},
+  {name:'World Class Pipera Plaza',lat:44.485959,lng:26.126123,segment:'premium',size:1200,members:1400,tier:'Bronze'},
+  // === STAY FIT GYM (21 clubs Bucharest proper) — Source: stayfit.ro/cluburi-bucuresti ===
+  {name:'Stay Fit Romana',lat:44.446576,lng:26.098938,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Titulescu',lat:44.452508,lng:26.072874,segment:'mid',size:650,members:750},
+  {name:'Stay Fit Domenii',lat:44.470229,lng:26.055085,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Colosseum',lat:44.491405,lng:26.016470,segment:'mid',size:650,members:750},
+  {name:'Stay Fit Jiului',lat:44.479129,lng:26.043101,segment:'mid',size:550,members:650},
+  {name:'Stay Fit Dorobanti',lat:44.464092,lng:26.095555,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Crangasi',lat:44.457782,lng:26.040357,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Teiul Doamnei',lat:44.461923,lng:26.126115,segment:'mid',size:550,members:650},
+  {name:'Stay Fit Pantelimon',lat:44.444634,lng:26.159203,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Esplanada',lat:44.437390,lng:26.186588,segment:'mid',size:700,members:800},
+  {name:'Stay Fit Pipera',lat:44.484539,lng:26.119650,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Pallady',lat:44.408566,lng:26.188415,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Vitan',lat:44.413189,lng:26.138211,segment:'mid',size:550,members:650},
+  {name:'Stay Fit Cocor',lat:44.434669,lng:26.102972,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Fizicienilor',lat:44.412674,lng:26.150343,segment:'mid',size:550,members:650},
+  {name:'Stay Fit Petre Ispirescu',lat:44.415185,lng:26.061615,segment:'mid',size:500,members:600},
+  {name:'Stay Fit Rahova',lat:44.400013,lng:26.043953,segment:'mid',size:500,members:600},
+  {name:'Stay Fit Liberty',lat:44.415067,lng:26.080094,segment:'mid',size:550,members:650},
+  {name:'Stay Fit Grand Arena',lat:44.373852,lng:26.119685,segment:'mid',size:700,members:800},
+  {name:'Stay Fit Prosper',lat:44.420032,lng:26.065738,segment:'mid',size:600,members:700},
+  {name:'Stay Fit Ghencea',lat:44.413339,lng:26.036551,segment:'mid',size:550,members:650},
+  // === 18GYM (6 clubs Bucharest) — Source: 18gym.ro/sali-fitness-bucuresti ===
+  {name:'18GYM Green Gate',lat:44.419395,lng:26.079521,segment:'mid',size:500,members:600},
+  {name:'18GYM Mihai Bravu',lat:44.415195,lng:26.135871,segment:'mid',size:500,members:600},
+  {name:'18GYM Pantelimon',lat:44.444800,lng:26.159500,segment:'mid',size:480,members:580},
+  {name:'18GYM Chiajna',lat:44.432000,lng:25.968000,segment:'mid',size:500,members:600},
+  {name:'18GYM Monaco Towers',lat:44.487247,lng:26.114866,segment:'mid',size:520,members:620},
+  {name:'18GYM Pipera',lat:44.490000,lng:26.118000,segment:'mid',size:500,members:600},
+  // === DOWNTOWN FITNESS (5 clubs) — Source: downtownfitness.ro ===
+  {name:'Downtown Fitness Vitan',lat:44.422982,lng:26.124447,segment:'mid-premium',size:800,members:900},
+  {name:'Downtown Fitness Mihai Bravu',lat:44.417438,lng:26.136058,segment:'mid-premium',size:700,members:800},
+  {name:'Downtown Fitness Mihalache',lat:44.458420,lng:26.077576,segment:'mid-premium',size:750,members:850},
+  {name:'Downtown Fitness Matei Basarab',lat:44.431249,lng:26.128556,segment:'mid-premium',size:800,members:900},
+  {name:'Downtown Fitness Obor',lat:44.450142,lng:26.127928,segment:'mid-premium',size:700,members:800},
+  // === NR1 FITNESS (5 clubs, 24/7) — Source: nr1fitness.ro ===
+  {name:'Nr1 Fitness Militari',lat:44.434294,lng:26.000327,segment:'mid',size:600,members:700},
+  {name:'Nr1 Fitness Pipera',lat:44.487000,lng:26.115000,segment:'mid',size:600,members:700},
+  {name:'Nr1 Fitness Ghencea',lat:44.408701,lng:25.982652,segment:'mid',size:600,members:700},
+  {name:'Nr1 Fitness Pantelimon',lat:44.441127,lng:26.180056,segment:'mid',size:550,members:650},
+  {name:'Nr1 Fitness Titan',lat:44.424248,lng:26.171397,segment:'mid',size:600,members:700},
+  // === CROSSFIT BOXES (5) ===
+  {name:'CrossFit Columna (Uzina)',lat:44.412172,lng:26.117383,segment:'crossfit',size:350,members:200},
+  {name:'CrossFit Nord BVS',lat:44.494202,lng:26.097007,segment:'crossfit',size:300,members:180},
+  {name:'CrossFit ROA',lat:44.452827,lng:26.079955,segment:'crossfit',size:280,members:150},
+  {name:'Replay CrossFit',lat:44.482106,lng:26.119076,segment:'crossfit',size:300,members:180},
+  {name:'Groove Box',lat:44.419305,lng:26.083442,segment:'crossfit',size:250,members:120},
+  // === ABSOLUTE GYM (3 clubs) — Source: absolutegym.ro ===
+  {name:'Absolute Gym Ghencea',lat:44.415706,lng:26.038957,segment:'independent',size:400,members:400},
+  {name:'Absolute Gym Titan',lat:44.429198,lng:26.150350,segment:'independent',size:350,members:350},
+  {name:'Absolute Gym Militari',lat:44.430000,lng:25.995000,segment:'independent',size:380,members:370},
+  // === OTHER VERIFIED ===
+  {name:'SalsaFit AFI Cotroceni',lat:44.432069,lng:26.048935,segment:'mid',size:500,members:400},
+  {name:'WoWGym Fundeni',lat:44.463244,lng:26.153917,segment:'independent',size:500,members:400},
+  {name:'Sweat Concept Promenada',lat:44.476000,lng:26.104000,segment:'boutique',size:300,members:250},
+  {name:'Best Fitness Gym',lat:44.423755,lng:26.011406,segment:'independent',size:500,members:400},
+];
+
+// Use same as demo — the verified database IS the real data
+const DEMO_COMPS = VERIFIED_CLUBS;
+
+// Metro stations (demo)
+const METRO = [
+  {n:'Piata Victoriei',lat:44.4527,lng:26.0855,lines:'M1,M3'},{n:'Aviatorilor',lat:44.4610,lng:26.0870,lines:'M2'},
+  {n:'Piata Romana',lat:44.4460,lng:26.0970,lines:'M2'},{n:'Universitate',lat:44.4355,lng:26.1002,lines:'M1,M3'},
+  {n:'Unirii',lat:44.4268,lng:26.1008,lines:'M1,M2,M3'},{n:'Tineretului',lat:44.4135,lng:26.1050,lines:'M2'},
+  {n:'Piata Sudului',lat:44.4010,lng:26.1050,lines:'M2'},{n:'Titan',lat:44.4130,lng:26.1550,lines:'M1'},
+  {n:'Dristor',lat:44.4200,lng:26.1320,lines:'M1,M3'},{n:'Republica',lat:44.4250,lng:26.1500,lines:'M1'},
+  {n:'Politehnica',lat:44.4390,lng:26.0480,lines:'M1'},{n:'Lujerului',lat:44.4340,lng:26.0330,lines:'M1'},
+  {n:'Crangasi',lat:44.4460,lng:26.0350,lines:'M1'},{n:'Basarab',lat:44.4490,lng:26.0630,lines:'M1,M4'},
+  {n:'Obor',lat:44.4510,lng:26.1240,lines:'M1'},{n:'Stefan cel Mare',lat:44.4530,lng:26.1100,lines:'M2'},
+  {n:'Pipera',lat:44.4790,lng:26.1130,lines:'M2'},{n:'Aurel Vlaicu',lat:44.4720,lng:26.1050,lines:'M2'},
+  {n:'Baneasa',lat:44.4890,lng:26.0850,lines:'M4'},{n:'Jiului',lat:44.4610,lng:26.0690,lines:'M4'},
+  {n:'Eroilor',lat:44.4325,lng:26.0710,lines:'M1,M3'},{n:'Izvor',lat:44.4325,lng:26.0820,lines:'M3'},
+  {n:'Drumul Taberei 34',lat:44.4240,lng:26.0280,lines:'M5'},{n:'Romancierilor',lat:44.4190,lng:26.0200,lines:'M5'},
+  {n:'Orizont',lat:44.4260,lng:26.0100,lines:'M5'},{n:'Pacii',lat:44.4310,lng:25.9930,lines:'M1'},
+  {n:'Gorjului',lat:44.4300,lng:26.0080,lines:'M1'},{n:'Iancului',lat:44.4380,lng:26.1160,lines:'M1'},
+  {n:'1 Mai',lat:44.4640,lng:26.0710,lines:'M3'},{n:'Pajura',lat:44.4720,lng:26.0700,lines:'M4'},
+  {n:'Preciziei',lat:44.4280,lng:25.9810,lines:'M3'},{n:'Petrache Poenaru',lat:44.4420,lng:26.0460,lines:'M1'},
+  {n:'Grozavesti',lat:44.4380,lng:26.0560,lines:'M1'},{n:'Timpuri Noi',lat:44.4160,lng:26.1130,lines:'M1'},
+  {n:'Mihai Bravu',lat:44.4220,lng:26.1270,lines:'M1,M3'},{n:'Nicolae Grigorescu',lat:44.4170,lng:26.1510,lines:'M1,M3'},
+  {n:'Costin Georgian',lat:44.4200,lng:26.1630,lines:'M1'},{n:'Piata Muncii',lat:44.4340,lng:26.1210,lines:'M1'},
+  {n:'Constantin Brancoveanu',lat:44.4080,lng:26.1070,lines:'M2'},{n:'Aparatorii Patriei',lat:44.3910,lng:26.1170,lines:'M2'},
+  {n:'Dimitrie Leonida',lat:44.3800,lng:26.1260,lines:'M2'},{n:'Gara de Nord',lat:44.4470,lng:26.0710,lines:'M1,M4'},
+  {n:'Grivita',lat:44.4560,lng:26.0690,lines:'M4'},{n:'Parc Bazilescu',lat:44.4770,lng:26.0530,lines:'M4'},
+  {n:'Laminorului',lat:44.4830,lng:26.0460,lines:'M4'},{n:'Straulesti',lat:44.4900,lng:26.0360,lines:'M4'},
+  {n:'Academia Militara',lat:44.4290,lng:26.0680,lines:'M5'},{n:'Favorit',lat:44.4230,lng:26.0230,lines:'M5'},
+  {n:'Tudor Vladimirescu',lat:44.4210,lng:26.0300,lines:'M5'},{n:'Parc Drumul Taberei',lat:44.4200,lng:26.0190,lines:'M5'},
+  {n:'Valea Ialomitei',lat:44.4280,lng:26.0050,lines:'M5'},{n:'Brancusi',lat:44.4290,lng:25.9970,lines:'M5'},
+  {n:'Raul Doamnei',lat:44.4310,lng:25.9880,lines:'M5'},
+];
+
+// ================================================================
+// CARTIERE (NEIGHBORHOODS) — ~50 quartiers avec pop estimee + prix immobilier
+// Sources: INS Census 2021, imobiliare.ro, investropa.com, wikipedia
+// Pop estimees = pop secteur repartie par densite relative des quartiers
+// Prix = EUR/m2 moyen 2025, proxy pouvoir d'achat
+// ================================================================
+const CARTIERE = [
+  // SECTOR 1 (pop 217,367)
+  {name:'Dorobanti',lat:44.4530,lng:26.0900,sector:1,pop:18000,price:2800,young:.42,desc:'Quartier diplomatique premium'},
+  {name:'Primaverii',lat:44.4580,lng:26.0820,sector:1,pop:12000,price:3200,young:.38,desc:'Villas ambassades, CSP++'},
+  {name:'Aviatorilor',lat:44.4620,lng:26.0880,sector:1,pop:10000,price:3000,young:.40,desc:'Proche Herastrau, premium'},
+  {name:'Floreasca',lat:44.4680,lng:26.0950,sector:1,pop:15000,price:2600,young:.45,desc:'Business + residentiel premium'},
+  {name:'Baneasa',lat:44.4950,lng:26.0800,sector:1,pop:22000,price:2200,young:.44,desc:'Baneasa Shopping, expansion nord'},
+  {name:'Pipera Nord',lat:44.4850,lng:26.1100,sector:1,pop:18000,price:2100,young:.46,desc:'Tech hub, bureaux + residentiel'},
+  {name:'Domenii',lat:44.4680,lng:26.0550,sector:1,pop:16000,price:2000,young:.42,desc:'Residentiel calme classe moyenne+'},
+  {name:'Bucurestii Noi',lat:44.4780,lng:26.0430,sector:1,pop:20000,price:1600,young:.43,desc:'Mixte, en gentrification'},
+  {name:'Victoriei',lat:44.4520,lng:26.0850,sector:1,pop:12000,price:2500,young:.44,desc:'Centre affaires, Piata Victoriei'},
+  {name:'Pajura-Straulesti',lat:44.4880,lng:26.0380,sector:1,pop:15000,price:1500,young:.44,desc:'Peripherie nord-ouest, M4'},
+  {name:'1 Mai-Grivita',lat:44.4600,lng:26.0700,sector:1,pop:18000,price:1700,young:.43,desc:'Densement peuple, commerce'},
+  // SECTOR 2 (pop 291,557)
+  {name:'Floreasca-Barbu Vacarescu',lat:44.4700,lng:26.1050,sector:2,pop:20000,price:2400,young:.45,desc:'CBD secondaire, bureaux premium'},
+  {name:'Stefan cel Mare',lat:44.4530,lng:26.1100,sector:2,pop:22000,price:1800,young:.46,desc:'Axe commercial, metro M2'},
+  {name:'Obor',lat:44.4520,lng:26.1250,sector:2,pop:25000,price:1500,young:.44,desc:'Marche Obor, quartier populaire'},
+  {name:'Tei',lat:44.4630,lng:26.1200,sector:2,pop:18000,price:1600,young:.45,desc:'Lac Tei, gentrification'},
+  {name:'Iancului',lat:44.4380,lng:26.1160,sector:2,pop:20000,price:1650,young:.45,desc:'Residentiel dense, metro M1'},
+  {name:'Colentina',lat:44.4650,lng:26.1400,sector:2,pop:30000,price:1300,young:.44,desc:'Extension nord-est, populaire'},
+  {name:'Pantelimon',lat:44.4400,lng:26.1700,sector:2,pop:35000,price:1200,young:.44,desc:'Grand ensemble est, Mega Mall'},
+  {name:'Vatra Luminoasa',lat:44.4450,lng:26.1350,sector:2,pop:15000,price:1700,young:.43,desc:'Residentiel calme, parc IOR'},
+  {name:'Fundeni',lat:44.4600,lng:26.1550,sector:2,pop:12000,price:1100,young:.43,desc:'Peripherie, hopital'},
+  // SECTOR 3 (pop 374,737)
+  {name:'Titan',lat:44.4130,lng:26.1550,sector:3,pop:65000,price:1400,young:.45,desc:'Plus grand quartier, ParkLake, M1'},
+  {name:'Dristor',lat:44.4200,lng:26.1320,sector:3,pop:30000,price:1500,young:.45,desc:'Carrefour metro M1+M3, commercial'},
+  {name:'Vitan',lat:44.4180,lng:26.1200,sector:3,pop:35000,price:1550,young:.44,desc:'Bucuresti Mall, residentiel dense'},
+  {name:'Dudesti',lat:44.4220,lng:26.1100,sector:3,pop:20000,price:1600,young:.44,desc:'Proche centre, en transformation'},
+  {name:'Centrul Civic-Unirii',lat:44.4280,lng:26.1020,sector:3,pop:15000,price:2000,young:.43,desc:'Piata Unirii, mixte'},
+  {name:'Muncii',lat:44.4350,lng:26.1200,sector:3,pop:25000,price:1500,young:.45,desc:'Piata Muncii, commercial'},
+  {name:'Pallady',lat:44.4080,lng:26.1850,sector:3,pop:30000,price:1100,young:.46,desc:'Extension est, nouveaux immeubles'},
+  {name:'Hala Laminor Zone',lat:44.4260,lng:26.1500,sector:3,pop:15000,price:1400,young:.45,desc:'Zone en regeneration, 86k m2 projet'},
+  // SECTOR 4 (pop 268,018)
+  {name:'Tineretului',lat:44.4100,lng:26.1050,sector:4,pop:25000,price:1800,young:.44,desc:'Parc Tineretului, metro M2'},
+  {name:'Berceni',lat:44.3950,lng:26.1150,sector:4,pop:55000,price:1400,young:.43,desc:'Grand ensemble sud, Sun Plaza'},
+  {name:'Piata Sudului',lat:44.4010,lng:26.1060,sector:4,pop:20000,price:1550,young:.43,desc:'Metro M2, commercial'},
+  {name:'Oltenitei',lat:44.3850,lng:26.1200,sector:4,pop:30000,price:1200,young:.42,desc:'Axe sud, en croissance'},
+  {name:'Giurgiului',lat:44.3800,lng:26.0900,sector:4,pop:25000,price:1100,young:.41,desc:'Sud-ouest, Grand Arena'},
+  {name:'Timpuri Noi',lat:44.4150,lng:26.1130,sector:4,pop:12000,price:1900,young:.45,desc:'Bureaux Timpuri Noi Square'},
+  {name:'Aparatorii Patriei',lat:44.3880,lng:26.1250,sector:4,pop:20000,price:1250,young:.42,desc:'Metro M2, peripherie sud'},
+  // SECTOR 5 (pop 240,288)
+  {name:'Cotroceni',lat:44.4350,lng:26.0650,sector:5,pop:18000,price:2200,young:.44,desc:'Quartier universitaire, CSP+'},
+  {name:'13 Septembrie',lat:44.4250,lng:26.0750,sector:5,pop:20000,price:1900,young:.43,desc:'Proche centre, residentiel+'},
+  {name:'Rahova',lat:44.4050,lng:26.0600,sector:5,pop:40000,price:1100,young:.42,desc:'Quartier populaire dense'},
+  {name:'Ferentari',lat:44.4000,lng:26.0500,sector:5,pop:35000,price:700,young:.40,desc:'Quartier defavorise'},
+  {name:'Dealul Spirii',lat:44.4300,lng:26.0800,sector:5,pop:10000,price:2000,young:.43,desc:'Proche Eroilor, patrimoine'},
+  {name:'Progresul',lat:44.4130,lng:26.0800,sector:5,pop:15000,price:1400,young:.42,desc:'Mixte, Liberty Mall'},
+  // SECTOR 6 (pop 324,994)
+  {name:'Militari',lat:44.4310,lng:25.9900,sector:6,pop:50000,price:1500,young:.44,desc:'Grand ensemble ouest, M1+shopping'},
+  {name:'Drumul Taberei',lat:44.4230,lng:26.0200,sector:6,pop:55000,price:1700,young:.44,desc:'Populaire, metro M5, en hausse'},
+  {name:'Crangasi',lat:44.4550,lng:26.0380,sector:6,pop:25000,price:1500,young:.43,desc:'Proche centre, metro M1'},
+  {name:'Giulesti',lat:44.4600,lng:26.0450,sector:6,pop:22000,price:1400,young:.43,desc:'Nord secteur 6, mixte'},
+  {name:'Ghencea',lat:44.4130,lng:26.0350,sector:6,pop:20000,price:1300,young:.42,desc:'Sud-ouest, stade'},
+  {name:'Grozavesti-Regie',lat:44.4380,lng:26.0560,sector:6,pop:15000,price:1600,young:.46,desc:'Cite universitaire, Politehnica'},
+  {name:'Plaza Romania Zone',lat:44.4280,lng:26.0350,sector:6,pop:18000,price:1550,young:.43,desc:'Centre commercial, dense'},
+  // === QUARTIERS COMPLEMENTAIRES — combler les gaps population vs census ===
+  // SECTOR 1 gap: 41k
+  {name:'Herastrau-Nordului',lat:44.4820,lng:26.0750,sector:1,pop:14000,price:2800,young:.40,desc:'Parc Herastrau, luxe'},
+  {name:'Aviatiei',lat:44.4750,lng:26.0880,sector:1,pop:16000,price:2300,young:.43,desc:'Residentiel recent, bureaux'},
+  {name:'Damaroaia',lat:44.4850,lng:26.0500,sector:1,pop:12000,price:1400,young:.42,desc:'Nord-ouest, mixte'},
+  // SECTOR 2 gap: 95k
+  {name:'Mosilor-Calarasi',lat:44.4380,lng:26.1050,sector:2,pop:18000,price:1600,young:.44,desc:'Proche centre, commercial'},
+  {name:'Baicului',lat:44.4450,lng:26.1200,sector:2,pop:15000,price:1400,young:.44,desc:'Residentiel dense'},
+  {name:'Plumbuita',lat:44.4700,lng:26.1300,sector:2,pop:12000,price:1200,young:.43,desc:'Nord-est, parc'},
+  {name:'Pipera Sud',lat:44.4750,lng:26.1150,sector:2,pop:20000,price:1800,young:.46,desc:'Bureaux + residentiel neuf'},
+  {name:'Andronache',lat:44.4800,lng:26.1400,sector:2,pop:10000,price:1100,young:.43,desc:'Peripherie nord-est'},
+  {name:'Doamna Ghica',lat:44.4650,lng:26.1150,sector:2,pop:20000,price:1500,young:.44,desc:'Residentiel, bd Stefan'},
+  // SECTOR 3 gap: 140k
+  {name:'Lipscani-Old Town',lat:44.4320,lng:26.1000,sector:3,pop:8000,price:2200,young:.43,desc:'Centre historique, nightlife'},
+  {name:'Republica',lat:44.4250,lng:26.1500,sector:3,pop:20000,price:1300,young:.45,desc:'Metro M1, Hala Laminor'},
+  {name:'Ozana',lat:44.4200,lng:26.1700,sector:3,pop:22000,price:1200,young:.44,desc:'Grand ensemble est'},
+  {name:'Balta Alba',lat:44.4250,lng:26.1400,sector:3,pop:25000,price:1350,young:.45,desc:'Parc IOR, residentiel dense'},
+  {name:'1 Decembrie',lat:44.4120,lng:26.1650,sector:3,pop:20000,price:1200,young:.44,desc:'Extension est Titan'},
+  {name:'Splaiul Unirii Est',lat:44.4200,lng:26.1100,sector:3,pop:15000,price:1700,young:.44,desc:'Bureaux + residentiel'},
+  {name:'Calea Calarasilor',lat:44.4300,lng:26.1200,sector:3,pop:15000,price:1500,young:.45,desc:'Axe commercial est'},
+  {name:'Nicolae Teclu',lat:44.4050,lng:26.1700,sector:3,pop:16000,price:1100,young:.44,desc:'Peripherie sud-est'},
+  // SECTOR 4 gap: 81k
+  {name:'Eroii Revolutiei',lat:44.4050,lng:26.1000,sector:4,pop:18000,price:1600,young:.43,desc:'Metro M2, residentiel'},
+  {name:'Vacaresti',lat:44.4050,lng:26.1150,sector:4,pop:15000,price:1500,young:.43,desc:'Parc naturel Vacaresti'},
+  {name:'Progresul',lat:44.3950,lng:26.0900,sector:4,pop:18000,price:1300,young:.42,desc:'Sud-centre, commerce'},
+  {name:'Metalurgiei',lat:44.3750,lng:26.1200,sector:4,pop:15000,price:1100,young:.42,desc:'Grand Arena zone'},
+  {name:'Popesti-Leordeni lim.',lat:44.3700,lng:26.1400,sector:4,pop:16000,price:1200,young:.44,desc:'Limite sud, en expansion'},
+  // SECTOR 5 gap: 102k
+  {name:'Margeanului',lat:44.4100,lng:26.0500,sector:5,pop:18000,price:1000,young:.41,desc:'Ouest S5, populaire'},
+  {name:'Sebastian',lat:44.4200,lng:26.0700,sector:5,pop:20000,price:1400,young:.43,desc:'Proche Eroilor, mixte'},
+  {name:'Pieptanari',lat:44.4050,lng:26.0700,sector:5,pop:15000,price:1200,young:.42,desc:'Residentiel dense'},
+  {name:'Panduri',lat:44.4300,lng:26.0700,sector:5,pop:12000,price:1700,young:.43,desc:'Proche Cotroceni, CSP+'},
+  {name:'Giurgiului Nord',lat:44.3900,lng:26.0800,sector:5,pop:18000,price:900,young:.41,desc:'Quartier populaire'},
+  {name:'Odai-Antiaeriana',lat:44.3850,lng:26.0600,sector:5,pop:20000,price:800,young:.40,desc:'Peripherie sud-ouest'},
+  // SECTOR 6 gap: 120k
+  {name:'Militari Residence',lat:44.4300,lng:25.9600,sector:6,pop:25000,price:1300,young:.46,desc:'Plus grand quartier neuf, 40k hab'},
+  {name:'Pacii-Apusului',lat:44.4320,lng:25.9850,sector:6,pop:18000,price:1200,young:.43,desc:'Metro M1 Pacii, dense'},
+  {name:'Lujerului',lat:44.4340,lng:26.0300,sector:6,pop:20000,price:1500,young:.43,desc:'Metro M1, residentiel'},
+  {name:'Cotroceni-AFI Zone',lat:44.4320,lng:26.0520,sector:6,pop:15000,price:1800,young:.44,desc:'AFI Cotroceni, bureaux Campus6'},
+  {name:'Lacul Morii',lat:44.4400,lng:26.0200,sector:6,pop:12000,price:1300,young:.43,desc:'Lac, residentiel'},
+  {name:'Veteranilor',lat:44.4250,lng:26.0150,sector:6,pop:15000,price:1400,young:.43,desc:'Drumul Taberei sud'},
+  {name:'Gorjului-Razoare',lat:44.4300,lng:26.0100,sector:6,pop:16000,price:1350,young:.43,desc:'Metro M1 Gorjului'},
+];
+
+// Custom sites management
+let customSites = JSON.parse(sessionStorage.getItem('customSites')||'[]');
+
+function addCustomSite(lat,lng,name,notes) {
+  const id = Date.now();
+  const site = {id,lat,lng,name:name||'Site '+customSites.length,notes:notes||'',status:'prospect',rating:null,analysisData:null};
+  customSites.push(site);
+  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+  renderCustomSites();
+  addCustomSiteMarker(site);
+  return site;
+}
+
+function removeCustomSite(id) {
+  customSites = customSites.filter(s=>s.id!==id);
+  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+  renderCustomSites();
+  refreshCustomMarkers();
+}
+
+function qualifyCustomSite(id,status,rating) {
+  const site = customSites.find(s=>s.id===id);
+  if(site){site.status=status;site.rating=rating;sessionStorage.setItem('customSites',JSON.stringify(customSites));renderCustomSites()}
+}
+
+let customMarkersLayer = L.layerGroup();
+
+function addCustomSiteMarker(site) {
+  const colors={prospect:'#8b5cf6',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
+  const c=colors[site.status]||'#8b5cf6';
+  const icon=L.divIcon({className:'',
+    html:`<div style="width:22px;height:22px;background:${c};border:3px solid white;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;box-shadow:0 2px 8px ${c}80;cursor:pointer">&#9733;</div>`,
+    iconSize:[22,22],iconAnchor:[11,11]});
+  const mk=L.marker([site.lat,site.lng],{icon,draggable:false});
+  mk.bindPopup(`<h3>${site.name}</h3>
+    <div class="ps"><span>Statut</span><span class="pv" style="color:${c}">${site.status}</span></div>
+    <div class="ps"><span>Notes</span><span class="pv">${site.notes||'-'}</span></div>
+    <div style="margin-top:6px"><a href="#" onclick="analyzeCustomSite(${site.id});return false" style="color:#d4a017;font-size:11px;font-weight:600">Analyser ce site &rarr;</a></div>
+  `);
+  mk.siteId = site.id;
+  customMarkersLayer.addLayer(mk);
+}
+
+function refreshCustomMarkers() {
+  customMarkersLayer.clearLayers();
+  customSites.forEach(s=>addCustomSiteMarker(s));
+}
+
+function analyzeCustomSite(id) {
+  const site = customSites.find(s=>s.id===id);
+  if(!site) return;
+  map.flyTo([site.lat,site.lng],15);
+  setTimeout(()=>onMapClick({latlng:{lat:site.lat,lng:site.lng}}),500);
+}
+
+// Find nearest cartier for a point
+function findCartier(lat,lng) {
+  let best=null,bd=Infinity;
+  CARTIERE.forEach(c=>{
+    const d=haversine(lat,lng,c.lat,c.lng);
+    if(d<bd){bd=d;best=c}
+  });
+  return bd<2000?best:null;
+}
+
+// Neighborhood-level population estimate in radius
+function estimatePopInRadiusGranular(lat,lng,r) {
+  let totalPop=0,totalTarget=0,avgPrice=0,priceCount=0;
+  CARTIERE.forEach(c=>{
+    const d=haversine(lat,lng,c.lat,c.lng);
+    if(d<=r) {
+      totalPop+=c.pop;
+      totalTarget+=Math.round(c.pop*c.young);
+      avgPrice+=c.price;priceCount++;
+    } else if(d<=r*1.5) {
+      // Partial overlap — weighted by distance
+      const weight=Math.max(0,1-(d-r)/(r*0.5));
+      totalPop+=Math.round(c.pop*weight);
+      totalTarget+=Math.round(c.pop*c.young*weight);
+      avgPrice+=c.price;priceCount++;
+    }
+  });
+  return {pop:totalPop,target:totalTarget,avgPrice:priceCount>0?Math.round(avgPrice/priceCount):0};
+}
+
+// Revenue scenario modeling per zone
+function revenueScenarios(popTarget,nbCompetitors,avgPrice) {
+  // Market penetration assumptions calibrated on Romania (5% national, 8-12% urban)
+  const basePenetration = avgPrice > 2000 ? 0.10 : avgPrice > 1500 ? 0.08 : avgPrice > 1000 ? 0.06 : 0.04;
+  const competitorImpact = nbCompetitors > 0 ? Math.max(0.3, 1 - nbCompetitors * 0.06) : 1;
+
+  const pessimistic = Math.round(popTarget * basePenetration * competitorImpact * 0.6);
+  const realistic = Math.round(popTarget * basePenetration * competitorImpact);
+  const optimistic = Math.round(popTarget * basePenetration * competitorImpact * 1.4);
+
+  // Cap at FP target: 4000 members
+  const capMembers = n => Math.min(n, 5000);
+  const monthlyARPU = 24.68; // EUR HT from BP
+
+  return {
+    pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
+    realistic: {members:capMembers(realistic), ca:Math.round(capMembers(realistic)*monthlyARPU*12/1000)},
+    optimistic: {members:capMembers(optimistic), ca:Math.round(capMembers(optimistic)*monthlyARPU*12/1000)},
+    penetration: (basePenetration*competitorImpact*100).toFixed(1),
+    breakeven: capMembers(realistic) >= 2800 ? 'OUI' : capMembers(realistic) >= 2000 ? 'POSSIBLE' : 'NON'
+  };
+}
+
+// Cannibalization analysis between sites
+function cannibalizeRisk(site1,site2) {
+  const dist = haversine(site1.lat,site1.lng,site2.lat,site2.lng);
+  if(dist > 5000) return {risk:'faible',pct:0,dist};
+  if(dist > 3000) return {risk:'modere',pct:Math.round((1-dist/5000)*30),dist};
+  if(dist > 1500) return {risk:'significatif',pct:Math.round((1-dist/5000)*50),dist};
+  return {risk:'critique',pct:Math.round((1-dist/3000)*70),dist};
+}
+
+// ================================================================
+// POI DATABASE — Universities, Malls, Offices, Residential
+// Sources: Nominatim geocoding, official websites, INS Romania
+// ================================================================
+const POIS = [
+  // UNIVERSITIES (14) — Source: universityguru.com, official uni websites
+  {name:'Universitatea din Bucuresti (UB)',lat:44.435139,lng:26.080362,type:'university',students:33000,icon:'🎓'},
+  {name:'Politehnica Bucuresti (UPB)',lat:44.439368,lng:26.050603,type:'university',students:23000,icon:'🎓'},
+  {name:'ASE Bucuresti',lat:44.447677,lng:26.097152,type:'university',students:22000,icon:'🎓'},
+  {name:'UMF Carol Davila',lat:44.442020,lng:26.101938,type:'university',students:10000,icon:'🎓'},
+  {name:'SNSPA',lat:44.449603,lng:26.094087,type:'university',students:5000,icon:'🎓'},
+  {name:'Ion Mincu (Arhitectura)',lat:44.436173,lng:26.100374,type:'university',students:3000,icon:'🎓'},
+  {name:'USAMV Bucuresti',lat:44.471028,lng:26.066426,type:'university',students:8000,icon:'🎓'},
+  {name:'UNARTE Bucuresti',lat:44.444761,lng:26.087031,type:'university',students:2000,icon:'🎓'},
+  {name:'UNATC (Theatre & Film)',lat:44.437909,lng:26.130389,type:'university',students:1500,icon:'🎓'},
+  {name:'Spiru Haret University',lat:44.433381,lng:26.101018,type:'university',students:15000,icon:'🎓'},
+  {name:'Romanian-American University',lat:44.472984,lng:26.065692,type:'university',students:6000,icon:'🎓'},
+  {name:'Titu Maiorescu University',lat:44.411007,lng:26.115159,type:'university',students:8000,icon:'🎓'},
+  {name:'Hyperion University',lat:44.432737,lng:26.125487,type:'university',students:4000,icon:'🎓'},
+  {name:'Nicolae Titulescu University',lat:44.404416,lng:26.121035,type:'university',students:5000,icon:'🎓'},
+  // MALLS (13) — Source: romania-insider.com, official mall websites
+  {name:'AFI Cotroceni',lat:44.431500,lng:26.052000,type:'mall',gla:90000,icon:'🛒'},
+  {name:'Baneasa Shopping City',lat:44.507259,lng:26.089485,type:'mall',gla:85000,icon:'🛒'},
+  {name:'Mega Mall',lat:44.441776,lng:26.152213,type:'mall',gla:75000,icon:'🛒'},
+  {name:'ParkLake Mall',lat:44.420665,lng:26.149631,type:'mall',gla:70000,icon:'🛒'},
+  {name:'Sun Plaza',lat:44.395444,lng:26.123051,type:'mall',gla:81000,icon:'🛒'},
+  {name:'Promenada Mall',lat:44.478191,lng:26.103413,type:'mall',gla:45000,icon:'🛒'},
+  {name:'Bucuresti Mall',lat:44.420262,lng:26.126688,type:'mall',gla:50000,icon:'🛒'},
+  {name:'Plaza Romania',lat:44.428482,lng:26.035172,type:'mall',gla:55000,icon:'🛒'},
+  {name:'Militari Shopping',lat:44.436707,lng:25.982650,type:'mall',gla:54000,icon:'🛒'},
+  {name:'Veranda Mall',lat:44.452127,lng:26.129041,type:'mall',gla:30000,icon:'🛒'},
+  {name:'Grand Arena Mall',lat:44.374227,lng:26.120416,type:'mall',gla:50000,icon:'🛒'},
+  {name:'Unirea Shopping Center',lat:44.427541,lng:26.101922,type:'mall',gla:40000,icon:'🛒'},
+  {name:'Liberty Mall',lat:44.415067,lng:26.080094,type:'mall',gla:25000,icon:'🛒'},
+  // OFFICE DISTRICTS (5) — Source: Cushman & Wakefield, romania-insider.com
+  {name:'Pipera Business District',lat:44.478813,lng:26.112428,type:'office',employees:45000,icon:'🏢'},
+  {name:'Floreasca-Barbu Vacarescu',lat:44.471986,lng:26.108830,type:'office',employees:25000,icon:'🏢'},
+  {name:'Center-West (Cotroceni)',lat:44.433000,lng:26.055000,type:'office',employees:15000,icon:'🏢'},
+  {name:'Timpuri Noi Square',lat:44.411499,lng:26.115091,type:'office',employees:15000,icon:'🏢'},
+  {name:'Sema Parc',lat:44.442909,lng:26.048414,type:'office',employees:10000,icon:'🏢'},
+  // MAJOR RESIDENTIAL (4) — Source: romania-insider.com
+  {name:'Militari Residence',lat:44.430000,lng:25.960000,type:'residential',inhabitants:25000,icon:'🏠'},
+  {name:'Cosmopolis',lat:44.530000,lng:26.115000,type:'residential',inhabitants:7500,icon:'🏠'},
+  {name:'Greenfield Baneasa',lat:44.490189,lng:26.084950,type:'residential',inhabitants:5000,icon:'🏠'},
+  {name:'One Herastrau',lat:44.488000,lng:26.078000,type:'residential',inhabitants:3000,icon:'🏠'},
+];
+
+let poiLayer = L.layerGroup();
+
+// ================================================================
+// INIT
+// ================================================================
+function init() {
+  map = L.map('map',{center:BUCHAREST,zoom:12,zoomControl:false,attributionControl:false});
+  L.control.zoom({position:'topright'}).addTo(map);
+  L.control.attribution({position:'bottomright',prefix:false}).addTo(map).addAttribution('&copy; OSM &copy; CARTO');
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+
+  map.addLayer(compCluster);
+  map.addLayer(transportLayer);
+  map.addLayer(poiLayer);
+
+  drawSectors();
+  renderSectorList();
+  renderTargets();
+  initCharts();
+  initTabs();
+  initSearch();
+
+  map.on('click', function(e) {
+    if(addingSite) {
+      addingSite = false;
+      map.getContainer().style.cursor = '';
+      setStatus('ok','APIs connectees');
+      const name = prompt('Nom du site :', 'Site '+(customSites.length+1)) || 'Site '+(customSites.length+1);
+      const notes = prompt('Notes (optionnel) :', '') || '';
+      const site = addCustomSite(e.latlng.lat, e.latlng.lng, name, notes);
+      switchTab('mysites');
+      runSiteAnalysis(site);
+      return;
+    }
+    onMapClick(e);
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      if(addingSite){addingSite=false;map.getContainer().style.cursor='';setStatus('ok','APIs connectees');return}
+      closePanel();
+    }
+  });
+
+  // Custom sites layer + restore
+  map.addLayer(customMarkersLayer);
+  refreshCustomMarkers();
+  renderCustomSites();
+
+  // Restore cache
+  try{const c=sessionStorage.getItem('opCache');if(c){opCache=JSON.parse(c);updCache()}}catch(e){}
+}
+
+// ================================================================
+// SECTORS DRAWING
+// ================================================================
+function drawSectors() {
+  SECTORS.forEach(s => {
+    const poly = L.polygon(s.polygon,{
+      color:s.color,weight:2,fillColor:s.color,fillOpacity:.12,
+      smoothFactor:1
+    });
+
+    poly.on('click',e=>{L.DomEvent.stopPropagation(e);zoomSector(s.id)});
+    poly.on('mouseover',function(){this.setStyle({fillOpacity:.28})});
+    poly.on('mouseout',function(){this.setStyle({fillOpacity:.12})});
+    poly.bindTooltip(`<b>${s.name}</b><br>${s.desc}<br>Pop: ${fmt(s.pop)} | 15-45: ${fmt(Math.round(s.pop*s.youngPct))}`,{
+      sticky:true,className:'custom-tooltip',direction:'top'
+    });
+
+    sectorPolys[s.id] = poly;
+    poly.addTo(map);
+
+    // Label
+    L.marker(s.center,{
+      icon:L.divIcon({
+        className:'',
+        html:`<div style="background:${s.color};color:white;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;opacity:.85;font-family:var(--font);letter-spacing:.3px">${s.name}</div>`,
+        iconSize:[80,24],iconAnchor:[40,12]
+      })
+    }).addTo(map);
+  });
+}
+
+// ================================================================
+// MAP CLICK — Core analysis flow
+// ================================================================
+let radiusHandle = null;
+let popLabel = null;
+
+// Estimate population in a circle based on sector density overlap
+function estimatePopInRadius(lat,lng,r) {
+  let totalPop=0, totalTarget=0;
+  const rKm = r/1000;
+  const circleArea = Math.PI * rKm * rKm;
+  SECTORS.forEach(s=>{
+    const dToCenter = haversine(lat,lng,s.center[0],s.center[1])/1000;
+    const sectorRadius = Math.sqrt(s.area/Math.PI);
+    const overlap = Math.max(0, Math.min(1, 1 - (dToCenter / (sectorRadius + rKm))));
+    if(overlap > 0) {
+      const densityKm2 = s.pop / s.area;
+      const targetDensity = (s.pop * s.youngPct) / s.area;
+      const contributingArea = Math.min(circleArea, s.area) * overlap;
+      totalPop += Math.round(densityKm2 * contributingArea);
+      totalTarget += Math.round(targetDensity * contributingArea);
+    }
+  });
+  return {pop:totalPop, target:totalTarget};
+}
+
+// Count POIs within radius and estimate additional foot traffic
+function poisInRadius(lat,lng,r) {
+  const unis=[],malls=[],offices=[];
+  let totalStudents=0, totalEmployees=0;
+  POIS.forEach(p=>{
+    if(haversine(lat,lng,p.lat,p.lng) <= r) {
+      if(p.type==='university'){unis.push(p);totalStudents+=(p.students||0)}
+      else if(p.type==='mall'){malls.push(p)}
+      else if(p.type==='office'){offices.push(p);totalEmployees+=(p.employees||0)}
+    }
+  });
+  return {unis,malls,offices,totalStudents,totalEmployees};
+}
+
+function updateRadiusLabel() {
+  if(!circle || !selectedPt) return;
+  const r = circle.getRadius();
+  const est = estimatePopInRadiusGranular(selectedPt.lat, selectedPt.lng, r);
+  const compsInRadius = VERIFIED_CLUBS.filter(c=>haversine(selectedPt.lat,selectedPt.lng,c.lat,c.lng)<=r).length;
+  const poi = poisInRadius(selectedPt.lat, selectedPt.lng, r);
+
+  if(popLabel) map.removeLayer(popLabel);
+  const labelLat = selectedPt.lat;
+  const labelLng = selectedPt.lng + (r / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
+  popLabel = L.marker([labelLat, labelLng], {
+    icon: L.divIcon({
+      className:'',
+      html:`<div style="background:rgba(6,8,15,.94);border:1px solid rgba(212,160,23,.5);border-radius:8px;padding:7px 11px;font-size:10px;color:white;white-space:nowrap;font-family:var(--font);box-shadow:0 2px 10px rgba(0,0,0,.5)">
+        <div style="font-weight:800;color:#d4a017;font-size:13px;margin-bottom:2px">${(r/1000).toFixed(1)} km</div>
+        <div>Pop: <b>${fmt(est.pop)}</b></div>
+        <div>Cible 15-45: <b style="color:#3b82f6">${fmt(est.target)}</b></div>
+        <div>Clubs fitness: <b style="color:#f97316">${compsInRadius}</b></div>
+        ${poi.unis.length?`<div>Universites: <b style="color:#a855f7">${poi.unis.length}</b> (${fmt(poi.totalStudents)} etud.)</div>`:''}
+        ${poi.offices.length?`<div>Bureaux: <b style="color:#3b82f6">${poi.offices.length}</b> (~${fmt(poi.totalEmployees)} empl.)</div>`:''}
+        ${poi.malls.length?`<div>Malls: <b style="color:#06b6d4">${poi.malls.length}</b></div>`:''}
+      </div>`,
+      iconSize:[160,80],iconAnchor:[-8,40]
+    })
+  }).addTo(map);
+}
+
+async function onMapClick(e) {
+  const {lat,lng} = e.latlng;
+  selectedPt = {lat,lng};
+
+  if(circle) map.removeLayer(circle);
+  if(radiusHandle) map.removeLayer(radiusHandle);
+  if(popLabel) map.removeLayer(popLabel);
+
+  // Extensible catchment circle — drag the edge to resize
+  circle = L.circle([lat,lng],{
+    radius,color:'#d4a017',weight:2,fillColor:'#d4a017',fillOpacity:.06,dashArray:'8,6'
+  }).addTo(map);
+
+  // Add draggable radius handle
+  const handleLat = lat;
+  const handleLng = lng + (radius / 111320 / Math.cos(lat * Math.PI/180));
+  radiusHandle = L.circleMarker([handleLat, handleLng], {
+    radius:7, color:'#d4a017', fillColor:'white', fillOpacity:1, weight:2,
+    draggable:false // we handle drag via events
+  }).addTo(map);
+
+  // Enable drag on the handle to resize the catchment
+  radiusHandle.on('mousedown', function(e){
+    L.DomEvent.stopPropagation(e);
+    map.dragging.disable();
+    const onMove = function(ev){
+      const newR = haversine(lat,lng,ev.latlng.lat,ev.latlng.lng);
+      if(newR >= 200 && newR <= 10000) {
+        radius = Math.round(newR);
+        circle.setRadius(radius);
+        radiusHandle.setLatLng(ev.latlng);
+        updateRadiusLabel();
+        // Update pill selection
+        document.querySelectorAll('.radius-pill').forEach(p=>p.classList.remove('active'));
+      }
+    };
+    const onUp = function(){
+      map.off('mousemove',onMove);
+      map.off('mouseup',onUp);
+      map.dragging.enable();
+      // Re-analyze with new radius
+      analyzePoint(lat,lng,findSector(lat,lng));
+    };
+    map.on('mousemove',onMove);
+    map.on('mouseup',onUp);
+  });
+
+  // Style the handle cursor
+  radiusHandle.getElement && radiusHandle.getElement() && (radiusHandle.getElement().style.cursor='ew-resize');
+
+  updateRadiusLabel();
+
+  const sector = findSector(lat,lng);
+  const popEst = estimatePopInRadiusGranular(lat,lng,radius);
+  const poi = poisInRadius(lat,lng,radius);
+
+  // Point info box
+  el('pointBox').style.display='block';
+  el('pointBoxContent').innerHTML=`
+    <div class="map-stat"><span>Coordonnees</span><span class="map-stat-v" style="font-family:var(--mono);font-size:10px">${lat.toFixed(4)}, ${lng.toFixed(4)}</span></div>
+    <div class="map-stat"><span>Secteur</span><span class="map-stat-v">${sector?sector.name:'Hors Bucarest'}</span></div>
+    <div class="map-stat"><span>Rayon</span><span class="map-stat-v">${radius/1000} km</span></div>
+    <div class="map-stat"><span>Pop. dans rayon</span><span class="map-stat-v" style="color:var(--blue)">${fmt(popEst.pop)}</span></div>
+    <div class="map-stat"><span>Cible 15-45 ans</span><span class="map-stat-v" style="color:var(--green);font-weight:800">${fmt(popEst.target)}</span></div>
+    ${sector?`<div class="map-stat"><span>Revenu zone</span><span class="map-stat-v">${sector.income}</span></div>`:''}
+    ${poi.unis.length?`<div class="map-stat"><span>Universites</span><span class="map-stat-v" style="color:#a855f7">${poi.unis.length} (${fmt(poi.totalStudents)} etud.)</span></div>`:''}
+    ${poi.offices.length?`<div class="map-stat"><span>Poles bureaux</span><span class="map-stat-v" style="color:var(--blue)">${poi.offices.length} (~${fmt(poi.totalEmployees)} empl.)</span></div>`:''}
+    ${poi.malls.length?`<div class="map-stat"><span>Centres commerciaux</span><span class="map-stat-v" style="color:var(--cyan)">${poi.malls.length}</span></div>`:''}
+    <div style="margin-top:6px;font-size:9px;color:var(--gray2)">Tirez le bord du cercle pour ajuster le rayon</div>
+  `;
+
+  await analyzePoint(lat,lng,sector);
+}
+
+async function analyzePoint(lat,lng,sector) {
+  showLoad('Detection des concurrents...','Croisement base verifiee (83 clubs) + Overpass API');
+
+  // Always start with verified database
+  let verifiedInRadius = getDemoInRadius(lat,lng,radius);
+
+  let comps;
+  if(demo) {
+    comps = verifiedInRadius;
+  } else {
+    // Fetch from Overpass and merge with verified DB (cross-reference)
+    const overpassComps = await fetchOverpass(lat,lng,radius);
+    // Merge: keep verified DB as base, add any Overpass result not already in verified
+    const merged = [...verifiedInRadius];
+    overpassComps.forEach(oc => {
+      const alreadyExists = merged.some(vc =>
+        haversine(vc.lat,vc.lng,oc.lat,oc.lng) < 150 // within 150m = same club
+      );
+      if(!alreadyExists) merged.push(oc);
+    });
+    comps = merged;
+  }
+
+  curComps = comps;
+
+  const saz = calcSAZ(lat,lng,sector,comps);
+  displaySAZ(saz);
+  displayComps(comps,lat,lng);
+  updateSegChart(comps);
+  addZone(lat,lng,sector,saz,comps);
+  genSiteCard(lat,lng,sector,saz,comps);
+
+  hideLoad();
+}
+
+function findSector(lat,lng) {
+  let best=null,bd=Infinity;
+  SECTORS.forEach(s=>{
+    const d=Math.sqrt((lat-s.center[0])**2+(lng-s.center[1])**2);
+    if(d<bd){bd=d;best=s}
+  });
+  return bd<.06?best:null;
+}
+
+// ================================================================
+// OVERPASS API
+// ================================================================
+async function fetchOverpass(lat,lng,r) {
+  const key=`${lat.toFixed(3)}_${lng.toFixed(3)}_${r}`;
+  if(opCache[key]) return opCache[key];
+
+  const q=`[out:json][timeout:30];(node["leisure"="fitness_centre"](around:${r},${lat},${lng});way["leisure"="fitness_centre"](around:${r},${lat},${lng});node["leisure"="sports_centre"](around:${r},${lat},${lng});way["leisure"="sports_centre"](around:${r},${lat},${lng});node["sport"="fitness"](around:${r},${lat},${lng});way["sport"="fitness"](around:${r},${lat},${lng});node["amenity"="gym"](around:${r},${lat},${lng});way["amenity"="gym"](around:${r},${lat},${lng}););out center body;`;
+
+  try {
+    const res=await fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+    const data=await res.json();
+
+    const comps=data.elements.map(el=>{
+      const lt=el.lat||(el.center&&el.center.lat);
+      const ln=el.lon||(el.center&&el.center.lon);
+      if(!lt||!ln) return null;
+      const nm=el.tags?.name||el.tags?.brand||'Salle inconnue';
+      const m=matchDB(nm);
+      return {id:el.id,name:nm,lat:lt,lng:ln,
+        segment:m?.segment||guessSeg(nm),size:m?.avgSize||guessSize(nm),
+        members:m?.avgMembers||guessMembers(nm),threat:m?.threat||'low',
+        color:m?.color||'#22c55e',price:m?.price||'?',
+        brand:m?.brand||'local',est:!m,source:'overpass'};
+    }).filter(Boolean);
+
+    const dd=dedup(comps);
+    opCache[key]=dd;
+    sessionStorage.setItem('opCache',JSON.stringify(opCache));
+    updCache();
+    return dd;
+  } catch(e) {
+    console.error('Overpass:',e);
+    setStatus('err','Overpass indisponible — fallback estimations');
+    return getDemoInRadius(lat,lng,r);
+  }
+}
+
+async function fetchAllBucharest() {
+  const key='all_buc';
+  if(opCache[key]) return opCache[key];
+  showLoad('Scan complet Bucarest...','Requete Overpass API — tous les POI fitness');
+
+  const q=`[out:json][timeout:60];area["name"="București"]->.b;(node["leisure"="fitness_centre"](area.b);way["leisure"="fitness_centre"](area.b);node["leisure"="sports_centre"](area.b);way["leisure"="sports_centre"](area.b);node["sport"="fitness"](area.b);way["sport"="fitness"](area.b);node["amenity"="gym"](area.b);way["amenity"="gym"](area.b););out center body;`;
+
+  try {
+    const res=await fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+    const data=await res.json();
+    const comps=data.elements.map(el=>{
+      const lt=el.lat||(el.center&&el.center.lat);const ln=el.lon||(el.center&&el.center.lon);
+      if(!lt||!ln)return null;
+      const nm=el.tags?.name||el.tags?.brand||'Salle inconnue';const m=matchDB(nm);
+      return{id:el.id,name:nm,lat:lt,lng:ln,segment:m?.segment||guessSeg(nm),size:m?.avgSize||guessSize(nm),
+        members:m?.avgMembers||guessMembers(nm),threat:m?.threat||'low',color:m?.color||'#22c55e',
+        price:m?.price||'?',brand:m?.brand||'local',est:!m,source:'overpass'};
+    }).filter(Boolean);
+    const dd=dedup(comps);
+    opCache[key]=dd;
+    allComps=dd;
+    hideLoad();
+    return dd;
+  } catch(e) {
+    hideLoad();
+    return demo?DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'})):[];
+  }
+}
+
+function matchDB(name) {
+  if(!name) return null;
+  const l=name.toLowerCase();
+  return COMP_DB.find(c=>l.includes(c.name.toLowerCase()));
+}
+function guessSeg(n){if(!n)return'independent';const l=n.toLowerCase();if(l.includes('crossfit')||l.includes('box'))return'crossfit';if(l.includes('yoga')||l.includes('pilates'))return'boutique';return'independent'}
+function guessSize(n){const s=guessSeg(n);return{premium:1500,mid:600,'mid-premium':800,lowcost:1000,independent:300,crossfit:250,boutique:200}[s]||300}
+function guessMembers(n){const s=guessSeg(n);return{premium:2000,mid:600,'mid-premium':1000,lowcost:1500,independent:250,crossfit:150,boutique:100}[s]||250}
+function dedup(list){const r=[];list.forEach(c=>{if(!r.some(x=>Math.abs(x.lat-c.lat)<.0003&&Math.abs(x.lng-c.lng)<.0003))r.push(c)});return r}
+function getDemoInRadius(lat,lng,r){
+  return VERIFIED_CLUBS.filter(c=>haversine(lat,lng,c.lat,c.lng)<=r).map(c=>{
+    const m=matchDB(c.name);
+    return{...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),
+      threat:segThreat(c.segment),brand:m?.brand||'local',price:m?.price||'?'};
+  });
+}
+function segColor(s){return{premium:'#ef4444','mid-premium':'#f97316',mid:'#f97316',lowcost:'#eab308',independent:'#22c55e',crossfit:'#22c55e',boutique:'#8b5cf6',aggregator:'#eab308'}[s]||'#22c55e'}
+function segThreat(s){return{premium:'high','mid-premium':'medium',mid:'medium',lowcost:'medium',independent:'low',crossfit:'low',boutique:'low'}[s]||'low'}
+
+// ================================================================
+// THREAT SCORE
+// ================================================================
+function threatScore(c,dist) {
+  // Proximity 40%
+  let prox;
+  if(dist<300)prox=100;else if(dist<500)prox=90;else if(dist<1000)prox=70;
+  else if(dist<1500)prox=50;else if(dist<2000)prox=35;else if(dist<3000)prox=20;else prox=8;
+
+  // Size 25%
+  let sz=30;
+  if(c.size){if(c.size>1500)sz=100;else if(c.size>1000)sz=80;else if(c.size>600)sz=55;else if(c.size>300)sz=35;else sz=15}
+
+  // Positioning 20% — same target segment = more dangerous
+  const pos={premium:95,'mid-premium':75,mid:50,lowcost:35,independent:18,crossfit:12,boutique:10,aggregator:40};
+
+  // Brand strength 15%
+  const br=c.est?25:c.brand==='international'?90:c.brand==='local'?55:30;
+
+  return Math.round(prox*.40+sz*.25+(pos[c.segment]||20)*.20+br*.15);
+}
+
+// ================================================================
+// SAZ — Score d'Attractivite de Zone
+// ================================================================
+// ================================================================
+// SAZ v2 — Restructure autour de FLUX + DENSITE (50/50)
+// Objectif business : clubs a fort traffic, generateurs de flux
+// ================================================================
+
+// Traffic generators with estimated daily footfall
+// Metro ridership by station (estimated from 750k total/day, weighted by interchange + line)
+// Interchanges = 2-5x regular stations, M2 busiest line, terminals lower
+const METRO_RIDERSHIP = {};
+(function(){
+  // Interchange mega-stations
+  const interchanges={Unirii:85000,Victoriei:70000,'Gara de Nord':55000,Dristor:45000,Eroilor:40000,Basarab:35000,'Nicolae Grigorescu':30000,'Mihai Bravu':28000};
+  // M2 (busiest): avg 18k/station
+  const m2busy={Pipera:25000,'Aurel Vlaicu':22000,'Stefan cel Mare':18000,'Piata Romana':28000,Universitate:30000,Tineretului:16000,'Piata Sudului':15000,'Constantin Brancoveanu':14000,'Eroii Revolutiei':16000,'Aparatorii Patriei':12000,'Dimitrie Leonida':10000,Aviatorilor:20000};
+  // M1: avg 14k
+  const m1={'Pantelimon':8000,Republica:12000,'Costin Georgian':10000,Titan:18000,'Piata Muncii':15000,'Piata Iancului':14000,Obor:16000};
+  // M3: avg 12k
+  const m3={Preciziei:8000,Pacii:10000,Gorjului:11000,Lujerului:14000,Politehnica:16000,'Anghel Saligny':8000,'Nicolae Teclu':7000,'1 Decembrie 1918':9000};
+  // M4: avg 10k
+  const m4={Grivita:10000,'1 Mai':12000,Jiului:9000,'Parc Bazilescu':8000,Laminorului:7000,Straulesti:6000,Pajura:8000};
+  // M5: avg 12k
+  const m5={'Academia Militara':14000,Orizont:11000,Favorit:10000,'Tudor Vladimirescu':10000,'Parc Drumul Taberei':13000,Romancierilor:9000,'Valea Ialomitei':8000,Brancusi:8000,'Raul Doamnei':7000};
+  // Default for unlisted
+  [interchanges,m2busy,m1,m3,m4,m5].forEach(obj=>Object.assign(METRO_RIDERSHIP,obj));
+  // Add Timpuri Noi, Izvor
+  METRO_RIDERSHIP['Timpuri Noi']=15000;METRO_RIDERSHIP['Izvor']=12000;
+  METRO_RIDERSHIP['Petrache Poenaru']=9000;METRO_RIDERSHIP['Grozavesti']=14000;
+  METRO_RIDERSHIP['Baneasa']=10000;METRO_RIDERSHIP['Crangasi']=12000;
+  METRO_RIDERSHIP['Berceni']=8000;METRO_RIDERSHIP['Tudor Arghezi']=6000;
+})();
+
+// Get ridership for a metro station
+function getMetroRidership(stationName) {
+  for(const [key,val] of Object.entries(METRO_RIDERSHIP)) {
+    if(stationName.includes(key) || key.includes(stationName)) return val;
+  }
+  return 10000; // default for unknown
+}
+
+const TRAFFIC_GENERATORS = {
+  metroInterchange: [{name:'Unirii',lat:44.4268,lng:26.1008,dailyPax:85000},
+    {name:'Victoriei',lat:44.4527,lng:26.0855,dailyPax:70000},
+    {name:'Dristor',lat:44.4200,lng:26.1320,dailyPax:45000},
+    {name:'Eroilor',lat:44.4325,lng:26.0710,dailyPax:40000},
+    {name:'Basarab',lat:44.4490,lng:26.0630,dailyPax:35000},
+    {name:'Nicolae Grigorescu',lat:44.4170,lng:26.1510,dailyPax:30000},
+    {name:'Gara de Nord',lat:44.4470,lng:26.0710,dailyPax:55000}],
+  malls: [{name:'AFI Cotroceni',lat:44.4315,lng:26.0520,dailyVisitors:60000},
+    {name:'Mega Mall',lat:44.4418,lng:26.1522,dailyVisitors:35000},
+    {name:'ParkLake',lat:44.4207,lng:26.1496,dailyVisitors:30000},
+    {name:'Baneasa Shopping',lat:44.5073,lng:26.0895,dailyVisitors:30000},
+    {name:'Sun Plaza',lat:44.3954,lng:26.1231,dailyVisitors:28000},
+    {name:'Promenada',lat:44.4782,lng:26.1034,dailyVisitors:25000},
+    {name:'Unirea Shopping',lat:44.4275,lng:26.1019,dailyVisitors:25000},
+    {name:'Plaza Romania',lat:44.4285,lng:26.0352,dailyVisitors:20000},
+    {name:'Militari Shopping',lat:44.4367,lng:25.9827,dailyVisitors:18000},
+    {name:'Veranda Mall',lat:44.4521,lng:26.1290,dailyVisitors:15000},
+    {name:'Grand Arena',lat:44.3742,lng:26.1204,dailyVisitors:15000},
+    {name:'Bucuresti Mall',lat:44.4203,lng:26.1267,dailyVisitors:18000}],
+  pedestrian: [{name:'Calea Victoriei',lat:44.4440,lng:26.0930,dailyPed:50000},
+    {name:'Old Town Lipscani',lat:44.4320,lng:26.1000,dailyPed:40000},
+    {name:'Bd Magheru',lat:44.4430,lng:26.0980,dailyPed:35000},
+    {name:'Piata Romana',lat:44.4460,lng:26.0970,dailyPed:30000},
+    {name:'Piata Universitatii',lat:44.4355,lng:26.1002,dailyPed:35000}],
+  // Tram/Bus major corridors (STB 1B pax/year = ~2.7M/day)
+  tramCorridor: [
+    {name:'Bd Stefan cel Mare (tram 21/40)',lat:44.4530,lng:26.1100,dailyPax:25000},
+    {name:'Bd Colentina (tram 21)',lat:44.4600,lng:26.1350,dailyPax:18000},
+    {name:'Sos Mihai Bravu (tram 40)',lat:44.4200,lng:26.1300,dailyPax:20000},
+    {name:'Sos Pantelimon (tram 1/40)',lat:44.4400,lng:26.1600,dailyPax:15000},
+    {name:'Bd Iuliu Maniu (bus 137/301)',lat:44.4340,lng:26.0100,dailyPax:22000},
+    {name:'Bd Magheru-Balcescu (bus 783/N)',lat:44.4400,lng:26.0970,dailyPax:20000},
+    {name:'Calea Vacaresti (bus 116/312)',lat:44.4100,lng:26.1100,dailyPax:15000},
+  ],
+  // Parking capacity (relevant for suburban clubs)
+  parking: [
+    {name:'Hala Laminor',lat:44.4258,lng:26.1492,spaces:1325},
+    {name:'AFI Cotroceni',lat:44.4315,lng:26.0520,spaces:3500},
+    {name:'Mega Mall',lat:44.4418,lng:26.1522,spaces:2500},
+    {name:'Militari Shopping',lat:44.4367,lng:25.9827,spaces:2500},
+    {name:'ParkLake',lat:44.4207,lng:26.1496,spaces:2400},
+    {name:'Sun Plaza',lat:44.3954,lng:26.1231,spaces:1900},
+    {name:'Grand Arena',lat:44.3742,lng:26.1204,spaces:2000},
+    {name:'Plaza Romania',lat:44.4285,lng:26.0352,spaces:1800},
+    {name:'Baneasa Shopping',lat:44.5073,lng:26.0895,spaces:3000},
+    {name:'Promenada',lat:44.4782,lng:26.1034,spaces:1600},
+  ]
+};
+
+// SAZ weight configuration — adjustable by user
+let sazWeights = {flux:33, densite:33, jeunesse:34};
+
+// Calculate FLUX score (0-100) — proximity to traffic generators
+function calcFluxScore(lat,lng) {
+  let metroScore=0, mallScore=0, officeScore=0, uniScore=0, pedScore=0;
+
+  // 1. Metro proximity & ridership (weight: 30% of flux)
+  TRAFFIC_GENERATORS.metroInterchange.forEach(m=>{
+    const d=haversine(lat,lng,m.lat,m.lng);
+    if(d<500) metroScore+=m.dailyPax/1000;
+    else if(d<1000) metroScore+=m.dailyPax/2000;
+    else if(d<2000) metroScore+=m.dailyPax/5000;
+  });
+  // Per-station ridership scoring
+  METRO.forEach(m=>{
+    const d=haversine(lat,lng,m.lat,m.lng);
+    const pax=getMetroRidership(m.n)/1000;
+    if(d<400) metroScore+=pax*1.5;
+    else if(d<800) metroScore+=pax*0.8;
+    else if(d<1500) metroScore+=pax*0.3;
+  });
+  // Tram/bus corridors
+  TRAFFIC_GENERATORS.tramCorridor.forEach(t=>{
+    const d=haversine(lat,lng,t.lat,t.lng);
+    if(d<300) metroScore+=t.dailyPax/3000;
+    else if(d<800) metroScore+=t.dailyPax/6000;
+  });
+  metroScore=Math.min(100,Math.round(metroScore));
+
+  // 2. Mall proximity & footfall (weight: 25% of flux)
+  TRAFFIC_GENERATORS.malls.forEach(m=>{
+    const d=haversine(lat,lng,m.lat,m.lng);
+    if(d<300) mallScore+=m.dailyVisitors/500;
+    else if(d<800) mallScore+=m.dailyVisitors/1500;
+    else if(d<1500) mallScore+=m.dailyVisitors/4000;
+    else if(d<3000) mallScore+=m.dailyVisitors/10000;
+  });
+  mallScore=Math.min(100,Math.round(mallScore));
+
+  // 3. Office/Employee flux (weight: 25% of flux)
+  POIS.filter(p=>p.type==='office').forEach(p=>{
+    const d=haversine(lat,lng,p.lat,p.lng);
+    const emp=p.employees||0;
+    if(d<500) officeScore+=emp/500;
+    else if(d<1500) officeScore+=emp/2000;
+    else if(d<3000) officeScore+=emp/5000;
+  });
+  officeScore=Math.min(100,Math.round(officeScore));
+
+  // 4. University/Student flux (weight: 10% of flux)
+  POIS.filter(p=>p.type==='university').forEach(p=>{
+    const d=haversine(lat,lng,p.lat,p.lng);
+    const stu=p.students||0;
+    if(d<500) uniScore+=stu/300;
+    else if(d<1500) uniScore+=stu/1000;
+    else if(d<3000) uniScore+=stu/3000;
+  });
+  uniScore=Math.min(100,Math.round(uniScore));
+
+  // 5. Pedestrian zone proximity (weight: 10% of flux)
+  TRAFFIC_GENERATORS.pedestrian.forEach(p=>{
+    const d=haversine(lat,lng,p.lat,p.lng);
+    if(d<300) pedScore+=p.dailyPed/500;
+    else if(d<800) pedScore+=p.dailyPed/2000;
+    else if(d<2000) pedScore+=p.dailyPed/5000;
+  });
+  pedScore=Math.min(100,Math.round(pedScore));
+
+  const composite = Math.round(metroScore*.30 + mallScore*.25 + officeScore*.25 + uniScore*.10 + pedScore*.10);
+
+  return {total:Math.min(100,composite),metro:metroScore,mall:mallScore,office:officeScore,uni:uniScore,ped:pedScore};
+}
+
+// Calculate DENSITE score (0-100) — population density + income + competition
+function calcDensiteScore(lat,lng,sector,comps) {
+  if(!sector) return {total:0,pop:0,density:0,income:0,comp:0};
+
+  const popTarget=Math.round(sector.pop*sector.youngPct);
+  const maxTarget=Math.max(...SECTORS.map(s=>s.pop*s.youngPct));
+  const popScore=Math.round((popTarget/maxTarget)*100);
+
+  const dKm2=popTarget/sector.area;
+  const maxDensity=Math.max(...SECTORS.map(s=>(s.pop*s.youngPct)/s.area));
+  const densityScore=Math.round((dKm2/maxDensity)*100);
+
+  const incomeScore=sector.incomeIdx;
+
+  const n=comps.length;
+  let compScore;
+  if(n===0)compScore=100;else if(n<=1)compScore=90;else if(n<=3)compScore=70;
+  else if(n<=5)compScore=50;else if(n<=8)compScore=30;else if(n<=12)compScore=15;else compScore=5;
+
+  const total=Math.round(popScore*.30 + densityScore*.25 + incomeScore*.25 + compScore*.20);
+  return {total,pop:popScore,density:densityScore,income:incomeScore,comp:compScore,
+    details:{popTarget,totalPop:sector.pop,dKm2:Math.round(dKm2),nbComp:n}};
+}
+
+// ================================================================
+// JEUNESSE SCORE (0-100) — Presence de population jeune 15-45
+// ================================================================
+function calcJeunesseScore(lat,lng,sector) {
+  let uniScore=0, ageScore=0, newResScore=0, cartierYoung=0;
+
+  // 1. Universites & etudiants a proximite (40% du score Jeunesse)
+  let totalStudents=0;
+  POIS.filter(p=>p.type==='university').forEach(p=>{
+    const d=haversine(lat,lng,p.lat,p.lng);
+    const stu=p.students||0;
+    if(d<500) {totalStudents+=stu; uniScore+=stu/200;}
+    else if(d<1000) {totalStudents+=Math.round(stu*.7); uniScore+=stu/400;}
+    else if(d<2000) {totalStudents+=Math.round(stu*.3); uniScore+=stu/1000;}
+    else if(d<3000) {totalStudents+=Math.round(stu*.1); uniScore+=stu/2500;}
+  });
+  uniScore=Math.min(100,Math.round(uniScore));
+
+  // 2. Profil age du quartier (30% du score Jeunesse) — % jeunes du cartier
+  const cartier=findCartier(lat,lng);
+  if(cartier) {
+    cartierYoung = cartier.young || .42;
+    // Score relative: .46 = best (Grozavesti, Pallady), .38 = worst (Primaverii older)
+    ageScore = Math.round(((cartierYoung - .38) / (.46 - .38)) * 100);
+    ageScore = Math.max(0,Math.min(100,ageScore));
+  } else if(sector) {
+    cartierYoung = sector.youngPct;
+    ageScore = Math.round(((cartierYoung - .38) / (.46 - .38)) * 100);
+    ageScore = Math.max(0,Math.min(100,ageScore));
+  }
+
+  // 3. Nouveaux ensembles residentiels a proximite (20% du score) — attirent jeunes actifs
+  POIS.filter(p=>p.type==='residential').forEach(p=>{
+    const d=haversine(lat,lng,p.lat,p.lng);
+    const inh=p.inhabitants||0;
+    if(d<2000) newResScore+=inh/300;
+    else if(d<4000) newResScore+=inh/1000;
+  });
+  newResScore=Math.min(100,Math.round(newResScore));
+
+  // 4. Prix immobilier comme proxy gentrification jeune (10%) — zones mid-price = plus de jeunes
+  let priceScore=50;
+  if(cartier) {
+    // Sweet spot pour jeunes actifs: 1400-2000 EUR/m2 (ni trop cher ni trop bas)
+    const p=cartier.price;
+    if(p>=1400 && p<=2000) priceScore=100;
+    else if(p>=1000 && p<1400) priceScore=70;
+    else if(p>2000 && p<=2500) priceScore=65;
+    else if(p>2500) priceScore=40; // trop cher, plus age
+    else priceScore=30; // trop bas, moins de pouvoir d'achat
+  }
+
+  const total=Math.round(uniScore*.40 + ageScore*.30 + newResScore*.20 + priceScore*.10);
+
+  return {total:Math.min(100,total),uni:uniScore,age:ageScore,newRes:newResScore,price:priceScore,
+    totalStudents,cartierYoung:Math.round(cartierYoung*100)};
+}
+
+// SAZ v3 = 33% FLUX + 33% DENSITE + 33% JEUNESSE
+function calcSAZ(lat,lng,sector,comps) {
+  const flux = calcFluxScore(lat,lng);
+  const densite = calcDensiteScore(lat,lng,sector,comps);
+  const jeunesse = calcJeunesseScore(lat,lng,sector);
+
+  const wf=sazWeights.flux/100, wd=sazWeights.densite/100, wj=sazWeights.jeunesse/100;
+  const total = Math.round(flux.total * wf + densite.total * wd + jeunesse.total * wj);
+
+  return {total,
+    // Flux components
+    flux:flux.total, fluxMetro:flux.metro, fluxMall:flux.mall, fluxOffice:flux.office, fluxUni:flux.uni, fluxPed:flux.ped,
+    // Densite components
+    densite:densite.total, pop:densite.pop, density:densite.density, income:densite.income, comp:densite.comp,
+    // Jeunesse components
+    jeunesse:jeunesse.total, jeuUni:jeunesse.uni, jeuAge:jeunesse.age, jeuNewRes:jeunesse.newRes, jeuPrice:jeunesse.price,
+    jeuTotalStudents:jeunesse.totalStudents, jeuCartierYoung:jeunesse.cartierYoung,
+    // Legacy compat
+    sport:sector?sector.sportIdx:0, transport:sector?sector.transportIdx:0,
+    details:{popTarget:densite.details?.popTarget||0,totalPop:sector?.pop||0,dKm2:densite.details?.dKm2||0,
+      sectorName:sector?.name||'',nbComp:densite.details?.nbComp||0,incomeLevel:sector?.income||''}
+  };
+}
+
+function displaySAZ(saz) {
+  const box=el('sazBox');box.style.display='block';
+  const cls=saz.total>=70?'good':saz.total>=45?'medium':'bad';
+  const reco=saz.total>=70?'GO':saz.total>=45?'PRUDENCE':'NO-GO';
+  const recoCls=saz.total>=70?'reco-go':saz.total>=45?'reco-caution':'reco-nogo';
+  const fluxC=saz.flux>=70?'var(--green)':saz.flux>=45?'var(--yellow)':'var(--red)';
+  const densC=saz.densite>=70?'var(--green)':saz.densite>=45?'var(--yellow)':'var(--red)';
+  const jeuC=saz.jeunesse>=70?'var(--green)':saz.jeunesse>=45?'var(--yellow)':'var(--red)';
+
+  const bar=(val)=>{const c=val>=70?'var(--green)':val>=45?'var(--yellow)':'var(--red)';return `<div class="metric-bar"><div class="metric-fill" style="width:${val}%;background:${c}"></div></div><span class="metric-value" style="color:${c}">${val}</span>`};
+
+  el('sazBoxContent').innerHTML=`
+    <div style="text-align:center;margin-bottom:10px">
+      <div class="saz-number ${cls}">${saz.total}</div>
+      <div class="saz-sublabel">sur 100</div>
+      <div class="${recoCls} reco-chip">${reco}</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border:1px solid ${fluxC}30">
+        <div style="font-size:8px;font-weight:700;color:var(--cyan);margin-bottom:2px">FLUX ${sazWeights.flux}%</div>
+        <div style="font-size:20px;font-weight:900;color:${fluxC}">${saz.flux}</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border:1px solid ${densC}30">
+        <div style="font-size:8px;font-weight:700;color:var(--purple);margin-bottom:2px">DENSITE ${sazWeights.densite}%</div>
+        <div style="font-size:20px;font-weight:900;color:${densC}">${saz.densite}</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border:1px solid ${jeuC}30">
+        <div style="font-size:8px;font-weight:700;color:var(--green);margin-bottom:2px">JEUNESSE ${sazWeights.jeunesse}%</div>
+        <div style="font-size:20px;font-weight:900;color:${jeuC}">${saz.jeunesse}</div>
+      </div>
+    </div>
+    <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">FLUX — Generateurs de traffic</div>
+    <div class="metric-row"><span class="metric-label">Metro (prox.+freq.)</span><span class="metric-weight">30%</span>${bar(saz.fluxMetro)}</div>
+    <div class="metric-row"><span class="metric-label">Malls (footfall)</span><span class="metric-weight">25%</span>${bar(saz.fluxMall)}</div>
+    <div class="metric-row"><span class="metric-label">Bureaux (employes)</span><span class="metric-weight">25%</span>${bar(saz.fluxOffice)}</div>
+    <div class="metric-row"><span class="metric-label">Universites (etud.)</span><span class="metric-weight">10%</span>${bar(saz.fluxUni)}</div>
+    <div class="metric-row"><span class="metric-label">Zones pietonnes</span><span class="metric-weight">10%</span>${bar(saz.fluxPed)}</div>
+    <div style="font-size:9px;font-weight:700;color:var(--purple);margin:8px 0 4px">DENSITE — Population & marche</div>
+    <div class="metric-row"><span class="metric-label">Pop. cible 15-45</span><span class="metric-weight">30%</span>${bar(saz.pop)}</div>
+    <div class="metric-row"><span class="metric-label">Densite/km2</span><span class="metric-weight">25%</span>${bar(saz.density)}</div>
+    <div class="metric-row"><span class="metric-label">Pouvoir achat</span><span class="metric-weight">25%</span>${bar(saz.income)}</div>
+    <div class="metric-row"><span class="metric-label">Concurrence inv.</span><span class="metric-weight">20%</span>${bar(saz.comp)}</div>
+    <div style="font-size:9px;font-weight:700;color:var(--green);margin:8px 0 4px">JEUNESSE — Pop. jeune & attractivite</div>
+    <div class="metric-row"><span class="metric-label">Universites (${fmt(saz.jeuTotalStudents)} etud.)</span><span class="metric-weight">40%</span>${bar(saz.jeuUni)}</div>
+    <div class="metric-row"><span class="metric-label">Age quartier (${saz.jeuCartierYoung}% jeunes)</span><span class="metric-weight">30%</span>${bar(saz.jeuAge)}</div>
+    <div class="metric-row"><span class="metric-label">Nvx residentiels</span><span class="metric-weight">20%</span>${bar(saz.jeuNewRes)}</div>
+    <div class="metric-row"><span class="metric-label">Prix immo (sweet spot)</span><span class="metric-weight">10%</span>${bar(saz.jeuPrice)}</div>
+    ${saz.details.popTarget?`<div style="margin-top:6px;font-size:9px;color:var(--gray2)">Pop. cible: ${fmt(saz.details.popTarget)} | Conc: ${saz.details.nbComp} | ${saz.details.incomeLevel}</div>`:''}
+  `;
+}
+
+// ================================================================
+// COMPETITOR DISPLAY
+// ================================================================
+function showCompsOnMap(comps) {
+  compCluster.clearLayers();
+  comps.forEach(c=>{
+    const icon=L.divIcon({className:'',
+      html:`<div style="width:13px;height:13px;background:${c.color};border:2px solid rgba(255,255,255,.8);border-radius:50%;box-shadow:0 0 8px ${c.color}80"></div>`,
+      iconSize:[13,13],iconAnchor:[7,7]});
+    const dist=selectedPt?haversine(selectedPt.lat,selectedPt.lng,c.lat,c.lng):null;
+    const ts=dist!==null?threatScore(c,dist):null;
+
+    const mk=L.marker([c.lat,c.lng],{icon});
+    const tierColors={W:'#a855f7',Platinum:'#e2e8f0',Gold:'#fbbf24',Silver:'#94a3b8',Bronze:'#cd7f32'};
+    const tierLabel=c.tier?`<div class="ps"><span>Tier</span><span class="pv" style="color:${tierColors[c.tier]||'#fff'};font-weight:800">${c.tier}</span></div>`:'';
+    mk.bindPopup(`<h3>${c.name}</h3>
+      <div class="ps"><span>Segment</span><span class="pv" style="color:${c.color}">${c.segment}</span></div>
+      ${tierLabel}
+      <div class="ps"><span>Taille</span><span class="pv">${c.size?c.size+' m2':'N/A'} ${c.est?'<span style="color:var(--yellow);font-size:9px">est.</span>':''}</span></div>
+      <div class="ps"><span>Membres est.</span><span class="pv">${c.members?fmt(c.members):'N/A'} ${c.est?'<span style="color:var(--yellow);font-size:9px">est.</span>':''}</span></div>
+      ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km</span></div>`:''}
+      ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100</span></div>`:''}
+      <div class="ps"><span>Prix</span><span class="pv">${c.price||'?'} EUR/mois</span></div>
+      <div style="margin-top:4px;font-size:9px;color:var(--gray2)">Source: ${c.source==='overpass'?'Overpass API':'Base verifiee mars 2026'}</div>
+    `);
+    compCluster.addLayer(mk);
+  });
+}
+
+function displayComps(comps,refLat,refLng) {
+  el('compCountBadge').textContent=comps.length;
+
+  const sorted=comps.map(c=>({...c,dist:haversine(refLat,refLng,c.lat,c.lng)}))
+    .map(c=>({...c,ts:threatScore(c,c.dist)}))
+    .sort((a,b)=>b.ts-a.ts);
+
+  el('compList').innerHTML=sorted.length===0
+    ?'<p style="font-size:12px;color:var(--gray2);padding:10px">Aucun concurrent dans le rayon — <strong style="color:var(--green)">Zone blanche</strong></p>'
+    :sorted.map(c=>{
+      const tierBadge=c.tier?`<span style="color:${({W:'#a855f7',Platinum:'#e2e8f0',Gold:'#fbbf24',Silver:'#94a3b8',Bronze:'#cd7f32'})[c.tier]||'#fff'};font-weight:700;font-size:9px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">${c.tier}</span>`:'';
+      return `
+    <div class="comp-card" onclick="map.flyTo([${c.lat},${c.lng}],16)">
+      <div class="comp-dot" style="color:${c.color};background:${c.color}"></div>
+      <div class="comp-body">
+        <div class="comp-name">${c.name} ${tierBadge} ${c.est?'<span class="badge-est">est.</span>':''}</div>
+        <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km | ${c.size?c.size+'m2':'?'} | ${c.members?fmt(c.members)+' mbr':''}</div>
+      </div>
+      <div class="comp-threat" style="color:${c.ts>70?'var(--red)':c.ts>40?'var(--yellow)':'var(--green)'}">${c.ts}</div>
+    </div>`}).join('');
+
+  // Summary
+  const prem=sorted.filter(c=>c.segment==='premium').length;
+  const mid=sorted.filter(c=>['mid','mid-premium'].includes(c.segment)).length;
+  const low=sorted.filter(c=>['lowcost','independent','crossfit','boutique'].includes(c.segment)).length;
+  const avgT=sorted.length?Math.round(sorted.reduce((a,c)=>a+c.ts,0)/sorted.length):0;
+  const closest=sorted.length?sorted.sort((a,b)=>a.dist-b.dist)[0]:null;
+
+  // Estimated total addressable members in zone
+  const totalMembers=sorted.reduce((a,c)=>a+(c.members||0),0);
+  const sector=findSector(refLat,refLng);
+  const popTarget=sector?Math.round(sector.pop*sector.youngPct):0;
+  const penetration=popTarget>0?((totalMembers/popTarget)*100).toFixed(1):0;
+  // Market gap estimation
+  const targetPenetration=10; // EU avg fitness penetration
+  const potentialMembers=popTarget>0?Math.round(popTarget*targetPenetration/100):0;
+  const gap=potentialMembers-totalMembers;
+  const revenueEstimate=gap>0?Math.round(gap*24.68*12/1000):0;
+
+  el('compSummary').innerHTML=`
+    <div class="metric-row"><span class="metric-label">Total concurrents</span><span class="metric-value">${comps.length}</span></div>
+    <div class="metric-row"><span class="metric-label">Premium (concurrent direct)</span><span class="metric-value" style="color:var(--red)">${prem}</span></div>
+    <div class="metric-row"><span class="metric-label">Mid-range</span><span class="metric-value" style="color:var(--orange)">${mid}</span></div>
+    <div class="metric-row"><span class="metric-label">Low-cost / Independant</span><span class="metric-value" style="color:var(--green)">${low}</span></div>
+    <div class="metric-row"><span class="metric-label">Score menace moyen</span><span class="metric-value" style="color:${avgT>60?'var(--red)':avgT>35?'var(--yellow)':'var(--green)'}">${avgT}/100</span></div>
+    ${closest?`<div class="metric-row"><span class="metric-label">Concurrent le + proche</span><span class="metric-value" style="font-size:10px">${closest.name}<br>(${(closest.dist/1000).toFixed(1)}km)</span></div>`:''}
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div class="metric-row"><span class="metric-label">Membres estimes zone</span><span class="metric-value">${fmt(totalMembers)} <span class="badge-est">est.</span></span></div>
+      <div class="metric-row"><span class="metric-label">Penetration estimee</span><span class="metric-value">${penetration}%</span></div>
+      <div class="metric-row"><span class="metric-label">Cible 10% penetration UE</span><span class="metric-value">${fmt(potentialMembers)}</span></div>
+      <div class="metric-row"><span class="metric-label">Gap (opportunite)</span><span class="metric-value" style="color:${gap>0?'var(--green)':'var(--red)'}">${gap>0?'+':''}${fmt(gap)} membres</span></div>
+      <div class="metric-row"><span class="metric-label">Pot. CA annuel (gap x panier)</span><span class="metric-value" style="color:var(--green)">${revenueEstimate>0?revenueEstimate+'k EUR':'-'}</span></div>
+    </div>
+  `;
+
+  showCompsOnMap(sorted);
+}
+
+// ================================================================
+// CHARTS
+// ================================================================
+let segChart,gapChrt,finChart,priceChart;
+
+function initCharts() {
+  Chart.defaults.color='#8899b0';
+  Chart.defaults.borderColor='rgba(71,85,115,.2)';
+  Chart.defaults.font.family="'Inter',sans-serif";
+
+  segChart=new Chart(el('segmentChart'),{
+    type:'doughnut',
+    data:{labels:['Premium','Mid-range','Low-cost','Independant','CrossFit/Boutique'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#8b5cf6'],borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:8,font:{size:10},padding:8}}}}
+  });
+
+  gapChrt=new Chart(el('gapChart'),{
+    type:'bar',
+    data:{
+      labels:SECTORS.map(s=>'S'+s.id+' '+s.desc.split(',')[0]),
+      datasets:[
+        {label:'Pop. cible 15-45 (k)',data:SECTORS.map(s=>Math.round(s.pop*s.youngPct/1000)),backgroundColor:'rgba(59,130,246,.5)',borderColor:'#3b82f6',borderWidth:1,borderRadius:4,order:2},
+        {label:'Concurrents detectes',data:[0,0,0,0,0,0],backgroundColor:'rgba(239,68,68,.5)',borderColor:'#ef4444',borderWidth:1,borderRadius:4,order:1},
+        {label:'Ratio pop/conc. (k)',data:[0,0,0,0,0,0],type:'line',borderColor:'#22c55e',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:'#22c55e',yAxisID:'y1',order:0}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:30}},y:{grid:{color:'rgba(71,85,115,.15)'},ticks:{font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{font:{size:9},color:'#22c55e'}}},
+      plugins:{legend:{labels:{boxWidth:8,font:{size:9.5},padding:6}}}
+    }
+  });
+
+  finChart=new Chart(el('finChart'),{
+    type:'line',
+    data:{
+      labels:['Y0','A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'],
+      datasets:[
+        {label:'CA Enseigne (M EUR)',data:[0,0.44,1.95,4.9,11.5,18.9,31.0,40.5,45.8,49.0,51.3],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
+        {label:'EBITDA (M EUR)',data:[-0.1,-0.3,-0.1,0.4,1.1,1.9,3.1,3.3,5.6,8.0,9.6],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
+        {label:'Clubs cumul.',data:[0,1,3,7,16,26,37,38,40,40,40],borderColor:'#eab308',borderDash:[5,3],yAxisID:'y1',tension:.3,pointRadius:2}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(71,85,115,.15)'}},y1:{position:'right',grid:{display:false},ticks:{color:'#eab308'}}},
+      plugins:{legend:{labels:{boxWidth:8,font:{size:9.5}}},tooltip:{backgroundColor:'rgba(17,24,39,.95)',borderColor:'rgba(71,85,115,.5)',borderWidth:1,titleFont:{weight:'700'},bodyFont:{size:11}}}
+    }
+  });
+
+  priceChart=new Chart(el('pricingChart'),{
+    type:'bar',
+    data:{
+      labels:['Fitness Park\n(cible)','BeFIT','Stay Fit','18GYM','Downtown\nFitness','World Class\n(Bronze)','World Class\n(Gold)'],
+      datasets:[{
+        data:[22,28,30,36,42,46,145],
+        backgroundColor:['rgba(212,160,23,.7)','#f97316','#f97316','#f97316','#f97316','#ef4444','#ef4444'],
+        borderRadius:4,borderWidth:0
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      scales:{x:{grid:{color:'rgba(71,85,115,.15)'},title:{display:true,text:'EUR/mois',font:{size:9},color:'var(--gray2)'}},y:{grid:{display:false},ticks:{font:{size:9}}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw+' EUR/mois'}}}
+    }
+  });
+}
+
+function updateSegChart(comps) {
+  const p=comps.filter(c=>c.segment==='premium').length;
+  const m=comps.filter(c=>['mid','mid-premium'].includes(c.segment)).length;
+  const l=comps.filter(c=>c.segment==='lowcost').length;
+  const i=comps.filter(c=>c.segment==='independent').length;
+  const x=comps.filter(c=>['crossfit','boutique'].includes(c.segment)).length;
+  segChart.data.datasets[0].data=[p,m,l,i,x];
+  segChart.update();
+}
+
+function updateGapChart(counts) {
+  gapChrt.data.datasets[1].data=counts;
+  gapChrt.data.datasets[2].data=SECTORS.map((s,i)=>{
+    const popK=Math.round(s.pop*s.youngPct/1000);
+    return counts[i]>0?Math.round(popK/counts[i]):popK;
+  });
+  gapChrt.update();
+}
+
+// ================================================================
+// DASHBOARD
+// ================================================================
+function addZone(lat,lng,sector,saz,comps) {
+  const closest=comps.length>0?comps.reduce((a,c)=>{const d=haversine(lat,lng,c.lat,c.lng);return d<a.d?{n:c.name,d}:a},{n:'',d:Infinity}):null;
+
+  const popTarget=sector?Math.round(sector.pop*sector.youngPct):0;
+  const totalMembers=comps.reduce((a,c)=>a+(c.members||0),0);
+  const gap=popTarget>0?Math.round(popTarget*.10)-totalMembers:0;
+  const potCA=gap>0?Math.round(gap*24.68*12/1000):0;
+
+  const z={
+    name:sector?sector.name:`${lat.toFixed(3)},${lng.toFixed(3)}`,
+    lat,lng,pop:sector?sector.pop:0,popTarget,
+    saz:saz.total,nbComp:comps.length,
+    closest:closest?`${closest.n} (${(closest.d/1000).toFixed(1)}km)`:'-',
+    potCA,
+    reco:saz.total>=70?'GO':saz.total>=45?'PRUDENCE':'NO-GO'
+  };
+
+  const idx=zones.findIndex(x=>x.name===z.name);
+  if(idx>=0)zones[idx]=z;else zones.push(z);
+  renderDash();
+}
+
+function renderDash() {
+  el('dashBody').innerHTML=zones.sort((a,b)=>b.saz-a.saz).map(z=>`
+    <tr onclick="map.flyTo([${z.lat},${z.lng}],14)" style="cursor:pointer">
+      <td><b>${z.name}</b></td>
+      <td>${fmt(z.pop)}</td>
+      <td>${fmt(z.popTarget)}</td>
+      <td style="font-weight:800;color:${z.saz>=70?'var(--green)':z.saz>=45?'var(--yellow)':'var(--red)'}">${z.saz}</td>
+      <td>${z.nbComp}</td>
+      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${z.closest}</td>
+      <td style="color:var(--green);font-weight:600">${z.potCA>0?z.potCA+'k':'-'}</td>
+      <td class="reco-${z.reco.toLowerCase().replace('-','')}-text">${z.reco}</td>
+    </tr>
+  `).join('');
+}
+
+function sortTable(col) {
+  const keys=['name','pop','popTarget','saz','nbComp','closest','potCA','reco'];
+  const k=keys[col];
+  zones.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k]):b[k]-a[k]);
+  renderDash();
+}
+
+function exportCSV() {
+  if(!zones.length) return alert('Aucune zone analysee');
+  const h='Zone,Population,Pop 15-45,SAZ,Concurrents,Plus proche,Pot CA (kEUR),Recommandation\n';
+  const r=zones.map(z=>`${z.name},${z.pop},${z.popTarget},${z.saz},${z.nbComp},"${z.closest}",${z.potCA},${z.reco}`).join('\n');
+  const b=new Blob([h+r],{type:'text/csv'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='fp_romania_analysis.csv';a.click();URL.revokeObjectURL(u);
+}
+
+// ================================================================
+// SITE CARD
+// ================================================================
+function genSiteCard(lat,lng,sector,saz,comps) {
+  const sorted=comps.map(c=>({...c,dist:haversine(lat,lng,c.lat,c.lng)})).map(c=>({...c,ts:threatScore(c,c.dist)})).sort((a,b)=>a.dist-b.dist);
+  const top5=sorted.slice(0,5);
+  const reco=saz.total>=70?'GO':saz.total>=45?'PRUDENCE':'NO-GO';
+  const recoCls=reco==='GO'?'reco-go':reco==='PRUDENCE'?'reco-caution':'reco-nogo';
+  const sazCls=saz.total>=70?'good':saz.total>=45?'medium':'bad';
+
+  const totalMembers=comps.reduce((a,c)=>a+(c.members||0),0);
+  const popTarget=sector?Math.round(sector.pop*sector.youngPct):0;
+  const penetration=popTarget>0?((totalMembers/popTarget)*100).toFixed(1):0;
+  const gap=popTarget>0?Math.round(popTarget*.10)-totalMembers:0;
+
+  let recoText;
+  if(saz.total>=70) recoText='<strong style="color:var(--green)">Zone a fort potentiel.</strong> La combinaison d\'une population cible dense, d\'un pouvoir d\'achat favorable et d\'une pression concurrentielle moderee en fait un candidat prioritaire pour l\'implantation. La penetration fitness actuelle estimee a '+penetration+'% laisse un gap de marche de '+fmt(Math.max(0,gap))+' membres potentiels. Recommandation : <strong>poursuivre l\'analyse detaillee</strong> (negociation bail, etude de surface, visibilite).';
+  else if(saz.total>=45) recoText='<strong style="color:var(--yellow)">Zone a potentiel modere.</strong> La pression concurrentielle ('+comps.length+' acteurs dans le rayon) et/ou le profil socio-demographique requierent une analyse approfondie. La penetration estimee de '+penetration+'% est '+(parseFloat(penetration)>5?'deja significative':'encore modeste')+'. Recommandation : <strong>analyse complementaire</strong> avant engagement — evaluer les conditions locatives et la visibilite du local.';
+  else recoText='<strong style="color:var(--red)">Zone defavorable a l\'implantation.</strong> Le ratio population cible / concurrence est insuffisant pour garantir la viabilite du modele economique FP (objectif: 4,000 adherents a maturite). La penetration estimee de '+penetration+'% avec '+comps.length+' concurrents existants laisse peu de marge. Recommandation : <strong>explorer d\'autres localisations</strong>.';
+
+  el('siteCardContent').innerHTML=`
+    <div class="sc-section animate-in">
+      <h3>&#128205; Localisation</h3>
+      <div class="metric-row"><span class="metric-label">Coordonnees</span><span class="metric-value" style="font-family:var(--mono);font-size:10px">${lat.toFixed(4)}, ${lng.toFixed(4)}</span></div>
+      <div class="metric-row"><span class="metric-label">Secteur</span><span class="metric-value">${sector?sector.name:'N/A'}</span></div>
+      <div class="metric-row"><span class="metric-label">Quartier</span><span class="metric-value" style="font-size:10px">${sector?sector.desc:'N/A'}</span></div>
+      <div class="metric-row"><span class="metric-label">Rayon d'analyse</span><span class="metric-value">${radius/1000} km</span></div>
+    </div>
+
+    <div class="sc-section animate-in">
+      <h3>&#127919; Score Attractivite (SAZ) <span class="${recoCls} reco-chip" style="font-size:10px;margin-left:auto">${reco}</span></h3>
+      <div style="text-align:center;padding:12px 0">
+        <div class="saz-number ${sazCls}" style="font-size:48px">${saz.total}</div>
+        <div class="saz-sublabel">sur 100</div>
+      </div>
+      <div class="metric-row"><span class="metric-label">Pop. 15-45</span><span class="metric-weight">25%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.pop}%;background:${saz.pop>=70?'var(--green)':saz.pop>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.pop}</span></div>
+      <div class="metric-row"><span class="metric-label">Densite</span><span class="metric-weight">15%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.density}%;background:${saz.density>=70?'var(--green)':saz.density>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.density}</span></div>
+      <div class="metric-row"><span class="metric-label">Pouvoir achat</span><span class="metric-weight">20%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.income}%;background:${saz.income>=70?'var(--green)':saz.income>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.income}</span></div>
+      <div class="metric-row"><span class="metric-label">Pratique sport</span><span class="metric-weight">10%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.sport}%;background:${saz.sport>=70?'var(--green)':saz.sport>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.sport}</span></div>
+      <div class="metric-row"><span class="metric-label">Concurrence inv.</span><span class="metric-weight">20%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.comp}%;background:${saz.comp>=70?'var(--green)':saz.comp>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.comp}</span></div>
+      <div class="metric-row"><span class="metric-label">Transport</span><span class="metric-weight">10%</span><div class="metric-bar"><div class="metric-fill" style="width:${saz.transport}%;background:${saz.transport>=70?'var(--green)':saz.transport>=45?'var(--yellow)':'var(--red)'}"></div></div><span class="metric-value">${saz.transport}</span></div>
+    </div>
+
+    <div class="sc-section animate-in">
+      <h3>&#128202; Demographie & marche</h3>
+      ${sector?`
+        <div class="metric-row"><span class="metric-label">Pop. totale secteur</span><span class="metric-value">${fmt(sector.pop)} hab.</span></div>
+        <div class="metric-row"><span class="metric-label">Pop. cible 15-45 (${Math.round(sector.youngPct*100)}%)</span><span class="metric-value">${fmt(Math.round(sector.pop*sector.youngPct))}</span></div>
+        <div class="metric-row"><span class="metric-label">Surface secteur</span><span class="metric-value">${sector.area} km2</span></div>
+        <div class="metric-row"><span class="metric-label">Densite</span><span class="metric-value">${fmt(Math.round(sector.pop/sector.area))} hab/km2</span></div>
+        <div class="metric-row"><span class="metric-label">Niveau revenu</span><span class="metric-value">${sector.income}</span></div>
+        <div class="metric-row"><span class="metric-label">Loyer proxy</span><span class="metric-value">${sector.rentProxy} EUR/m2 <span class="badge-est">est.</span></span></div>
+        <div class="metric-row"><span class="metric-label">Membres fitness estimes</span><span class="metric-value">${fmt(totalMembers)} <span class="badge-est">est.</span></span></div>
+        <div class="metric-row"><span class="metric-label">Penetration estimee</span><span class="metric-value">${penetration}%</span></div>
+        <div class="metric-row"><span class="metric-label">Gap vs 10% UE</span><span class="metric-value" style="color:${gap>0?'var(--green)':'var(--red)'}">${gap>0?'+':''}${fmt(gap)} mbr</span></div>
+      `:'<p style="color:var(--gray2);font-size:12px">Hors zone Bucarest</p>'}
+    </div>
+
+    <div class="sc-section animate-in">
+      <h3>&#128165; Top 5 concurrents <span class="badge badge-blue">${comps.length} total</span></h3>
+      ${top5.length>0?top5.map((c,i)=>`
+        <div class="comp-card" style="cursor:default">
+          <div style="font-weight:800;color:var(--gray2);width:16px;font-size:13px">${i+1}</div>
+          <div class="comp-dot" style="color:${c.color};background:${c.color}"></div>
+          <div class="comp-body">
+            <div class="comp-name">${c.name}</div>
+            <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km | menace ${c.ts}/100</div>
+          </div>
+        </div>
+      `).join(''):'<p style="color:var(--green);font-size:12px;padding:8px 0">Aucun concurrent — Zone blanche &#9989;</p>'}
+    </div>
+
+    <div class="sc-section animate-in">
+      <h3>&#128161; Synthese & recommandation</h3>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:11.5px;line-height:1.7;color:var(--gray)">
+        ${recoText}
+      </div>
+    </div>
+
+    <div class="sc-section animate-in">
+      <h3>&#128221; Notes</h3>
+      <textarea class="notes-area" placeholder="Ajoutez vos observations, contraintes bail, surface disponible..."></textarea>
+    </div>
+
+    <div style="text-align:center;margin-top:14px">
+      <button class="btn btn-primary" onclick="printCard()">Imprimer / Exporter fiche</button>
+    </div>
+  `;
+}
+
+function printCard() {
+  const c=el('siteCardContent').innerHTML;
+  const w=window.open('','','width=800,height=1000');
+  w.document.write(`<html><head><title>Fiche Site — FP Romania</title><style>
+    body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:12px;max-width:700px;margin:0 auto}
+    h3{font-size:14px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin:20px 0 10px}
+    .metric-row{display:flex;align-items:center;gap:8px;padding:4px 0}.metric-label{flex:1;color:#64748b}.metric-value{font-weight:700;text-align:right}.metric-bar{flex:0 0 60px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden}.metric-fill{height:100%;border-radius:2px}.metric-weight{font-size:8px;color:#94a3b8;min-width:28px;text-align:right}
+    .badge,.badge-est{font-size:9px;padding:1px 5px;border-radius:3px}.badge-blue{background:#dbeafe;color:#2563eb}
+    .saz-number{font-size:48px;font-weight:900;text-align:center}.saz-sublabel{font-size:11px;color:#94a3b8;text-align:center}
+    .reco-chip{display:inline-block;padding:3px 12px;border-radius:16px;font-size:10px;font-weight:700}
+    .reco-go{background:#dcfce7;color:#166534;border:1px solid #86efac}.reco-caution{background:#fef9c3;color:#854d0e;border:1px solid #fde047}.reco-nogo{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+    .comp-card{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9}.comp-dot{width:8px;height:8px;border-radius:50%}.comp-name{font-weight:600}.comp-meta{font-size:10px;color:#94a3b8}
+    .notes-area{width:100%;border:1px solid #e2e8f0;padding:10px;min-height:60px;border-radius:6px}
+    .btn{display:none}.animate-in{animation:none}
+  </style></head><body>
+    <div style="text-align:center;margin-bottom:20px"><h1 style="color:#d4a017;margin:0">Fitness Park Romania</h1><p style="color:#94a3b8;margin:4px 0">Fiche de Due Diligence — ${new Date().toLocaleDateString('fr-FR')}</p></div>
+    ${c}
+    <div style="margin-top:30px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:9px;color:#94a3b8;text-align:center">Genere par FP Romania Expansion Intelligence Platform | Isseo x Fitness Park | Donnees: INS Romania, Eurostat, Overpass API</div>
+  </body></html>`);
+  w.document.close();w.print();
+}
+
+// ================================================================
+// ANALYZE ALL SECTORS
+// ================================================================
+async function analyzeAllSectors() {
+  showLoad('Analyse complete des 6 secteurs...','Requetes Overpass API sequentielles');
+  const counts=[];
+
+  for(const s of SECTORS) {
+    el('loaderSub').textContent=`Analyse ${s.name} (${s.desc.split(',')[0]})...`;
+    let comps;
+    if(demo) comps=getDemoInRadius(s.center[0],s.center[1],3000);
+    else comps=await fetchOverpass(s.center[0],s.center[1],3000);
+
+    const saz=calcSAZ(s.center[0],s.center[1],s,comps);
+    sectorSAZ[s.id]=saz.total;
+    counts.push(comps.length);
+    addZone(s.center[0],s.center[1],s,saz,comps);
+
+    // Recolor sector by SAZ
+    if(sectorPolys[s.id]) {
+      const c=saz.total>=70?'#22c55e':saz.total>=45?'#eab308':'#ef4444';
+      sectorPolys[s.id].setStyle({fillColor:c,color:c,fillOpacity:.2});
+    }
+  }
+
+  updateGapChart(counts);
+  hideLoad();
+  switchTab('dash');
+}
+
+// ================================================================
+// LAYERS
+// ================================================================
+const layers={sectors:true,competitors:false,heatmap:false,transport:false,pois:false,cartiere:false,heatDensity:false,heatYouth:false};
+
+function toggleLayer(name) {
+  layers[name]=!layers[name];
+  const tgl=el('tgl'+name.charAt(0).toUpperCase()+name.slice(1));
+  if(tgl) tgl.classList.toggle('on');
+
+  if(name==='sectors'){
+    Object.values(sectorPolys).forEach(l=>{layers.sectors?l.addTo(map):map.removeLayer(l)});
+  }
+  if(name==='competitors'){
+    if(layers.competitors) loadAllCompetitors();
+    else compCluster.clearLayers();
+  }
+  if(name==='heatmap'){
+    if(layers.heatmap) genHeatmap();
+    else if(heatLayer) map.removeLayer(heatLayer);
+  }
+  if(name==='transport'){
+    if(layers.transport) loadTransport();
+    else transportLayer.clearLayers();
+  }
+  if(name==='pois'){
+    if(layers.pois) loadPois();
+    else poiLayer.clearLayers();
+  }
+  if(name==='cartiere'){
+    if(layers.cartiere){loadCartiere();map.addLayer(cartiereLayer)}
+    else map.removeLayer(cartiereLayer);
+  }
+  if(name==='heatDensity'){
+    if(layers.heatDensity) genHeatDensity();
+    else if(heatDensityLayer) map.removeLayer(heatDensityLayer);
+  }
+  if(name==='heatYouth'){
+    if(layers.heatYouth) genHeatYouth();
+    else if(heatYouthLayer) map.removeLayer(heatYouthLayer);
+  }
+}
+
+async function loadAllCompetitors() {
+  let comps;
+  if(demo) comps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
+  else comps=await fetchAllBucharest();
+  allComps=comps;
+  showCompsOnMap(comps);
+  if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
+  setStatus('ok',`${comps.length} concurrents charges`);
+}
+
+async function genHeatmap() {
+  if(!allComps.length) await loadAllCompetitors();
+  if(heatLayer) map.removeLayer(heatLayer);
+  heatLayer=L.heatLayer(allComps.map(c=>[c.lat,c.lng,.7]),{
+    radius:30,blur:20,maxZoom:15,
+    gradient:{0.15:'#1e3a5f',0.35:'#3b82f6',0.5:'#06b6d4',0.65:'#eab308',0.8:'#f97316',1:'#ef4444'}
+  }).addTo(map);
+}
+
+function loadTransport() {
+  transportLayer.clearLayers();
+  METRO.forEach(s=>{
+    const icon=L.divIcon({className:'',
+      html:`<div style="width:9px;height:9px;background:#3b82f6;border:2px solid rgba(255,255,255,.7);border-radius:2px;box-shadow:0 0 4px rgba(59,130,246,.5)"></div>`,
+      iconSize:[9,9],iconAnchor:[5,5]});
+    L.marker([s.lat,s.lng],{icon}).bindTooltip(`<b>${s.n}</b><br><span style="font-size:10px;color:#94a3b8">${s.lines}</span>`,{className:'custom-tooltip',direction:'top',offset:[0,-8]}).addTo(transportLayer);
+  });
+}
+
+function loadPois() {
+  poiLayer.clearLayers();
+  const colors={university:'#a855f7',mall:'#06b6d4',office:'#3b82f6',residential:'#f59e0b'};
+  const sizes={university:11,mall:10,office:9,residential:9};
+  POIS.forEach(p=>{
+    const c=colors[p.type]||'#fff';
+    const sz=sizes[p.type]||9;
+    const icon=L.divIcon({className:'',
+      html:`<div style="width:${sz}px;height:${sz}px;background:${c};border:2px solid rgba(255,255,255,.7);border-radius:${p.type==='mall'?'2px':'50%'};box-shadow:0 0 6px ${c}80;font-size:0"></div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    const detail = p.students ? `${fmt(p.students)} etudiants` : p.employees ? `~${fmt(p.employees)} employes` : p.inhabitants ? `~${fmt(p.inhabitants)} habitants` : p.gla ? `${fmt(p.gla)} m2 GLA` : '';
+    L.marker([p.lat,p.lng],{icon}).bindTooltip(
+      `<b>${p.icon} ${p.name}</b><br><span style="font-size:10px;color:#94a3b8">${p.type} | ${detail}</span>`,
+      {className:'custom-tooltip',direction:'top',offset:[0,-8]}
+    ).addTo(poiLayer);
+  });
+}
+
+// ================================================================
+// CARTIERE LAYER — Neighborhoods colored by youth score
+// ================================================================
+let cartiereLayer = L.layerGroup();
+
+function loadCartiere() {
+  cartiereLayer.clearLayers();
+  CARTIERE.forEach(c=>{
+    const youngPct = c.young || .42;
+    // Color by youth: green = high youth, red = low
+    const score = Math.round(((youngPct - .38) / (.46 - .38)) * 100);
+    const color = score >= 70 ? '#22c55e' : score >= 50 ? '#d4a017' : score >= 30 ? '#f97316' : '#ef4444';
+    const radius = Math.sqrt(c.pop / 3000) * 200; // Size proportional to population
+
+    const circle = L.circle([c.lat, c.lng], {
+      radius: Math.max(250, Math.min(600, radius)),
+      color: color, weight: 1, fillColor: color, fillOpacity: 0.2
+    });
+    circle.bindTooltip(`<b>${c.name}</b><br>
+      Pop: ${fmt(c.pop)} | Jeunes: ${Math.round(youngPct*100)}%<br>
+      Prix: ${fmt(c.price)} EUR/m2 | ${c.desc}`,
+      {className:'custom-tooltip',direction:'top'});
+    circle.addTo(cartiereLayer);
+
+    // Label
+    L.marker([c.lat, c.lng], {
+      icon: L.divIcon({className:'',
+        html:`<div style="font-size:8px;color:${color};font-weight:700;text-align:center;white-space:nowrap;opacity:.8">${c.name}</div>`,
+        iconSize:[60,12],iconAnchor:[30,6]})
+    }).addTo(cartiereLayer);
+  });
+}
+
+// ================================================================
+// HEATMAPS — Density & Youth
+// ================================================================
+let heatDensityLayer = null;
+let heatYouthLayer = null;
+
+function genHeatDensity() {
+  if(heatDensityLayer) map.removeLayer(heatDensityLayer);
+  // Population density heatmap from cartiere
+  const points = CARTIERE.map(c => {
+    const density = c.pop / 3; // weight factor
+    return [c.lat, c.lng, density / 20000];
+  });
+  heatDensityLayer = L.heatLayer(points, {
+    radius: 35, blur: 25, maxZoom: 15, max: 1,
+    gradient: {0.1:'#0c1021',0.25:'#1e3a5f',0.4:'#3b82f6',0.55:'#06b6d4',0.7:'#22c55e',0.85:'#eab308',1:'#ef4444'}
+  }).addTo(map);
+}
+
+function genHeatYouth() {
+  if(heatYouthLayer) map.removeLayer(heatYouthLayer);
+  // Youth heatmap: universities + young neighborhoods
+  const points = [];
+  // Universities weighted by student count
+  POIS.filter(p=>p.type==='university').forEach(p=>{
+    const w = (p.students || 1000) / 10000;
+    points.push([p.lat, p.lng, Math.min(1, w)]);
+  });
+  // Cartiere weighted by youth percentage
+  CARTIERE.forEach(c=>{
+    const youthWeight = ((c.young || .42) - .38) / .08; // 0 to 1
+    const popWeight = c.pop / 60000; // normalized
+    points.push([c.lat, c.lng, Math.min(1, youthWeight * popWeight * 1.5)]);
+  });
+  // New residential
+  POIS.filter(p=>p.type==='residential').forEach(p=>{
+    points.push([p.lat, p.lng, 0.4]);
+  });
+  heatYouthLayer = L.heatLayer(points, {
+    radius: 30, blur: 22, maxZoom: 15, max: 1,
+    gradient: {0.1:'#0c1021',0.25:'#1e293b',0.4:'#6d28d9',0.55:'#8b5cf6',0.7:'#a78bfa',0.85:'#22c55e',1:'#4ade80'}
+  }).addTo(map);
+}
+
+// ================================================================
+// SAZ WEIGHT SLIDERS
+// ================================================================
+function updateWeights() {
+  let f=parseInt(el('wFlux').value), d=parseInt(el('wDens').value), j=parseInt(el('wJeu').value);
+  const total=f+d+j;
+  if(total!==100) {
+    // Auto-adjust last one
+    j=100-f-d;
+    if(j<0){j=0;d=100-f}
+    el('wJeu').value=j;
+  }
+  sazWeights={flux:f,densite:d,jeunesse:j};
+  el('wFluxVal').textContent=f+'%';
+  el('wDensVal').textContent=d+'%';
+  el('wJeuVal').textContent=j+'%';
+  // Re-analyze if point selected
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+function resetWeights() {
+  el('wFlux').value=33;el('wDens').value=33;el('wJeu').value=34;
+  sazWeights={flux:33,densite:33,jeunesse:34};
+  el('wFluxVal').textContent='33%';el('wDensVal').textContent='33%';el('wJeuVal').textContent='34%';
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+function setPresetWeights(f,d,j) {
+  el('wFlux').value=f;el('wDens').value=d;el('wJeu').value=j;
+  sazWeights={flux:f,densite:d,jeunesse:j};
+  el('wFluxVal').textContent=f+'%';el('wDensVal').textContent=d+'%';el('wJeuVal').textContent=j+'%';
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+// ================================================================
+// OVERLAP ANALYSIS — BP sites catchment overlap
+// ================================================================
+function showOverlapAnalysis() {
+  const allSites = [...TARGETS, ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
+  if(allSites.length < 2) return;
+
+  // Draw circles for all sites
+  allSites.forEach(s=>{
+    L.circle([s.lat, s.lng], {
+      radius: 2000, color: '#d4a01780', weight: 1, fillColor: '#d4a017', fillOpacity: 0.05, dashArray: '4,4'
+    }).addTo(map);
+  });
+
+  // Find overlaps
+  const overlaps = [];
+  for(let i=0;i<allSites.length;i++){
+    for(let j=i+1;j<allSites.length;j++){
+      const d=haversine(allSites[i].lat,allSites[i].lng,allSites[j].lat,allSites[j].lng);
+      if(d<4000){
+        overlaps.push({a:allSites[i].name,b:allSites[j].name,dist:d,
+          overlap:Math.max(0,Math.round((1-d/4000)*100))});
+        // Draw overlap line
+        L.polyline([[allSites[i].lat,allSites[i].lng],[allSites[j].lat,allSites[j].lng]],{
+          color:d<2000?'#ef4444':d<3000?'#f97316':'#eab308',weight:2,dashArray:'6,4',opacity:.7
+        }).bindTooltip(`${allSites[i].name} ↔ ${allSites[j].name}<br>${(d/1000).toFixed(1)}km | Overlap: ${Math.max(0,Math.round((1-d/4000)*100))}%`,
+          {className:'custom-tooltip'}).addTo(map);
+      }
+    }
+  }
+}
+
+// ================================================================
+// CUSTOM SITES MANAGEMENT
+// ================================================================
+let addingSite = false;
+
+function startAddSite() {
+  addingSite = true;
+  setStatus('warn','Cliquez sur la carte pour placer votre site...');
+  map.getContainer().style.cursor = 'crosshair';
+}
+
+// Hook into map click for adding sites
+const origOnMapClick = onMapClick;
+// We'll override in init after defining
+
+function renderCustomSites() {
+  const list = el('customSitesList');
+  if(!list) return;
+  const colors={prospect:'#8b5cf6',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
+  list.innerHTML = customSites.length===0
+    ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site ajoute. Cliquez + Ajouter pour commencer.</p>'
+    : customSites.map(s=>`
+    <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#8b5cf6'}">
+      <div style="flex:1;min-width:0">
+        <div class="comp-name">${s.name}</div>
+        <div class="comp-meta">${s.notes||'Pas de notes'} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          <select onchange="qualifyCustomSite(${s.id},this.value)" style="padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:10px;font-family:var(--font)">
+            <option value="prospect" ${s.status==='prospect'?'selected':''}>Prospect</option>
+            <option value="shortlist" ${s.status==='shortlist'?'selected':''}>Shortlist</option>
+            <option value="validated" ${s.status==='validated'?'selected':''}>Valide</option>
+            <option value="rejected" ${s.status==='rejected'?'selected':''}>Rejete</option>
+          </select>
+          <button class="btn btn-sm" onclick="analyzeCustomSite(${s.id})">Analyser</button>
+          <button class="btn btn-sm" style="color:var(--red)" onclick="if(confirm('Supprimer ce site?'))removeCustomSite(${s.id})">Suppr.</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Update cannibalization
+  if(customSites.length >= 2) updateCannibalization();
+}
+
+async function addSiteByAddress() {
+  const addr = el('newSiteAddr').value.trim();
+  if(!addr) return;
+  try {
+    const resp = await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(addr+', Bucharest, Romania')}&limit=1`);
+    const data = await resp.json();
+    if(data.length > 0) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      const name = prompt('Nom du site :', addr.substring(0,40)) || addr.substring(0,40);
+      const notes = prompt('Notes (optionnel) :', '') || '';
+      const site = addCustomSite(lat, lng, name, notes);
+      map.flyTo([lat,lng],15);
+      el('newSiteAddr').value = '';
+      // Auto-analyze
+      setTimeout(()=>runSiteAnalysis(site),500);
+    } else {
+      alert('Adresse non trouvee. Essayez avec plus de details.');
+    }
+  } catch(e) { alert('Erreur geocodage: '+e.message); }
+}
+
+async function runSiteAnalysis(site) {
+  const lat=site.lat, lng=site.lng;
+  const sector = findSector(lat,lng);
+  const cartier = findCartier(lat,lng);
+
+  // Get competitors in 3km radius
+  let comps = getDemoInRadius(lat,lng,3000);
+  if(!demo) {
+    const overpassComps = await fetchOverpass(lat,lng,3000);
+    const merged = [...comps];
+    overpassComps.forEach(oc=>{
+      if(!merged.some(vc=>haversine(vc.lat,vc.lng,oc.lat,oc.lng)<150)) merged.push(oc);
+    });
+    comps = merged;
+  }
+
+  const popGranular = estimatePopInRadiusGranular(lat,lng,radius);
+  const poi = poisInRadius(lat,lng,3000);
+  const saz = calcSAZ(lat,lng,sector,comps);
+  const scenarios = revenueScenarios(popGranular.target, comps.length, popGranular.avgPrice);
+
+  // Save analysis to site
+  site.analysisData = {saz,comps:comps.length,popGranular,poi,scenarios,cartier:cartier?.name,sector:sector?.name};
+  sessionStorage.setItem('customSites',JSON.stringify(customSites));
+
+  // Display analysis
+  const card = el('siteAnalysisCard');
+  card.style.display = 'block';
+
+  const sorted = comps.map(c=>({...c,dist:haversine(lat,lng,c.lat,c.lng),ts:threatScore(c,haversine(lat,lng,c.lat,c.lng))})).sort((a,b)=>a.dist-b.dist);
+  const top3 = sorted.slice(0,3);
+  const premium = sorted.filter(c=>c.segment==='premium');
+  const recoClass = saz.total>=70?'reco-go':saz.total>=45?'reco-caution':'reco-nogo';
+  const recoText = saz.total>=70?'GO':saz.total>=45?'PRUDENCE':'NO-GO';
+
+  el('siteAnalysisContent').innerHTML = `
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:11px;font-weight:600;margin-bottom:4px">${site.name}</div>
+      <div style="font-size:10px;color:var(--gray2)">${cartier?cartier.name+' | ':''} ${sector?sector.name:'Hors zone'} | R=${radius/1000}km</div>
+    </div>
+
+    <div style="display:flex;gap:16px;justify-content:center;margin:12px 0">
+      <div style="text-align:center">
+        <div class="saz-number ${saz.total>=70?'good':saz.total>=45?'medium':'bad'}" style="font-size:36px">${saz.total}</div>
+        <div class="saz-sublabel">SAZ</div>
+        <div class="${recoClass} reco-chip" style="font-size:9px;margin-top:4px">${recoText}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:900;color:var(--blue)">${fmt(popGranular.target)}</div>
+        <div class="saz-sublabel">Cible 15-45</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:900;color:${comps.length>10?'var(--red)':comps.length>5?'var(--yellow)':'var(--green)'}">${comps.length}</div>
+        <div class="saz-sublabel">Concurrents</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">QUARTIER (CARTIER)</div>
+      ${cartier?`
+        <div class="metric-row"><span class="metric-label">Nom</span><span class="metric-value">${cartier.name}</span></div>
+        <div class="metric-row"><span class="metric-label">Population</span><span class="metric-value">${fmt(cartier.pop)}</span></div>
+        <div class="metric-row"><span class="metric-label">Prix immo. (proxy revenu)</span><span class="metric-value">${fmt(cartier.price)} EUR/m2</span></div>
+        <div class="metric-row"><span class="metric-label">Profil</span><span class="metric-value" style="font-size:10px">${cartier.desc}</span></div>
+      `:'<div style="font-size:11px;color:var(--gray2)">Hors quartiers references</div>'}
+    </div>
+
+    <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">POPULATION ZONE (R=${radius/1000}km) — Calcul par quartier</div>
+      <div class="metric-row"><span class="metric-label">Pop. totale</span><span class="metric-value">${fmt(popGranular.pop)}</span></div>
+      <div class="metric-row"><span class="metric-label">Cible 15-45 ans</span><span class="metric-value" style="color:var(--blue)">${fmt(popGranular.target)}</span></div>
+      <div class="metric-row"><span class="metric-label">Prix moyen zone</span><span class="metric-value">${fmt(popGranular.avgPrice)} EUR/m2</span></div>
+      ${poi.unis.length?`<div class="metric-row"><span class="metric-label">Universites (${poi.unis.length})</span><span class="metric-value" style="color:#a855f7">${fmt(poi.totalStudents)} etudiants</span></div>`:''}
+      ${poi.offices.length?`<div class="metric-row"><span class="metric-label">Bureaux (${poi.offices.length})</span><span class="metric-value">${fmt(poi.totalEmployees)} employes</span></div>`:''}
+      ${poi.malls.length?`<div class="metric-row"><span class="metric-label">Malls</span><span class="metric-value">${poi.malls.length}</span></div>`:''}
+    </div>
+
+    <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">CONCURRENCE (R=3km)</div>
+      <div class="metric-row"><span class="metric-label">Total concurrents</span><span class="metric-value">${comps.length}</span></div>
+      <div class="metric-row"><span class="metric-label">dont Premium (WC etc.)</span><span class="metric-value" style="color:var(--red)">${premium.length}</span></div>
+      ${top3.map((c,i)=>`<div class="metric-row"><span class="metric-label">#${i+1} ${c.name}</span><span class="metric-value">${(c.dist/1000).toFixed(1)}km | menace ${c.ts}</span></div>`).join('')}
+    </div>
+
+    <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">SCENARIOS DE REVENUE — Panier 24,68EUR HT/mois</div>
+      <div class="metric-row"><span class="metric-label">Penetration estimee</span><span class="metric-value">${scenarios.penetration}%</span></div>
+      <div class="metric-row" style="color:var(--red)"><span class="metric-label">Pessimiste</span><span class="metric-value">${fmt(scenarios.pessimistic.members)} mbr | ${scenarios.pessimistic.ca}k EUR/an</span></div>
+      <div class="metric-row" style="color:var(--yellow)"><span class="metric-label">Realiste</span><span class="metric-value" style="font-weight:800">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR/an</span></div>
+      <div class="metric-row" style="color:var(--green)"><span class="metric-label">Optimiste</span><span class="metric-value">${fmt(scenarios.optimistic.members)} mbr | ${scenarios.optimistic.ca}k EUR/an</span></div>
+      <div class="metric-row"><span class="metric-label">Breakeven (2,800 mbr A1)</span><span class="metric-value" style="color:${scenarios.breakeven==='OUI'?'var(--green)':scenarios.breakeven==='POSSIBLE'?'var(--yellow)':'var(--red)'}"><b>${scenarios.breakeven}</b></span></div>
+    </div>
+  `;
+}
+
+function updateCannibalization() {
+  const card = el('cannibalizationCard');
+  if(customSites.length < 2) { card.style.display='none'; return; }
+  card.style.display = 'block';
+  const allSites = [...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng,type:'BP'})), ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng,type:'custom'}))];
+
+  let rows = '';
+  for(let i=0;i<allSites.length;i++){
+    for(let j=i+1;j<allSites.length;j++){
+      const risk = cannibalizeRisk(allSites[i],allSites[j]);
+      if(risk.dist < 6000) {
+        const riskColor = risk.risk==='critique'?'var(--red)':risk.risk==='significatif'?'var(--orange)':risk.risk==='modere'?'var(--yellow)':'var(--green)';
+        rows += `<div class="metric-row">
+          <span class="metric-label" style="font-size:10px">${allSites[i].name} ↔ ${allSites[j].name}</span>
+          <span class="metric-value" style="color:${riskColor};font-size:10px">${(risk.dist/1000).toFixed(1)}km | ${risk.risk} (${risk.pct}%)</span>
+        </div>`;
+      }
+    }
+  }
+  el('cannibalizationContent').innerHTML = rows || '<p style="font-size:11px;color:var(--green)">Aucun risque de cannibalisation detecte (&gt;5km entre sites)</p>';
+}
+
+// ================================================================
+// SEARCH
+// ================================================================
+function initSearch() {
+  let timeout;
+  const inp=el('searchInput'),res=el('searchResults');
+  inp.addEventListener('input',()=>{clearTimeout(timeout);const q=inp.value.trim();if(q.length<3){res.classList.remove('active');return}timeout=setTimeout(()=>searchAddr(q),400)});
+  document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))res.classList.remove('active')});
+}
+
+async function searchAddr(q) {
+  try{
+    const r=await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(q+', Bucharest, Romania')}&limit=5&addressdetails=1`);
+    const data=await r.json();
+    const res=el('searchResults');
+    res.innerHTML=data.length===0?'<div class="search-result-item">Aucun resultat</div>':data.map(d=>`<div class="search-result-item" onclick="pickSearch(${d.lat},${d.lon})">${d.display_name.substring(0,80)}</div>`).join('');
+    res.classList.add('active');
+  }catch(e){console.error('Nominatim:',e)}
+}
+
+function pickSearch(lat,lng) {
+  el('searchResults').classList.remove('active');
+  map.flyTo([lat,lng],15);
+  setTimeout(()=>onMapClick({latlng:{lat:parseFloat(lat),lng:parseFloat(lng)}}),500);
+}
+
+// ================================================================
+// TABS
+// ================================================================
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>switchTab(t.dataset.tab));
+  });
+}
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+}
+
+// ================================================================
+// SIDEBAR RENDER
+// ================================================================
+function renderSectorList() {
+  el('sectorList').innerHTML=SECTORS.map(s=>{
+    const popT=Math.round(s.pop*s.youngPct);
+    return `<div class="sector-row" onclick="zoomSector(${s.id})">
+      <div class="sector-num" style="background:${s.color}20;color:${s.color}">${s.id}</div>
+      <div class="sector-body">
+        <h4>${s.name}</h4>
+        <p>${s.desc}</p>
+        <p>Pop: ${fmt(s.pop)} | 15-45: ${fmt(popT)} | ${s.income}</p>
+      </div>
+      <div class="sector-saz" id="sazS${s.id}" style="color:var(--gray2)">—</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTargets() {
+  el('targetSites').innerHTML=TARGETS.map(t=>`
+    <div class="target-card ${t.phase===2?'phase2':''}" onclick="flyTarget(${t.lat},${t.lng})">
+      <div class="target-phase" style="background:${t.phase===1?'rgba(212,160,23,.15)':'rgba(59,130,246,.15)'};color:${t.phase===1?'var(--accent)':'var(--blue)'}">P${t.phase}</div>
+      <div class="target-body">
+        <h4>${t.name}</h4>
+        <p>S${t.sector} | ${t.area} | ${t.rent}</p>
+        <div class="target-status" style="color:${t.status.includes('securise')?'var(--green)':'var(--yellow)'}">${t.status} — ${t.opening}</div>
+      </div>
+    </div>
+  `).join('');
+
+  TARGETS.forEach(t=>{
+    const icon=L.divIcon({className:'',
+      html:`<div style="width:26px;height:26px;background:${t.phase===1?'#d4a017':'#3b82f6'};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;box-shadow:0 2px 10px ${t.phase===1?'rgba(212,160,23,.5)':'rgba(59,130,246,.5)'}">P${t.phase}</div>`,
+      iconSize:[26,26],iconAnchor:[13,13]});
+    L.marker([t.lat,t.lng],{icon}).addTo(map).bindPopup(`
+      <h3>${t.name}</h3>
+      <div class="ps"><span>Phase</span><span class="pv">${t.phase}</span></div>
+      <div class="ps"><span>Secteur</span><span class="pv">${t.sector}</span></div>
+      <div class="ps"><span>Surface</span><span class="pv">${t.area}</span></div>
+      <div class="ps"><span>Loyer</span><span class="pv">${t.rent}</span></div>
+      <div class="ps"><span>Ouverture</span><span class="pv">${t.opening}</span></div>
+      <div class="ps"><span>Statut</span><span class="pv" style="color:${t.status.includes('securise')?'var(--green)':'var(--yellow)'}">${t.status}</span></div>
+      <div style="margin-top:6px;font-size:11px;color:#8899b0;line-height:1.5">${t.note}</div>
+    `);
+  });
+}
+
+function zoomSector(id) {
+  const s=SECTORS.find(x=>x.id===id);
+  if(!s)return;
+  map.flyTo(s.center,14);
+  setTimeout(()=>onMapClick({latlng:{lat:s.center[0],lng:s.center[1]}}),500);
+}
+
+function flyTarget(lat,lng) {
+  map.flyTo([lat,lng],15);
+  setTimeout(()=>onMapClick({latlng:{lat,lng}}),500);
+}
+
+// ================================================================
+// DEMO MODE
+// ================================================================
+function toggleDemoMode() {
+  demo=!demo;
+  el('demoBanner').classList.toggle('on',demo);
+  setStatus(demo?'warn':'ok',demo?'Mode demo actif':'APIs connectees');
+  if(demo) {
+    allComps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
+    showCompsOnMap(allComps);
+    if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
+  }
+}
+
+// ================================================================
+// RADIUS
+// ================================================================
+function setRadius(r) {
+  radius=r;
+  document.querySelectorAll('.radius-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.r)===r));
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+// ================================================================
+// UTILITIES
+// ================================================================
+function el(id){return document.getElementById(id)}
+function fmt(n){return n?n.toLocaleString('fr-FR'):'0'}
+function haversine(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function showLoad(t,s){el('loaderText').textContent=t||'Chargement...';el('loaderSub').textContent=s||'';el('loader').classList.add('on')}
+function hideLoad(){el('loader').classList.remove('on')}
+function setStatus(s,t){el('statusDot').className='status-dot '+s;el('statusText').textContent=t}
+function updCache(){el('cacheInfo').textContent=`Cache: ${Object.keys(opCache).length} req`}
+function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').style.display='none'}
+
+// ================================================================
+// USER MANAGEMENT — Viewer / Admin roles
+// ================================================================
+let currentUser = JSON.parse(localStorage.getItem('fpCurrentUser')||'null');
+let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
+
+// Check URL for invite token
+(function checkInvite(){
+  const params = new URLSearchParams(window.location.search);
+  const invite = params.get('invite');
+  if(invite) {
+    try {
+      const data = JSON.parse(atob(invite));
+      if(data.email && data.role) {
+        currentUser = {email:data.email, role:data.role, name:data.email.split('@')[0]};
+        localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+        // Add to list if not exists
+        if(!userList.find(u=>u.email===data.email)) {
+          userList.push(currentUser);
+          localStorage.setItem('fpUsers', JSON.stringify(userList));
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch(e) {}
+  }
+})();
+
+// Default admin if no users
+if(userList.length === 0) {
+  const defaultAdmin = {email:'paul@isseo.fr',role:'admin',name:'Paul'};
+  userList.push(defaultAdmin);
+  localStorage.setItem('fpUsers', JSON.stringify(userList));
+  if(!currentUser) {
+    currentUser = defaultAdmin;
+    localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+  }
+}
+
+function isAdmin() { return !currentUser || currentUser.role === 'admin'; }
+
+function showUserPanel() {
+  const panel = document.createElement('div');
+  panel.id = 'userPanel';
+  panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,8,15,.92);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)';
+
+  const adminBtns = isAdmin() ? `
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px">INVITER UN UTILISATEUR</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input type="email" id="inviteEmail" placeholder="email@example.com" style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;font-family:var(--font)">
+        <select id="inviteRole" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
+          <option value="viewer">Viewer</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button class="btn btn-sm btn-primary" onclick="inviteUser()">Inviter</button>
+      </div>
+      <div id="inviteLink" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;word-break:break-all;color:var(--cyan);margin-bottom:8px"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;margin-top:12px">UTILISATEURS (${userList.length})</div>
+      <div id="userListPanel" style="max-height:200px;overflow-y:auto">
+        ${userList.map(u=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;margin-bottom:4px;background:var(--card2)">
+            <div style="width:28px;height:28px;border-radius:50%;background:${u.role==='admin'?'var(--accent)':'var(--blue)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white">${(u.name||u.email)[0].toUpperCase()}</div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600">${u.name||u.email.split('@')[0]}</div>
+              <div style="font-size:10px;color:var(--gray2)">${u.email} — <span style="color:${u.role==='admin'?'var(--accent)':'var(--blue)'}">${u.role}</span></div>
+            </div>
+            ${u.email!==currentUser?.email?`<button class="btn btn-sm" style="color:var(--red);font-size:9px" onclick="removeUser('${u.email}')">Retirer</button>`:'<span style="font-size:9px;color:var(--gray2)">Vous</span>'}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  panel.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:440px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700">Gestion utilisateurs</div>
+        <button onclick="document.getElementById('userPanel').remove()" style="background:none;border:none;color:var(--gray);font-size:18px;cursor:pointer">&times;</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:${currentUser?.role==='admin'?'var(--accent)':'var(--blue)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:white">${(currentUser?.name||'A')[0].toUpperCase()}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600">${currentUser?.name||'Admin'}</div>
+          <div style="font-size:11px;color:var(--gray2)">${currentUser?.email||'—'} — <span style="color:${currentUser?.role==='admin'?'var(--accent)':'var(--blue)'}; font-weight:700">${currentUser?.role||'admin'}</span></div>
+        </div>
+      </div>
+      ${adminBtns}
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="switchUser()">Changer d'utilisateur</button>
+        <button class="btn" style="flex:1" onclick="document.getElementById('userPanel').remove()">Fermer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+}
+
+function inviteUser() {
+  const email = document.getElementById('inviteEmail')?.value?.trim();
+  const role = document.getElementById('inviteRole')?.value || 'viewer';
+  if(!email || !email.includes('@')) return alert('Email invalide');
+
+  // Add to user list
+  if(!userList.find(u=>u.email===email)) {
+    userList.push({email, role, name:email.split('@')[0]});
+    localStorage.setItem('fpUsers', JSON.stringify(userList));
+  }
+
+  // Generate invite link
+  const token = btoa(JSON.stringify({email, role}));
+  const link = window.location.origin + window.location.pathname + '?invite=' + token;
+
+  const linkDiv = document.getElementById('inviteLink');
+  linkDiv.style.display = 'block';
+  linkDiv.innerHTML = `<div style="font-size:9px;color:var(--gray);margin-bottom:4px">Lien d'invitation (${role}) :</div><div style="cursor:pointer" onclick="navigator.clipboard.writeText('${link}');this.style.color='var(--green)';this.textContent='Copie !'">${link}</div>`;
+
+  // Refresh panel
+  document.getElementById('inviteEmail').value = '';
+}
+
+function removeUser(email) {
+  userList = userList.filter(u=>u.email!==email);
+  localStorage.setItem('fpUsers', JSON.stringify(userList));
+  document.getElementById('userPanel').remove();
+  showUserPanel();
+}
+
+function switchUser() {
+  const email = prompt('Votre email :');
+  if(!email) return;
+  const user = userList.find(u=>u.email===email);
+  if(user) {
+    currentUser = user;
+    localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+    document.getElementById('userPanel').remove();
+    applyRole();
+    showUserPanel();
+  } else {
+    alert('Utilisateur non trouve. Demandez une invitation a l\'admin.');
+  }
+}
+
+function applyRole() {
+  // Viewer restrictions: hide edit buttons, disable site adding
+  const isV = currentUser?.role === 'viewer';
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isV ? 'none' : '');
+}
+
+// ================================================================
+// BOOT
+// ================================================================
+init();
+applyRole();
+</script>
+</body>
+</html>
