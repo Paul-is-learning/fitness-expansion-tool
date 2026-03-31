@@ -688,6 +688,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <p style="font-size:13px;line-height:1.6">Cliquez sur un point de la carte<br>pour generer une fiche de due diligence</p>
         </div>
       </div>
+      <!-- Captage widget in Fiche Site tab -->
+      <div class="card" id="captageCardSite" style="display:none">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">&#127919;</span> Potentiel de captage</div>
+          <span class="info-tip">?<div class="tip-content"><strong>Captifs</strong> = membres concurrents qui switchent vers FP (prix + proximite).<br><strong>Natifs</strong> = non-inscrits qui rejoignent FP (nouvelle offre).<br>Total = membres theoriques a terme.<div class="tip-source">Taux ajustables ci-dessous</div></div></span>
+        </div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>Rayon de captage</span><span id="captageRadiusValSite" style="font-weight:700">3 km</span></div>
+          <input type="range" id="captageRadiusSliderSite" min="1000" max="5000" step="500" value="3000" style="width:100%;accent-color:#f97316" oninput="updateCaptageRadiusSite()">
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+          <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px">TAUX DE CAPTURE (ajustables)</div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--red)">Premium (WC)</span><span id="crPremValS">15%</span></div><input type="range" min="0" max="40" value="15" id="crPremS" style="width:100%;accent-color:#ef4444" oninput="updateCaptureRatesSite()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:#f97316">Mid-premium</span><span id="crMidPValS">20%</span></div><input type="range" min="0" max="40" value="20" id="crMidPS" style="width:100%;accent-color:#f97316" oninput="updateCaptureRatesSite()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--yellow)">Mid (SF/18G)</span><span id="crMidValS">25%</span></div><input type="range" min="0" max="40" value="25" id="crMidS" style="width:100%;accent-color:#eab308" oninput="updateCaptureRatesSite()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--green)">Independant</span><span id="crIndValS">18%</span></div><input type="range" min="0" max="40" value="18" id="crIndS" style="width:100%;accent-color:#22c55e" oninput="updateCaptureRatesSite()"></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--gray)">Low-cost</span><span id="crLowValS">8%</span></div><input type="range" min="0" max="25" value="8" id="crLowS" style="width:100%;accent-color:#64748b" oninput="updateCaptureRatesSite()"></div>
+        </div>
+        <div id="captageContentSite"></div>
+      </div>
     </div>
   </div>
 
@@ -1675,6 +1695,9 @@ async function analyzePoint(lat,lng,sector) {
   updateSegChart(comps);
   addZone(lat,lng,sector,saz,comps);
   genSiteCard(lat,lng,sector,saz,comps);
+
+  // Run captage analysis for this point (visible in Fiche Site tab)
+  showCaptageForPoint(lat, lng);
 
   hideLoad();
 }
@@ -3202,9 +3225,41 @@ function updateCaptageRadius() {
 
 function showCaptageForPoint(lat, lng) {
   lastCaptagePoint = {lat, lng};
-  el('captageCard').style.display = 'block';
-  const r = parseInt(el('captageRadiusSlider')?.value || 3000);
-  renderCaptageAnalysis('captageContent', lat, lng, r);
+  // Render in Mes Sites tab
+  const cc = el('captageCard');
+  if(cc) {cc.style.display='block'; renderCaptageAnalysis('captageContent', lat, lng, parseInt(el('captageRadiusSlider')?.value||3000));}
+  // Render in Fiche Site tab
+  const cs = el('captageCardSite');
+  if(cs) {cs.style.display='block'; renderCaptageAnalysis('captageContentSite', lat, lng, parseInt(el('captageRadiusSliderSite')?.value||3000));}
+}
+
+function updateCaptageRadiusSite() {
+  const r = parseInt(el('captageRadiusSliderSite').value);
+  el('captageRadiusValSite').textContent = (r/1000) + ' km';
+  if(lastCaptagePoint) renderCaptageAnalysis('captageContentSite', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
+}
+
+function updateCaptureRatesSite() {
+  CAPTURE_RATES.premium.rate = parseInt(el('crPremS').value)/100;
+  CAPTURE_RATES['mid-premium'].rate = parseInt(el('crMidPS').value)/100;
+  CAPTURE_RATES.mid.rate = parseInt(el('crMidS').value)/100;
+  CAPTURE_RATES.independent.rate = parseInt(el('crIndS').value)/100;
+  CAPTURE_RATES.lowcost.rate = parseInt(el('crLowS').value)/100;
+  el('crPremValS').textContent=el('crPremS').value+'%';
+  el('crMidPValS').textContent=el('crMidPS').value+'%';
+  el('crMidValS').textContent=el('crMidS').value+'%';
+  el('crIndValS').textContent=el('crIndS').value+'%';
+  el('crLowValS').textContent=el('crLowS').value+'%';
+  // Sync to Mes Sites sliders too
+  if(el('crPrem')){el('crPrem').value=el('crPremS').value;el('crPremVal').textContent=el('crPremS').value+'%'}
+  if(el('crMidP')){el('crMidP').value=el('crMidPS').value;el('crMidPVal').textContent=el('crMidPS').value+'%'}
+  if(el('crMid')){el('crMid').value=el('crMidS').value;el('crMidVal').textContent=el('crMidS').value+'%'}
+  if(el('crInd')){el('crInd').value=el('crIndS').value;el('crIndVal').textContent=el('crIndS').value+'%'}
+  if(el('crLow')){el('crLow').value=el('crLowS').value;el('crLowVal').textContent=el('crLowS').value+'%'}
+  if(lastCaptagePoint) {
+    renderCaptageAnalysis('captageContentSite', lastCaptagePoint.lat, lastCaptagePoint.lng, parseInt(el('captageRadiusSliderSite')?.value||3000));
+    renderCaptageAnalysis('captageContent', lastCaptagePoint.lat, lastCaptagePoint.lng, parseInt(el('captageRadiusSlider')?.value||3000));
+  }
 }
 
 function updateCannibalization() {
