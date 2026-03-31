@@ -589,6 +589,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <input type="range" id="captageRadiusSlider" min="1000" max="5000" step="500" value="3000" style="width:100%;accent-color:#f97316" oninput="updateCaptageRadius()">
           <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gray2)"><span>1 km</span><span>2 km</span><span>3 km</span><span>4 km</span><span>5 km</span></div>
         </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+          <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px">TAUX DE CAPTURE (ajustables)</div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--red)">Premium (WC)</span><span id="crPremVal">15%</span></div><input type="range" min="0" max="40" value="15" id="crPrem" style="width:100%;accent-color:#ef4444" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:#f97316">Mid-premium</span><span id="crMidPVal">20%</span></div><input type="range" min="0" max="40" value="20" id="crMidP" style="width:100%;accent-color:#f97316" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--yellow)">Mid (SF/18G)</span><span id="crMidVal">25%</span></div><input type="range" min="0" max="40" value="25" id="crMid" style="width:100%;accent-color:#eab308" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--green)">Independant</span><span id="crIndVal">18%</span></div><input type="range" min="0" max="40" value="18" id="crInd" style="width:100%;accent-color:#22c55e" oninput="updateCaptureRates()"></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--gray)">Low-cost</span><span id="crLowVal">8%</span></div><input type="range" min="0" max="25" value="8" id="crLow" style="width:100%;accent-color:#64748b" oninput="updateCaptureRates()"></div>
+        </div>
         <div id="captageContent"></div>
       </div>
       <div class="card" id="cannibalizationCard" style="display:none">
@@ -2626,13 +2634,13 @@ function showOverlapAnalysis() {
 // FP positioning: premium low-cost, 22-28 EUR/month
 // Capture rates by competitor segment (% of their members who would switch to FP)
 const CAPTURE_RATES = {
-  premium: {rate:0.08, reason:'Prix WC 46-145EUR → FP 22-28EUR = forte incitation prix, mais perte services premium (piscine, spa)'},
-  'mid-premium': {rate:0.12, reason:'Positionnement similaire (Downtown ~35EUR), FP offre meilleur rapport qualite/prix'},
-  mid: {rate:0.15, reason:'Stay Fit/18GYM ~30-36EUR, FP moins cher avec image internationale'},
-  lowcost: {rate:0.05, reason:'Deja moins cher que FP, faible migration vers le haut'},
-  independent: {rate:0.10, reason:'Clients fideles mais sensibles a une offre structuree'},
-  crossfit: {rate:0.03, reason:'Niche tres specifique, faible transferabilite'},
-  boutique: {rate:0.02, reason:'Experience unique non substituable'},
+  premium: {rate:0.15, reason:'Prix WC 46-145EUR → FP 22-28EUR = ecart prix majeur (÷2 a ÷5), forte incitation au switch malgre perte piscine/spa'},
+  'mid-premium': {rate:0.20, reason:'Downtown/BeFIT ~28-35EUR → FP 22-28EUR, positionnement quasi-identique, FP gagne sur le rapport Q/P + image internationale'},
+  mid: {rate:0.25, reason:'Stay Fit/18GYM ~30-36EUR, FP strictement moins cher avec equipements neufs + marque franchise internationale = migration naturelle'},
+  lowcost: {rate:0.08, reason:'Deja moins cher que FP, seuls les insatisfaits de la qualite migrent vers le haut'},
+  independent: {rate:0.18, reason:'Pas de programme structure, equipement vieillissant — FP offre un upgrade significatif a prix comparable'},
+  crossfit: {rate:0.05, reason:'Niche communautaire tres specifique, faible transferabilite sauf pour les curieux'},
+  boutique: {rate:0.03, reason:'Experience unique (yoga, pilates) non substituable par un club generaliste'},
 };
 
 // Distance decay: capture rate decreases with distance
@@ -2811,7 +2819,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">METHODOLOGIE CAPTAGE</div>
       <div style="line-height:1.6">
         <b>Captifs</b> = Σ (membres_concurrent × taux_capture × decay_distance)<br>
-        Taux par segment : Premium 8%, Mid-premium 12%, Mid 15%, Low-cost 5%<br>
+        Taux par segment : Premium 15%, Mid-premium 20%, Mid 25%, Low-cost 8%, Independant 18%<br>
         Decay : <500m=100%, 1km=85%, 2km=45%, 3km=25%, >4km=5%<br><br>
         <b>Natifs</b> = Pop_non_inscrite × uplift_FP<br>
         Uplift = attractivite_zone × 3% (nouvelle offre cree nouvelle demande)<br><br>
@@ -2985,6 +2993,24 @@ async function runSiteAnalysis(site) {
 }
 
 let lastCaptagePoint = null;
+
+function updateCaptureRates() {
+  CAPTURE_RATES.premium.rate = parseInt(el('crPrem').value)/100;
+  CAPTURE_RATES['mid-premium'].rate = parseInt(el('crMidP').value)/100;
+  CAPTURE_RATES.mid.rate = parseInt(el('crMid').value)/100;
+  CAPTURE_RATES.independent.rate = parseInt(el('crInd').value)/100;
+  CAPTURE_RATES.lowcost.rate = parseInt(el('crLow').value)/100;
+  el('crPremVal').textContent=el('crPrem').value+'%';
+  el('crMidPVal').textContent=el('crMidP').value+'%';
+  el('crMidVal').textContent=el('crMid').value+'%';
+  el('crIndVal').textContent=el('crInd').value+'%';
+  el('crLowVal').textContent=el('crLow').value+'%';
+  // Re-compute captage
+  if(lastCaptagePoint) {
+    const r = parseInt(el('captageRadiusSlider')?.value || 3000);
+    renderCaptageAnalysis('captageContent', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
+  }
+}
 
 function updateCaptageRadius() {
   const r = parseInt(el('captageRadiusSlider').value);
