@@ -448,7 +448,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <div class="radius-pill" data-r="3000" onclick="setRadius(3000)">3 km</div>
           <div class="radius-pill" data-r="5000" onclick="setRadius(5000)">5 km</div>
         </div>
-        <p style="font-size:11px;color:var(--gray2);margin-top:10px">&#128073; Cliquez sur la carte pour analyser un point</p>
+        <div style="margin-top:8px">
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <button class="btn btn-sm" id="isoWalkBtn" onclick="setIsoMode('walk')" style="font-size:9px">&#128694; 10min marche</button>
+            <button class="btn btn-sm" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px">&#128663; 10min voiture</button>
+            <button class="btn btn-sm" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)">&#9898; Cercle</button>
+          </div>
+          <div id="orsKeyWrap" style="display:none;margin-top:4px">
+            <input type="text" id="orsApiKey" placeholder="Cle API Openrouteservice (gratuite)" style="width:100%;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;font-family:var(--font)" onchange="localStorage.setItem('orsKey',this.value)">
+            <a href="https://openrouteservice.org/dev/#/home" target="_blank" style="font-size:9px;color:var(--cyan)">Obtenir une cle gratuite →</a>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--gray2);margin-top:6px">&#128073; Cliquez sur la carte pour analyser un point</p>
       </div>
 
       <!-- SAZ Weight Sliders -->
@@ -1728,10 +1739,16 @@ async function onMapClick(e) {
   if(circle) map.removeLayer(circle);
   if(radiusHandle) map.removeLayer(radiusHandle);
   if(popLabel) map.removeLayer(popLabel);
+  if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
 
-  // Extensible catchment circle — drag the edge to resize
+  // Draw isochrone if mode is walk/drive, otherwise circle
+  if(isoMode !== 'circle') {
+    drawIsochrone(lat, lng); // async, draws on map when ready
+  }
+
+  // Always draw circle too (for analysis calculations which use radius)
   circle = L.circle([lat,lng],{
-    radius,color:'#d4a017',weight:2,fillColor:'#d4a017',fillOpacity:.06,dashArray:'8,6'
+    radius,color:'#d4a017',weight:2,fillColor:'#d4a017',fillOpacity: isoMode==='circle'?.06:.02, dashArray:'8,6'
   }).addTo(map);
 
   // Add draggable radius handle
@@ -3757,6 +3774,110 @@ function setRadius(r) {
   radius=r;
   document.querySelectorAll('.radius-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.r)===r));
   if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+// ================================================================
+// ISOCHRONES — Real travel-time catchment areas
+// ================================================================
+let isoMode = 'circle'; // 'circle' | 'walk' | 'drive'
+let isoLayer = null;
+
+function setIsoMode(mode) {
+  isoMode = mode;
+  // Update button styles
+  ['isoWalkBtn','isoDriveBtn','isoCircleBtn'].forEach(id => {
+    const b = el(id);
+    if(b) b.style.cssText = 'font-size:9px;' + (
+      (mode==='walk'&&id==='isoWalkBtn') || (mode==='drive'&&id==='isoDriveBtn') || (mode==='circle'&&id==='isoCircleBtn')
+      ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : ''
+    );
+  });
+  // Show/hide API key input
+  const wrap = el('orsKeyWrap');
+  if(wrap) wrap.style.display = mode==='circle' ? 'none' : 'block';
+  // Load saved key
+  const keyInput = el('orsApiKey');
+  if(keyInput && !keyInput.value) keyInput.value = localStorage.getItem('orsKey') || '';
+  // Re-analyze if point selected
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+async function fetchIsochrone(lat, lng, profile, rangeSeconds) {
+  const apiKey = el('orsApiKey')?.value || localStorage.getItem('orsKey');
+  if(!apiKey) {
+    alert('Cle API Openrouteservice requise pour les isochrones.\nInscription gratuite: openrouteservice.org/dev');
+    setIsoMode('circle');
+    return null;
+  }
+
+  const url = `https://api.openrouteservice.org/v2/isochrones/${profile}`;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        locations: [[lng, lat]], // ORS uses [lng, lat]
+        range: [rangeSeconds],
+        range_type: 'time',
+        smoothing: 25,
+        attributes: ['area']
+      })
+    });
+
+    if(!resp.ok) {
+      const err = await resp.text();
+      if(resp.status === 403) alert('Cle API invalide ou quota epuise (500 isochrones/jour gratuit)');
+      else if(resp.status === 429) alert('Rate limit atteint. Attendez 1 minute.');
+      else console.error('ORS error:', resp.status, err);
+      return null;
+    }
+
+    const data = await resp.json();
+    return data;
+  } catch(e) {
+    console.error('Isochrone error:', e);
+    return null;
+  }
+}
+
+async function drawIsochrone(lat, lng) {
+  if(isoMode === 'circle') return; // normal circle mode, handled elsewhere
+
+  if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+
+  const profile = isoMode === 'walk' ? 'foot-walking' : 'driving-car';
+  const rangeSeconds = 600; // 10 minutes
+  const color = isoMode === 'walk' ? '#22c55e' : '#3b82f6';
+
+  showLoad('Calcul isochrone...', `${isoMode==='walk'?'10 min a pied':'10 min en voiture'} via Openrouteservice`);
+
+  const data = await fetchIsochrone(lat, lng, profile, rangeSeconds);
+
+  if(data && data.features && data.features.length > 0) {
+    const geojson = data.features[0];
+    isoLayer = L.geoJSON(geojson, {
+      style: {
+        color: color,
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 0.1,
+        dashArray: '6,4'
+      }
+    }).addTo(map);
+
+    // Calculate area
+    const areaKm2 = geojson.properties?.area ? (geojson.properties.area / 1000000).toFixed(1) : '?';
+
+    isoLayer.bindTooltip(
+      `<b>${isoMode==='walk'?'10 min a pied':'10 min en voiture'}</b><br>Surface: ${areaKm2} km2`,
+      {className:'custom-tooltip', permanent:false, direction:'center'}
+    );
+  }
+
+  hideLoad();
 }
 
 // ================================================================
