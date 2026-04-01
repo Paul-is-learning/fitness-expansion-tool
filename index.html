@@ -1281,23 +1281,31 @@ function analyzeCustomSite(id) {
   const site = customSites.find(s=>s.id===id);
   if(!site) {console.error('Site not found:',id,customSites);alert('Site introuvable. Rechargez la page.');return}
 
+  // Switch to Mes Sites tab first so user sees results
+  switchTab('mysites');
+
   // Show loading state
   const card = el('siteAnalysisCard');
-  if(card) {card.style.display='block'; el('siteAnalysisContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--gray2)"><div class="spinner" style="margin:0 auto 10px"></div>Analyse en cours...</div>';}
+  if(card) {card.style.display='block'; el('siteAnalysisContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--gray2)"><div class="spinner" style="margin:0 auto 10px"></div>Analyse en cours de <b>'+site.name+'</b>...</div>';}
 
   // Fly to site on map
   map.flyTo([site.lat,site.lng],14);
 
-  // Run map click + detailed analysis with delay for map to settle
+  // Run analysis with delay for map to settle
   setTimeout(async ()=>{
-    try {
-      // Trigger map analysis (SAZ overlay, competitors, etc)
-      await onMapClick({latlng:{lat:site.lat,lng:site.lng}});
-    } catch(e) {console.log('Map click error:',e)}
-    // Run detailed site analysis (always, even if map click fails)
-    try {
-      await runSiteAnalysis(site);
-    } catch(e) {console.error('Site analysis error:',e); el('siteAnalysisContent').innerHTML='<div style="color:var(--red);padding:10px">Erreur analyse: '+e.message+'</div>';}
+    // Map analysis (SAZ, competitors overlay)
+    try { await onMapClick({latlng:{lat:site.lat,lng:site.lng}}); } catch(e) {console.log('Map click:',e)}
+    // Detailed site analysis + captage
+    try { await runSiteAnalysis(site); } catch(e) {
+      console.error('Analysis error:',e);
+      if(el('siteAnalysisContent')) el('siteAnalysisContent').innerHTML='<div style="color:var(--red);padding:10px">Erreur: '+e.message+'</div>';
+    }
+    // Ensure we're on Mes Sites tab and scroll to results
+    switchTab('mysites');
+    setTimeout(()=>{
+      const c = el('siteAnalysisCard');
+      if(c) c.scrollIntoView({behavior:'smooth',block:'start'});
+    },300);
   },800);
 }
 
