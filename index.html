@@ -367,7 +367,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <div class="tab" data-tab="compete">Concurrence</div>
     <div class="tab" data-tab="mysites">Mes Sites</div>
     <div class="tab" data-tab="dash">Dashboard</div>
-    <div class="tab" data-tab="site">Fiche Site</div>
+    <div class="tab" data-tab="site">Fiche</div>
+    <div class="tab" data-tab="sources">Sources</div>
   </div>
 
   <div class="sidebar-body">
@@ -715,6 +716,99 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <div><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--gray)">Low-cost</span><span id="crLowValS">8%</span></div><input type="range" min="0" max="25" value="8" id="crLowS" style="width:100%;accent-color:#64748b" oninput="updateCaptureRatesSite()"></div>
         </div>
         <div id="captageContentSite"></div>
+      </div>
+    </div>
+
+    <!-- ============ SOURCES TAB ============ -->
+    <div class="tab-panel" id="tab-sources">
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">&#128218;</span> Sources de donnees</div></div>
+        <div style="font-size:11px;line-height:1.8;color:var(--gray)">
+          <div style="font-weight:700;color:var(--cyan);margin-bottom:4px">POPULATION & DEMOGRAPHIE</div>
+          <div>&#8226; <b>INS Romania</b> — Recensement 2021 (RPL 2021). Population par secteur: 1,716,961 habitants. <a href="https://recensamantromania.ro" style="color:var(--cyan)" target="_blank">recensamantromania.ro</a></div>
+          <div>&#8226; <b>83 quartiers (cartiere)</b> — Population estimee par repartition densite relative au sein de chaque secteur, calee sur totaux census</div>
+          <div>&#8226; <b>Facteur population reelle x1.7</b> — Census = residents legaux. Population reelle ~2.9M (navetteurs Ilfov, non-declares, expats). Source: estimations INS + Eurostat</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">CONCURRENTS (83 clubs)</div>
+          <div>&#8226; <b>World Class</b> (34 clubs) — worldclass.ro/harta-cluburi, business-review.eu. 84,000 membres / 45 clubs = 1,867 moy.</div>
+          <div>&#8226; <b>Stay Fit Gym</b> (21 clubs) — stayfit.ro/cluburi-bucuresti, morphosiscapital.com. 67 clubs nationaux, 50k+ membres</div>
+          <div>&#8226; <b>18GYM</b> (6 clubs) — 18gym.ro. 40 clubs nationaux, 15k+ membres Cluj</div>
+          <div>&#8226; <b>Downtown Fitness</b> (5 clubs) — downtownfitness.ro</div>
+          <div>&#8226; <b>Nr1 Fitness</b> (5 clubs) — outsourcing-today.ro, nr1fitness.ro</div>
+          <div>&#8226; <b>Autres</b> (12 clubs) — CrossFit, Absolute Gym, SalsaFit, WoWGym</div>
+          <div>&#8226; <b>Geocodage</b> — Nominatim OpenStreetMap, verification Google Maps</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">SURFACES (25 verifiees)</div>
+          <div>&#8226; Sources: worldclass.ro, business-review.eu, fitnet.ro, morphosiscapital.com, downtownfitness.ro, 18gym.ro, absolutegym.ro, outsourcing-today.ro</div>
+          <div>&#8226; Non-verifiees: estimees par tier/segment (WC Bronze ~1,300m2, Stay Fit ~1,000m2)</div>
+          <div>&#8226; Badge <span class="badge-est">est.</span> vs <span style="color:var(--green);font-size:9px;font-weight:600">verifie</span> dans chaque popup</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">ESTIMATION MEMBRES (double methode)</div>
+          <div>&#8226; <b>Methode A</b> — Surface × ratio: Premium 0.85 mbr/m2, Mid 1.1, Low-cost 1.5. Calibre sur WC (84k/45 clubs/~2000m2 moy = 0.93)</div>
+          <div>&#8226; <b>Methode B</b> — Google Reviews / anciennete × 81 × facteur_age. Calibre sur WC (219 avis moy / 9.5 ans = 23/an → 81× = 1,867 mbr). Sources: top-rated.online, citymaps.ro, wheree.com</div>
+          <div>&#8226; <b>Resultat</b> = moyenne(A, B) quand les 2 disponibles</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">HEATMAP DENSITE</div>
+          <div>&#8226; <b>397,009 batiments</b> extraits de l'export OSM complet Roumanie (Geofabrik, 301MB)</div>
+          <div>&#8226; <b>194,090 residentiels</b> traites avec ponderation volumetrique (emprise × etages)</div>
+          <div>&#8226; <b>building:levels</b> tag OSM (47,647 batiments = 12%) + estimation par type</div>
+          <div>&#8226; <b>Calage census</b> par secteur (facteur 0.005-0.009)</div>
+          <div>&#8226; <b>Landuse</b> OSM: filtrage residential vs commercial/industrial</div>
+          <div>&#8226; <b>3 modes</b>: Nuit (residentiel), Jour (bureaux+unis+malls), Combine</div>
+          <div>&#8226; Pipeline: Geofabrik → osmium extract → osmium tags-filter → osmium export → Python aggregation</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">FLUX & TRANSPORT</div>
+          <div>&#8226; <b>Metro Metrorex</b> — 53 stations, 750k pax/jour total. Ridership par station estime par type (interchange vs terminal)</div>
+          <div>&#8226; <b>Tram/bus STB</b> — 7 corridors principaux, 2.7M pax/jour total</div>
+          <div>&#8226; <b>Malls</b> — 12 centres, footfall estime. AFI Cotroceni 60k/jour (source: AFI Europe). Autres estimes par GLA/revenue</div>
+          <div>&#8226; <b>Zones pietonnes</b> — Calea Victoriei, Old Town, Magheru (source: visitbucharest.today)</div>
+          <div>&#8226; <b>Bureaux</b> — 340k employes en bureaux modernes (Cushman & Wakefield Echinox H1 2025)</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">POIs</div>
+          <div>&#8226; <b>14 universites</b> — universityguru.com, sites officiels. 150k+ etudiants total</div>
+          <div>&#8226; <b>13 malls</b> — romania-insider.com, sites officiels. GLA et footfall</div>
+          <div>&#8226; <b>5 poles bureaux</b> — Cushman & Wakefield, romania-insider.com</div>
+          <div>&#8226; <b>4 ensembles residentiels</b> — Militari Residence (25k hab), Cosmopolis (7.5k), Greenfield, One Herastrau</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">PRIX IMMOBILIER (proxy revenu)</div>
+          <div>&#8226; <b>imobiliare.ro</b>, investropa.com — Prix moyen par quartier (EUR/m2) 2025</div>
+          <div>&#8226; Range: 700 EUR/m2 (Ferentari) → 3,200 EUR/m2 (Primaverii)</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">MODELE DE CAPTAGE</div>
+          <div>&#8226; <b>3 sources</b>: Captifs concurrents + Natifs (nouvelle demande) + Walk-in (trafic mall)</div>
+          <div>&#8226; <b>4 facteurs</b> par concurrent: taux_base × decay_distance × note_Google × elasticite_prix</div>
+          <div>&#8226; <b>Walk-in</b>: 0.7% conversion annuelle visiteurs mall (benchmark industrie fitness en CC)</div>
+          <div>&#8226; <b>Ramp-up</b>: courbe S M1-M12 (8%→93%). Sources: benchmark FP France</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">BUSINESS PLAN</div>
+          <div>&#8226; <b>BP MF FP V17</b> — Isseo x Fitness Park. CAPEX 1,176k EUR/club. Cible 4,000 mbr maturite A3</div>
+          <div>&#8226; <b>Prix FP</b>: 28 EUR TTC/mois (23.14 HT, TVA 21%)</div>
+          <div>&#8226; <b>Ramp-up BP</b>: A1=70%, A2=90%, A3=100%</div>
+          <div>&#8226; <b>Reseau maturite</b>: 40 clubs (18 propres + 22 franchises)</div>
+
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">OUTILS & APIs</div>
+          <div>&#8226; <b>OpenStreetMap</b> — Overpass API (concurrents, POIs temps reel), Nominatim (geocodage)</div>
+          <div>&#8226; <b>Geofabrik</b> — Extract OSM Romania (batiments, landuse)</div>
+          <div>&#8226; <b>osmium-tool</b> — Filtrage et export OSM</div>
+          <div>&#8226; <b>Leaflet.js</b> + leaflet-heat + MarkerCluster — Cartographie</div>
+          <div>&#8226; <b>Chart.js</b> — Graphiques</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">&#9888;</span> Limites & avertissements</div></div>
+        <div style="font-size:11px;line-height:1.8;color:var(--gray)">
+          <div>&#8226; Les estimations de membres sont des <b>approximations</b> basees sur des proxies (surface, reviews). Aucune donnee reelle publiee par les enseignes roumaines</div>
+          <div>&#8226; Les Google Reviews sont des <b>estimations</b> collectees via sites aggregateurs, pas scraping direct Google</div>
+          <div>&#8226; Les taux de captage (15-25%) sont des <b>hypotheses sectorielles</b>, pas des donnees mesurees en Roumanie</div>
+          <div>&#8226; La heatmap densite represente le <b>volume bati</b> (emprise × etages), pas le nombre reel de residents</div>
+          <div>&#8226; Les ages des clubs sont estimes par marque quand la date d'ouverture exacte n'est pas connue</div>
+          <div>&#8226; Population reelle x1.7 est une <b>estimation</b> — la realite pourrait etre x1.5 a x2.0</div>
+          <div>&#8226; Le modele walk-in (0.7% conversion) est un <b>benchmark europeen</b>, pas specifique Roumanie</div>
+        </div>
+      </div>
+      <div style="text-align:center;padding:20px;font-size:9px;color:var(--gray2)">
+        Outil developpe par <b>Isseo</b> pour le projet Master Franchise Fitness Park Romania<br>
+        Donnees au 31 mars 2026 | v2.0
       </div>
     </div>
   </div>
