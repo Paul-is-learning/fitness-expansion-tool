@@ -650,6 +650,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
+          <div class="card-title"><span class="icon">&#9878;</span> Comparaison sites</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="compareA" style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)" onchange="runComparison()">
+            <option value="">-- Site A --</option>
+          </select>
+          <span style="color:var(--gray2);font-size:14px;align-self:center">vs</span>
+          <select id="compareB" style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)" onchange="runComparison()">
+            <option value="">-- Site B --</option>
+          </select>
+        </div>
+        <div id="comparisonResult"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
           <div class="card-title"><span class="icon">&#128176;</span> Trajectoire financiere reseau</div>
           <span class="info-tip">?<div class="tip-content"><strong>Projections BP V17</strong><br>CA Enseigne et EBITDA consolides sur 10 ans. Hypotheses : 40 clubs a maturite (18 propres + 22 franchises), prix 28EUR TTC/mois (23,14 HT), cible 4000 adherents/club.<div class="tip-source">Source : BP MF FP V17 — Isseo</div></div></span>
         </div>
@@ -2522,6 +2538,76 @@ function addZone(lat,lng,sector,saz,comps) {
   renderDash();
 }
 
+function updateCompareSelects() {
+  const allSites = [...zones.map(z=>({name:z.name,lat:z.lat,lng:z.lng})), ...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng})), ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
+  // Dedupe by name
+  const unique = [];
+  allSites.forEach(s=>{if(!unique.find(u=>u.name===s.name))unique.push(s)});
+  const opts = '<option value="">-- Choisir --</option>' + unique.map(s=>`<option value="${s.lat},${s.lng}">${s.name}</option>`).join('');
+  if(el('compareA')) el('compareA').innerHTML = opts;
+  if(el('compareB')) el('compareB').innerHTML = opts;
+}
+
+function runComparison() {
+  const vA = el('compareA')?.value;
+  const vB = el('compareB')?.value;
+  if(!vA || !vB) { el('comparisonResult').innerHTML='<p style="font-size:11px;color:var(--gray2)">Selectionnez 2 sites</p>'; return; }
+  const [latA,lngA] = vA.split(',').map(Number);
+  const [latB,lngB] = vB.split(',').map(Number);
+  const nameA = el('compareA').selectedOptions[0].textContent;
+  const nameB = el('compareB').selectedOptions[0].textContent;
+
+  const cA = runCaptageAnalysis(latA, lngA, 3000);
+  const cB = runCaptageAnalysis(latB, lngB, 3000);
+
+  const dist = haversine(latA,lngA,latB,lngB);
+  const cannibal = cannibalizeRisk({lat:latA,lng:lngA},{lat:latB,lng:lngB});
+
+  function bar(a,b,label){
+    const max=Math.max(a,b,1);
+    const pA=Math.round(a/max*100);const pB=Math.round(b/max*100);
+    const better=a>b?'A':a<b?'B':'=';
+    return `<div style="margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px"><span>${label}</span></div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:10px;font-weight:700;width:45px;text-align:right;color:${better==='A'?'var(--green)':'var(--gray)'}">${fmt(a)}</span>
+        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg)">
+          <div style="width:${pA}%;background:var(--cyan);border-radius:4px 0 0 4px"></div>
+          <div style="width:${100-pA}%"></div>
+        </div>
+        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg)">
+          <div style="width:${100-pB}%"></div>
+          <div style="width:${pB}%;background:#f97316;border-radius:0 4px 4px 0"></div>
+        </div>
+        <span style="font-size:10px;font-weight:700;width:45px;color:${better==='B'?'var(--green)':'var(--gray)'}">${fmt(b)}</span>
+      </div>
+    </div>`;
+  }
+
+  el('comparisonResult').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:10px;font-weight:700">
+      <span style="color:var(--cyan)">${nameA}</span>
+      <span style="color:var(--gray2)">${(dist/1000).toFixed(1)}km</span>
+      <span style="color:#f97316">${nameB}</span>
+    </div>
+    ${bar(cA.saz.total,cB.saz.total,'SAZ Score')}
+    ${bar(cA.saz.flux,cB.saz.flux,'Flux')}
+    ${bar(cA.saz.densite,cB.saz.densite,'Densite')}
+    ${bar(cA.saz.jeunesse,cB.saz.jeunesse,'Jeunesse')}
+    ${bar(cA.totalTheorique,cB.totalTheorique,'Membres theoriques')}
+    ${bar(cA.totalCaptifs,cB.totalCaptifs,'Captifs concurrents')}
+    ${bar(cA.native.captured,cB.native.captured,'Natifs')}
+    ${bar(cA.walkIn.walkInMembers,cB.walkIn.walkInMembers,'Walk-in mall')}
+    ${bar(cA.comps.length,cB.comps.length,'Nb concurrents (3km)')}
+    ${bar(cA.popTarget,cB.popTarget,'Pop. cible 15-45')}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px">
+      <div class="metric-row"><span class="metric-label">Distance entre sites</span><span class="metric-value">${(dist/1000).toFixed(1)} km</span></div>
+      <div class="metric-row"><span class="metric-label">Cannibalisation</span><span class="metric-value" style="color:${cannibal.risk==='critique'?'var(--red)':cannibal.risk==='significatif'?'var(--orange)':'var(--green)'}">${cannibal.risk} (${cannibal.pct}%)</span></div>
+      <div class="metric-row"><span class="metric-label"><b>Meilleur site</b></span><span class="metric-value" style="color:var(--green);font-weight:800">${cA.totalTheorique>cB.totalTheorique?nameA:nameB} (+${Math.abs(cA.totalTheorique-cB.totalTheorique)} mbr)</span></div>
+    </div>
+  `;
+}
+
 function renderDash() {
   el('dashBody').innerHTML=zones.sort((a,b)=>b.saz-a.saz).map(z=>`
     <tr onclick="map.flyTo([${z.lat},${z.lng}],14)" style="cursor:pointer">
@@ -2535,6 +2621,7 @@ function renderDash() {
       <td class="reco-${z.reco.toLowerCase().replace('-','')}-text">${z.reco}</td>
     </tr>
   `).join('');
+  updateCompareSelects();
 }
 
 function sortTable(col) {
