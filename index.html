@@ -650,7 +650,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <div class="card">
         <div class="card-header">
           <div class="card-title"><span class="icon">&#128176;</span> Trajectoire financiere reseau</div>
-          <span class="info-tip">?<div class="tip-content"><strong>Projections BP V17</strong><br>CA Enseigne et EBITDA consolides sur 10 ans. Hypotheses : 40 clubs a maturite (18 propres + 22 franchises), panier moyen 24,68EUR/mois, cible 4000 adherents/club.<div class="tip-source">Source : BP MF FP V17 — Isseo</div></div></span>
+          <span class="info-tip">?<div class="tip-content"><strong>Projections BP V17</strong><br>CA Enseigne et EBITDA consolides sur 10 ans. Hypotheses : 40 clubs a maturite (18 propres + 22 franchises), prix 28EUR TTC/mois (23,14 HT), cible 4000 adherents/club.<div class="tip-source">Source : BP MF FP V17 — Isseo</div></div></span>
         </div>
         <div class="chart-wrap" style="height:200px"><canvas id="finChart"></canvas></div>
       </div>
@@ -665,7 +665,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div class="metric-row"><span class="metric-label">dont equipement (40%)</span><span class="metric-value" style="color:var(--gray)">336k</span></div>
         <div class="metric-row"><span class="metric-label">Leasing equipement (60% / 5 ans)</span><span class="metric-value">101k/an</span></div>
         <div class="metric-row"><span class="metric-label">Cible adherents / club (maturite A3)</span><span class="metric-value">4 000</span></div>
-        <div class="metric-row"><span class="metric-label">Panier moyen mensuel HT</span><span class="metric-value">24,68 EUR</span></div>
+        <div class="metric-row"><span class="metric-label">Prix mensuel</span><span class="metric-value">28 EUR TTC (23,14 HT)</span></div>
         <div class="metric-row"><span class="metric-label">Ramp-up A1 / A2</span><span class="metric-value">70% / 90%</span></div>
         <div class="metric-row"><span class="metric-label">Loyer + charges / club / an</span><span class="metric-value">236 400 EUR</span></div>
         <div class="metric-row"><span class="metric-label">FTP (4 ETP, A1)</span><span class="metric-value">85 890 EUR</span></div>
@@ -1379,7 +1379,9 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   const optimistic = Math.round(realistic * 1.4);
 
   const capMembers = n => Math.min(n, 6000);
-  const monthlyARPU = 24.68;
+  const FP_PRICE_TTC = 28; // EUR TTC/month — prix affiche client
+  const FP_PRICE_HT = 23.14; // EUR HT/month (28 / 1.21 TVA Romania)
+  const monthlyARPU = FP_PRICE_HT; // CA calculations use HT
 
   return {
     pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
@@ -2286,7 +2288,7 @@ function displayComps(comps,refLat,refLng) {
   const targetPenetration=10; // EU avg fitness penetration
   const potentialMembers=popTarget>0?Math.round(popTarget*targetPenetration/100):0;
   const gap=potentialMembers-totalMembers;
-  const revenueEstimate=gap>0?Math.round(gap*24.68*12/1000):0;
+  const revenueEstimate=gap>0?Math.round(gap*23.14*12/1000):0;
 
   el('compSummary').innerHTML=`
     <div class="metric-row"><span class="metric-label">Total concurrents</span><span class="metric-value">${comps.length}</span></div>
@@ -2402,7 +2404,7 @@ function addZone(lat,lng,sector,saz,comps) {
   const popTarget=sector?Math.round(sector.pop*sector.youngPct):0;
   const totalMembers=comps.reduce((a,c)=>a+(c.members||0),0);
   const gap=popTarget>0?Math.round(popTarget*.10)-totalMembers:0;
-  const potCA=gap>0?Math.round(gap*24.68*12/1000):0;
+  const potCA=gap>0?Math.round(gap*23.14*12/1000):0;
 
   const z={
     name:sector?sector.name:`${lat.toFixed(3)},${lng.toFixed(3)}`,
@@ -2856,23 +2858,27 @@ function showOverlapAnalysis() {
 }
 
 // ================================================================
-// CAPTAGE ENGINE — Member capture potential model
+// CAPTAGE ENGINE v2 — 3 sources: Captifs + Natifs + Walk-in
 // ================================================================
-// FP positioning: premium low-cost, 22-28 EUR/month
-// Capture rates by competitor segment (% of their members who would switch to FP)
+// FP positioning: 28 EUR TTC/month, premium low-cost international franchise
+const FP_MONTHLY_TTC = 28;
+const FP_MONTHLY_HT = 23.14;
+
+// Competitor average prices TTC (for price elasticity calculation)
+const COMP_PRICES = {premium:80, 'mid-premium':32, mid:32, lowcost:18, independent:20, crossfit:40, boutique:35};
+
 const CAPTURE_RATES = {
-  premium: {rate:0.15, reason:'Prix WC 46-145EUR → FP 22-28EUR = ecart prix majeur (÷2 a ÷5), forte incitation au switch malgre perte piscine/spa'},
-  'mid-premium': {rate:0.20, reason:'Downtown/BeFIT ~28-35EUR → FP 22-28EUR, positionnement quasi-identique, FP gagne sur le rapport Q/P + image internationale'},
-  mid: {rate:0.25, reason:'Stay Fit/18GYM ~30-36EUR, FP strictement moins cher avec equipements neufs + marque franchise internationale = migration naturelle'},
-  lowcost: {rate:0.08, reason:'Deja moins cher que FP, seuls les insatisfaits de la qualite migrent vers le haut'},
-  independent: {rate:0.18, reason:'Pas de programme structure, equipement vieillissant — FP offre un upgrade significatif a prix comparable'},
-  crossfit: {rate:0.05, reason:'Niche communautaire tres specifique, faible transferabilite sauf pour les curieux'},
-  boutique: {rate:0.03, reason:'Experience unique (yoga, pilates) non substituable par un club generaliste'},
+  premium: {rate:0.15, reason:'WC 46-145EUR → FP 28EUR TTC = ecart prix majeur'},
+  'mid-premium': {rate:0.20, reason:'Downtown/BeFIT ~35EUR → FP 28EUR, FP gagne sur Q/P + marque'},
+  mid: {rate:0.25, reason:'Stay Fit/18GYM ~30-36EUR → FP 28EUR, moins cher + equipements neufs'},
+  lowcost: {rate:0.08, reason:'Deja moins cher que FP, migration limitee'},
+  independent: {rate:0.18, reason:'Equipement vieillissant, FP = upgrade significatif'},
+  crossfit: {rate:0.05, reason:'Niche communautaire, faible transferabilite'},
+  boutique: {rate:0.03, reason:'Experience unique non substituable'},
 };
 
-// Distance decay: capture rate decreases with distance
 function distanceDecay(dist) {
-  if(dist < 500) return 1.0;    // same street = max capture
+  if(dist < 500) return 1.0;
   if(dist < 1000) return 0.85;
   if(dist < 1500) return 0.65;
   if(dist < 2000) return 0.45;
@@ -2881,12 +2887,63 @@ function distanceDecay(dist) {
   return 0.05;
 }
 
-// Native demand: people not currently in any gym who would join FP
+// NEW: Google rating factor — low-rated clubs lose more members
+function ratingFactor(googleRating) {
+  if(!googleRating) return 1.0;
+  // Each 0.1 below 4.0 = +3% capture bonus (unhappy members switch more)
+  // Each 0.1 above 4.3 = -2% capture malus (happy members stay)
+  if(googleRating < 4.0) return 1 + (4.0 - googleRating) * 0.3;  // e.g. 3.6★ = +12%
+  if(googleRating > 4.3) return 1 - (googleRating - 4.3) * 0.2;  // e.g. 4.6★ = -6%
+  return 1.0;
+}
+
+// NEW: Price elasticity — bigger price gap = more capture
+function priceElasticity(compSegment) {
+  const compPrice = COMP_PRICES[compSegment] || 30;
+  const priceDiff = compPrice - FP_MONTHLY_TTC;
+  if(priceDiff <= 0) return 0.7;  // FP is MORE expensive → less capture
+  // Each 10€ of savings = +15% capture boost
+  return 1 + (priceDiff / 10) * 0.15;  // e.g. WC 80€ → diff 52€ → x1.78
+}
+
+// NEW: Walk-in conversion from mall/centre traffic
+function calcWalkIn(lat, lng) {
+  let dailyFootfall = 0;
+  let sources = [];
+
+  // Check nearby malls
+  TRAFFIC_GENERATORS.malls.forEach(m => {
+    const d = haversine(lat, lng, m.lat, m.lng);
+    if(d < 300) { dailyFootfall += m.dailyVisitors; sources.push({name:m.name,visitors:m.dailyVisitors,type:'in-mall'}); }
+    else if(d < 800) { dailyFootfall += m.dailyVisitors * 0.3; sources.push({name:m.name,visitors:Math.round(m.dailyVisitors*0.3),type:'adjacent'}); }
+  });
+
+  // Walk-in conversion: 0.7% of annual unique visitors become members
+  // (industry benchmark: 0.5-1% for fitness in shopping centres)
+  const annualUnique = dailyFootfall * 300; // ~300 operating days, adjusted for repeat visitors
+  const walkInMembers = Math.round(annualUnique * 0.007);
+
+  return { dailyFootfall, annualUnique, walkInMembers, sources, conversionRate: 0.7 };
+}
+
+// NEW: Monthly ramp-up projection M1-M12
+function monthlyRampUp(totalTheorique) {
+  // Ramp curve: S-shaped (slow start, fast middle, plateau)
+  const rampCurve = [0.08, 0.15, 0.25, 0.35, 0.45, 0.55, 0.63, 0.70, 0.76, 0.82, 0.88, 0.93];
+  // M1-M3: promo launch buzz (8->25%)
+  // M4-M6: word of mouth acceleration (35->55%)
+  // M7-M12: competitor contract expirations + stabilization (63->93%)
+  return rampCurve.map((pct, i) => ({
+    month: i + 1,
+    pct: Math.round(pct * 100),
+    members: Math.round(totalTheorique * pct),
+    ca: Math.round(totalTheorique * pct * FP_MONTHLY_HT / 1000)
+  }));
+}
+
 function calcNativeDemand(popTarget, currentPenetration, fpAttractivite) {
-  // Romania penetration: ~5% national, ~8-12% urban Bucharest
-  // Target penetration with FP entering: +1.5-3% uplift (new offer creates new demand)
-  const upliftPct = fpAttractivite * 0.03; // 0 to 3% new penetration from FP
-  const nativePool = popTarget * (1 - currentPenetration/100); // people NOT in a gym
+  const upliftPct = fpAttractivite * 0.03;
+  const nativePool = popTarget * (1 - currentPenetration/100);
   const nativeCapture = nativePool * upliftPct;
   return {
     pool: Math.round(nativePool),
@@ -2895,78 +2952,68 @@ function calcNativeDemand(popTarget, currentPenetration, fpAttractivite) {
   };
 }
 
-// Full captage analysis for a point
 function runCaptageAnalysis(lat, lng, captageRadius) {
   captageRadius = captageRadius || 3000;
-
-  // 1. Find all competitors in radius
   const comps = getDemoInRadius(lat, lng, captageRadius);
 
-  // 2. Calculate capture from each competitor
+  // === SOURCE 1: CAPTIFS (competitor capture) ===
   const captageDetails = comps.map(c => {
     const dist = haversine(lat, lng, c.lat, c.lng);
     const baseRate = (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).rate;
     const decay = distanceDecay(dist);
-    const effectiveRate = baseRate * decay;
     const rv = getReviewData(c.name);
+    const rating = rv ? rv.g : null;
+    const rFactor = ratingFactor(rating);
+    const pFactor = priceElasticity(c.segment);
+    const effectiveRate = baseRate * decay * rFactor * pFactor;
     const mA = c.members || 0;
-    const mB = rv ? Math.round(rv.r * REVIEWS_MULT) : 0;
+    const mB = rv ? rv.mB : 0;
     const membersEst = mB > 0 ? Math.round((mA + mB) / 2) : mA;
     const captured = Math.round(membersEst * effectiveRate);
 
     return {
-      name: c.name,
-      segment: c.segment,
-      color: c.color,
-      dist: Math.round(dist),
-      membersA: mA,
-      membersB: mB,
-      membersEst,
+      name: c.name, segment: c.segment, color: c.color,
+      dist: Math.round(dist), membersA: mA, membersB: mB, membersEst,
       baseRate: Math.round(baseRate * 100),
       decay: Math.round(decay * 100),
+      ratingFactor: Math.round(rFactor * 100),
+      priceFactor: Math.round(pFactor * 100),
       effectiveRate: Math.round(effectiveRate * 100 * 10) / 10,
-      captured,
+      captured, rating,
       reason: (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).reason
     };
   }).sort((a, b) => b.captured - a.captured);
 
-  // 3. Total captifs
   const totalCaptifs = captageDetails.reduce((a, c) => a + c.captured, 0);
   const totalMembersZone = captageDetails.reduce((a, c) => a + c.membersEst, 0);
 
-  // 4. Native demand
+  // === SOURCE 2: NATIFS (new gym-goers) ===
   const sector = findSector(lat, lng);
   const popGranular = estimatePopInRadiusGranular(lat, lng, captageRadius);
   const currentPenetration = popGranular.target > 0 ? (totalMembersZone / popGranular.target) * 100 : 0;
-
-  // FP attractivite: based on SAZ flux + jeunesse scores (0 to 1)
   const saz = calcSAZ(lat, lng, sector, comps);
-  const fpAttract = ((saz.flux || 0) + (saz.jeunesse || 0)) / 200; // 0 to 1
-
+  const fpAttract = ((saz.flux || 0) + (saz.jeunesse || 0)) / 200;
   const native = calcNativeDemand(popGranular.target, currentPenetration, fpAttract);
 
-  // 5. Total members theoriques
-  const totalTheorique = totalCaptifs + native.captured;
+  // === SOURCE 3: WALK-IN (mall/centre traffic conversion) ===
+  const walkIn = calcWalkIn(lat, lng);
 
-  // 6. Scenarios
+  // === TOTAL ===
+  const totalTheorique = totalCaptifs + native.captured + walkIn.walkInMembers;
+  const rampUp = monthlyRampUp(totalTheorique);
   const pessimiste = Math.round(totalTheorique * 0.6);
   const realiste = totalTheorique;
   const optimiste = Math.round(totalTheorique * 1.4);
 
   return {
-    captageRadius,
-    comps: captageDetails,
-    totalCaptifs,
-    totalMembersZone,
-    native,
+    captageRadius, comps: captageDetails,
+    totalCaptifs, totalMembersZone,
+    native, walkIn,
     currentPenetration: Math.round(currentPenetration * 10) / 10,
     popTarget: popGranular.target,
     fpAttract: Math.round(fpAttract * 100),
-    totalTheorique,
-    pessimiste,
-    realiste,
-    optimiste,
-    saz,
+    totalTheorique, pessimiste, realiste, optimiste,
+    rampUp, saz,
     breakeven2800: totalTheorique >= 2800 ? 'OUI' : totalTheorique >= 2000 ? 'POSSIBLE' : 'NON',
     breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
   };
@@ -2989,16 +3036,21 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:10px;font-weight:700;margin-top:6px;color:${recoColor};border:1px solid ${recoColor}30;background:${recoColor}10">${recoText}</div>
     </div>
 
-    <div style="display:flex;gap:6px;margin-bottom:12px">
-      <div style="flex:1;background:var(--bg);border-radius:6px;padding:8px;text-align:center;border-left:3px solid #f97316">
-        <div style="font-size:8px;font-weight:700;color:#f97316">CAPTIFS</div>
-        <div style="font-size:20px;font-weight:900;color:#f97316">${fmt(r.totalCaptifs)}</div>
-        <div style="font-size:8px;color:var(--gray2)">vols concurrents</div>
+    <div style="display:flex;gap:4px;margin-bottom:12px">
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid #f97316">
+        <div style="font-size:7px;font-weight:700;color:#f97316">CAPTIFS</div>
+        <div style="font-size:18px;font-weight:900;color:#f97316">${fmt(r.totalCaptifs)}</div>
+        <div style="font-size:7px;color:var(--gray2)">vols concurrents</div>
       </div>
-      <div style="flex:1;background:var(--bg);border-radius:6px;padding:8px;text-align:center;border-left:3px solid var(--green)">
-        <div style="font-size:8px;font-weight:700;color:var(--green)">NATIFS</div>
-        <div style="font-size:20px;font-weight:900;color:var(--green)">${fmt(r.native.captured)}</div>
-        <div style="font-size:8px;color:var(--gray2)">nouvelle demande</div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--green)">
+        <div style="font-size:7px;font-weight:700;color:var(--green)">NATIFS</div>
+        <div style="font-size:18px;font-weight:900;color:var(--green)">${fmt(r.native.captured)}</div>
+        <div style="font-size:7px;color:var(--gray2)">nouvelle demande</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--cyan)">
+        <div style="font-size:7px;font-weight:700;color:var(--cyan)">WALK-IN</div>
+        <div style="font-size:18px;font-weight:900;color:var(--cyan)">${fmt(r.walkIn.walkInMembers)}</div>
+        <div style="font-size:7px;color:var(--gray2)">trafic mall/centre</div>
       </div>
     </div>
 
@@ -3012,6 +3064,40 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--purple);margin-bottom:6px">RAMP-UP MENSUEL A1 — Courbe en S</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;height:60px;margin-bottom:6px">
+        ${r.rampUp.map(m=>{
+          const h = Math.max(4, m.pct * 0.55);
+          const color = m.month<=3?'#f97316':m.month<=6?'var(--yellow)':m.month<=9?'var(--cyan)':'var(--green)';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center">
+            <div style="font-size:7px;color:var(--gray2)">${m.pct}%</div>
+            <div style="width:100%;height:${h}px;background:${color};border-radius:2px 2px 0 0;min-width:8px"></div>
+            <div style="font-size:7px;color:var(--gray2);margin-top:2px">M${m.month}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:9px;color:var(--gray2);line-height:1.5">
+        <span style="color:#f97316">M1-M3</span> Promo ouverture (8→25%) |
+        <span style="color:var(--yellow)">M4-M6</span> Bouche-a-oreille (35→55%) |
+        <span style="color:var(--cyan)">M7-M9</span> Contrats concurrents expirent (63→76%) |
+        <span style="color:var(--green)">M10-M12</span> Stabilisation (82→93%)
+      </div>
+      <div class="metric-row" style="margin-top:6px"><span class="metric-label">M3 (fin promo)</span><span class="metric-value">${fmt(r.rampUp[2].members)} mbr | ${r.rampUp[2].ca}k EUR/mois</span></div>
+      <div class="metric-row"><span class="metric-label">M6 (mi-annee)</span><span class="metric-value">${fmt(r.rampUp[5].members)} mbr | ${r.rampUp[5].ca}k EUR/mois</span></div>
+      <div class="metric-row"><span class="metric-label">M12 (fin A1)</span><span class="metric-value" style="font-weight:700">${fmt(r.rampUp[11].members)} mbr | ${r.rampUp[11].ca}k EUR/mois</span></div>
+    </div>
+
+    ${r.walkIn.walkInMembers > 0 ? `
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:6px">WALK-IN — Conversion trafic mall/centre</div>
+      <div class="metric-row"><span class="metric-label">Trafic quotidien site</span><span class="metric-value">${fmt(r.walkIn.dailyFootfall)} visiteurs/jour</span></div>
+      <div class="metric-row"><span class="metric-label">Visiteurs uniques/an</span><span class="metric-value">${fmt(r.walkIn.annualUnique)}</span></div>
+      <div class="metric-row"><span class="metric-label">Taux conversion (benchmark)</span><span class="metric-value">${r.walkIn.conversionRate}%</span></div>
+      <div class="metric-row"><span class="metric-label">Walk-in membres</span><span class="metric-value" style="color:var(--cyan);font-weight:700">${fmt(r.walkIn.walkInMembers)}</span></div>
+      ${r.walkIn.sources.map(s=>`<div class="metric-row"><span class="metric-label" style="font-size:9px">${s.name} (${s.type})</span><span class="metric-value" style="font-size:9px">${fmt(s.visitors)}/jour</span></div>`).join('')}
+    </div>` : ''}
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px">CAPTAGE CONCURRENTS — ${r.comps.length} clubs dans ${r.captageRadius/1000}km</div>
       <div class="metric-row"><span class="metric-label">Membres total zone</span><span class="metric-value">${fmt(r.totalMembersZone)}</span></div>
       <div class="metric-row"><span class="metric-label">Penetration actuelle</span><span class="metric-value">${r.currentPenetration}%</span></div>
@@ -3022,7 +3108,8 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
             <div style="width:6px;height:6px;border-radius:50%;background:${comp.color};flex-shrink:0"></div>
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${comp.name}</div>
-              <div style="color:var(--gray2);font-size:9px">${comp.segment} | ${(comp.dist/1000).toFixed(1)}km | ~${fmt(comp.membersEst)} mbr</div>
+              <div style="color:var(--gray2);font-size:9px">${comp.segment} | ${(comp.dist/1000).toFixed(1)}km | ~${fmt(comp.membersEst)} mbr ${comp.rating?'| '+comp.rating+'★':''}</div>
+              <div style="color:var(--gray2);font-size:8px">base ${comp.baseRate}% × dist ${comp.decay}% × note ${comp.ratingFactor}% × prix ${comp.priceFactor}%</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div style="font-weight:800;color:#f97316">+${comp.captured}</div>
@@ -3045,10 +3132,14 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;color:var(--gray)">
       <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">METHODOLOGIE CAPTAGE</div>
       <div style="line-height:1.6">
-        <b>Captifs</b> = Σ (membres_concurrent × taux_capture × decay_distance)<br>
-        Taux par segment : Premium 15%, Mid-premium 20%, Mid 25%, Low-cost 8%, Independant 18%<br>
-        Decay : <500m=100%, 1km=85%, 2km=45%, 3km=25%, >4km=5%<br><br>
+        <b>Captifs</b> = Σ (membres × taux_base × decay_dist × note_Google × elasticite_prix)<br>
+        Taux base: Premium 15%, Mid-prem 20%, Mid 25%, Low-cost 8%<br>
+        Note: <4.0★ = +30%/0.1pt (insatisfaits), >4.3★ = -20%/0.1pt (fideles)<br>
+        Prix: ecart_€/10 × 15% bonus (WC 80€→FP 28€ = +78% boost)<br>
+        Decay: <500m=100%, 1km=85%, 2km=45%, 3km=25%<br><br>
         <b>Natifs</b> = Pop_non_inscrite × uplift_FP<br>
+        <b>Walk-in</b> = visiteurs_mall/an × 0.7% conversion (benchmark fitness en CC)<br>
+        <b>Ramp-up</b> = courbe S M1-M12 (promo→bouche-a-oreille→contrats expirent)<br>
         Uplift = attractivite_zone × 3% (nouvelle offre cree nouvelle demande)<br><br>
         <b>Calibration</b> : WC 84k mbr / 45 clubs. Reviews x8.5. Surface ratio 0.85-1.5/m2
       </div>
@@ -3207,11 +3298,11 @@ async function runSiteAnalysis(site) {
     </div>
 
     <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">PROJECTION MEMBRES & CA — Panier 24,68EUR HT/mois</div>
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">PROJECTION MEMBRES & CA — 28EUR TTC/mois (23,14 HT)</div>
       <div class="metric-row"><span class="metric-label">Penetration estimee zone</span><span class="metric-value">${scenarios.penetration}% ${scenarios.fluxBonus?'(flux x'+(scenarios.fluxBonus/100).toFixed(1)+')':''}</span></div>
       <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">RAMP-UP PAR ANNEE (selon BP V17)</div>
-      <div class="metric-row"><span class="metric-label">A1 — Ramp 70%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.7))} mbr | ${Math.round(scenarios.realistic.members*0.7*24.68*12/1000)}k EUR</span></div>
-      <div class="metric-row"><span class="metric-label">A2 — Ramp 90%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.9))} mbr | ${Math.round(scenarios.realistic.members*0.9*24.68*12/1000)}k EUR</span></div>
+      <div class="metric-row"><span class="metric-label">A1 — Ramp 70%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.7))} mbr | ${Math.round(scenarios.realistic.members*0.7*23.14*12/1000)}k EUR</span></div>
+      <div class="metric-row"><span class="metric-label">A2 — Ramp 90%</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.9))} mbr | ${Math.round(scenarios.realistic.members*0.9*23.14*12/1000)}k EUR</span></div>
       <div class="metric-row" style="font-weight:700"><span class="metric-label">A3 — Maturite 100%</span><span class="metric-value" style="color:var(--cyan)">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR</span></div>
       <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">SCENARIOS A MATURITE (A3+)</div>
       <div class="metric-row" style="color:var(--red)"><span class="metric-label">Pessimiste</span><span class="metric-value">${fmt(scenarios.pessimistic.members)} mbr | ${scenarios.pessimistic.ca}k EUR/an</span></div>
