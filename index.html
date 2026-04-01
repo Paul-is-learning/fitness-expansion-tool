@@ -258,6 +258,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
 /* Responsive */
 @media(max-width:1200px){.app{grid-template-columns:360px 1fr}.app.panel-open{grid-template-columns:360px 1fr 380px}}
+@media(max-width:768px){
+  .app{grid-template-columns:1fr!important;grid-template-rows:auto 1fr}
+  .app.panel-open{grid-template-columns:1fr!important}
+  .sidebar{max-height:50vh;overflow-y:auto;border-right:none;border-bottom:1px solid var(--border)}
+  .map-area{min-height:50vh}
+  .tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .tab{padding:8px 10px;font-size:9px;flex:none;min-width:auto}
+  .map-overlay-tr{top:8px;right:8px}
+  .map-box{min-width:160px;padding:8px;font-size:10px}
+  .right-panel{display:none!important}
+  #loginPage>div{width:95vw!important;padding:20px!important}
+  .sidebar-header{padding:10px 14px}
+}
 
 /* Animations */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
