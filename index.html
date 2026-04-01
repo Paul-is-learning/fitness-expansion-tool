@@ -2730,23 +2730,40 @@ function genSiteCard(lat,lng,sector,saz,comps) {
 }
 
 function printCard() {
-  const c=el('siteCardContent').innerHTML;
-  const w=window.open('','','width=800,height=1000');
+  const siteContent = el('siteCardContent')?.innerHTML || '';
+  const captageContent = el('captageContentSite')?.innerHTML || '';
+  const analysisContent = el('siteAnalysisContent')?.innerHTML || '';
+  const w=window.open('','','width=800,height=1200');
   w.document.write(`<html><head><title>Fiche Site — FP Romania</title><style>
-    body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:12px;max-width:700px;margin:0 auto}
-    h3{font-size:14px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin:20px 0 10px}
-    .metric-row{display:flex;align-items:center;gap:8px;padding:4px 0}.metric-label{flex:1;color:#64748b}.metric-value{font-weight:700;text-align:right}.metric-bar{flex:0 0 60px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden}.metric-fill{height:100%;border-radius:2px}.metric-weight{font-size:8px;color:#94a3b8;min-width:28px;text-align:right}
+    body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:11px;max-width:750px;margin:0 auto;line-height:1.5}
+    h3{font-size:13px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin:18px 0 8px}
+    .metric-row{display:flex;align-items:center;gap:8px;padding:3px 0}.metric-label{flex:1;color:#64748b}.metric-value{font-weight:700;text-align:right}.metric-bar{flex:0 0 60px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden}.metric-fill{height:100%;border-radius:2px}.metric-weight{font-size:8px;color:#94a3b8;min-width:28px;text-align:right}
     .badge,.badge-est{font-size:9px;padding:1px 5px;border-radius:3px}.badge-blue{background:#dbeafe;color:#2563eb}
-    .saz-number{font-size:48px;font-weight:900;text-align:center}.saz-sublabel{font-size:11px;color:#94a3b8;text-align:center}
+    .saz-number{font-size:42px;font-weight:900;text-align:center}.saz-sublabel{font-size:10px;color:#94a3b8;text-align:center}
     .reco-chip{display:inline-block;padding:3px 12px;border-radius:16px;font-size:10px;font-weight:700}
     .reco-go{background:#dcfce7;color:#166534;border:1px solid #86efac}.reco-caution{background:#fef9c3;color:#854d0e;border:1px solid #fde047}.reco-nogo{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-    .comp-card{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9}.comp-dot{width:8px;height:8px;border-radius:50%}.comp-name{font-weight:600}.comp-meta{font-size:10px;color:#94a3b8}
-    .notes-area{width:100%;border:1px solid #e2e8f0;padding:10px;min-height:60px;border-radius:6px}
-    .btn{display:none}.animate-in{animation:none}
+    .comp-card,.comp-body{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f1f5f9}.comp-dot{width:6px;height:6px;border-radius:50%}.comp-name{font-weight:600;font-size:10px}.comp-meta{font-size:9px;color:#94a3b8}
+    .notes-area{width:100%;border:1px solid #e2e8f0;padding:8px;min-height:40px;border-radius:6px}
+    .btn,.toggle,.info-tip,.admin-only{display:none}.animate-in{animation:none}
+    input[type=range]{display:none}
+    div[style*="background:var"]{background:#f8fafc!important;border:1px solid #e2e8f0!important}
+    @media print{body{font-size:10px}h3{font-size:12px}}
+    .page-break{page-break-before:always;margin-top:20px}
   </style></head><body>
-    <div style="text-align:center;margin-bottom:20px"><h1 style="color:#d4a017;margin:0">Fitness Park Romania</h1><p style="color:#94a3b8;margin:4px 0">Fiche de Due Diligence — ${new Date().toLocaleDateString('fr-FR')}</p></div>
-    ${c}
-    <div style="margin-top:30px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:9px;color:#94a3b8;text-align:center">Genere par FP Romania Expansion Intelligence Platform | Isseo x Fitness Park | Donnees: INS Romania, Eurostat, Overpass API</div>
+    <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid #d4a017;padding-bottom:15px">
+      <h1 style="color:#d4a017;margin:0;font-size:20px">FITNESS PARK ROMANIA</h1>
+      <p style="color:#666;margin:4px 0;font-size:11px">Fiche de Due Diligence — ${new Date().toLocaleDateString('fr-FR')}</p>
+      <p style="color:#94a3b8;margin:2px 0;font-size:9px">Expansion Intelligence Platform | Isseo x Fitness Park</p>
+    </div>
+    ${siteContent}
+    ${captageContent ? '<div class="page-break"><h2 style="color:#d4a017;font-size:16px;border-bottom:2px solid #d4a017;padding-bottom:8px">Potentiel de captage</h2>' + captageContent + '</div>' : ''}
+    ${analysisContent ? '<div class="page-break"><h2 style="color:#d4a017;font-size:16px;border-bottom:2px solid #d4a017;padding-bottom:8px">Analyse detaillee</h2>' + analysisContent + '</div>' : ''}
+    <div style="margin-top:30px;padding-top:10px;border-top:2px solid #d4a017;font-size:8px;color:#94a3b8;text-align:center">
+      Document genere le ${new Date().toLocaleDateString('fr-FR')} a ${new Date().toLocaleTimeString('fr-FR')}<br>
+      FP Romania Expansion Intelligence Platform v2.0 | Isseo x Fitness Park<br>
+      Sources: INS Romania Census 2021, OpenStreetMap, Overpass API, worldclass.ro, stayfit.ro, 18gym.ro, downtownfitness.ro<br>
+      Les estimations de membres et les taux de captage sont des approximations basees sur des proxies (surface, reviews, prix)
+    </div>
   </body></html>`);
   w.document.close();w.print();
 }
