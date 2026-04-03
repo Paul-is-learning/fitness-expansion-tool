@@ -2694,12 +2694,18 @@ function displaySAZ(saz) {
 let brandVisibility = {};
 let lastDisplayedComps = [];
 
-function extractBrand(name) {
+function extractBrand(name, segment) {
   if(!name) return 'Autre';
-  const brands = ['World Class','Stay Fit','StayFit','18GYM','Downtown Fitness','Nr1 Fitness','CrossFit','Absolute','SalsaFit','WoWGym','Sweat Concept','Best Fitness'];
+  const brands = ['World Class','Stay Fit','StayFit','18GYM','Downtown Fitness','Nr1 Fitness','CrossFit','Absolute','SalsaFit','WoWGym','Sweat Concept','Best Fitness','Groove Box'];
   for(const b of brands) {
-    if(name.toLowerCase().includes(b.toLowerCase())) return b.replace('StayFit','Stay Fit');
+    if(name.toLowerCase().includes(b.toLowerCase())) {
+      if(b==='StayFit') return 'Stay Fit';
+      if(b==='Groove Box') return 'CrossFit';
+      return b;
+    }
   }
+  // Fallback: use segment to group unknowns
+  if(segment === 'crossfit') return 'CrossFit';
   return 'Autre';
 }
 
@@ -2708,7 +2714,7 @@ function buildBrandFilters(comps) {
   const source = allComps.length > 0 ? allComps : VERIFIED_CLUBS;
   const brands = {};
   source.forEach(c => {
-    const b = extractBrand(c.name);
+    const b = extractBrand(c.name, c.segment);
     const col = c.color || segColor(c.segment) || '#22c55e';
     if(!brands[b]) brands[b] = {count:0, color:col};
     brands[b].count++;
@@ -2736,7 +2742,7 @@ function toggleAllBrands(state) {
 }
 
 function applyBrandFilter() {
-  const filtered = lastDisplayedComps.filter(c => brandVisibility[extractBrand(c.name)] !== false);
+  const filtered = lastDisplayedComps.filter(c => brandVisibility[extractBrand(c.name, c.segment)] !== false);
   showCompsOnMap(filtered);
   buildBrandFilters(lastDisplayedComps);
   el('compCountBadge').textContent = filtered.length + '/' + lastDisplayedComps.length;
