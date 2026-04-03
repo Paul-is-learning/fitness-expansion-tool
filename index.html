@@ -3777,33 +3777,19 @@ function renderTargets() {
     </div>
   `).join('');
 
-  TARGETS.forEach(t=>{
-    const icon=L.divIcon({className:'',
-      html:`<div style="width:26px;height:26px;background:${t.phase===1?'#d4a017':'#3b82f6'};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;box-shadow:0 2px 10px ${t.phase===1?'rgba(212,160,23,.5)':'rgba(59,130,246,.5)'}">P${t.phase}</div>`,
-      iconSize:[26,26],iconAnchor:[13,13]});
-    L.marker([t.lat,t.lng],{icon}).addTo(map).bindPopup(`
-      <h3>${t.name}</h3>
-      <div class="ps"><span>Phase</span><span class="pv">${t.phase}</span></div>
-      <div class="ps"><span>Secteur</span><span class="pv">${t.sector}</span></div>
-      <div class="ps"><span>Surface</span><span class="pv">${t.area}</span></div>
-      <div class="ps"><span>Loyer</span><span class="pv">${t.rent}</span></div>
-      <div class="ps"><span>Ouverture</span><span class="pv">${t.opening}</span></div>
-      <div class="ps"><span>Statut</span><span class="pv" style="color:${t.status.includes('securise')?'var(--green)':'var(--yellow)'}">${t.status}</span></div>
-      <div style="margin-top:6px;font-size:11px;color:#8899b0;line-height:1.5">${t.note}</div>
-    `);
-  });
+  // TARGETS are managed via "Mes Sites" tab — no auto-pin on map
 }
 
 function zoomSector(id) {
   const s=SECTORS.find(x=>x.id===id);
   if(!s)return;
   map.flyTo(s.center,14);
-  setTimeout(()=>onMapClick({latlng:{lat:s.center[0],lng:s.center[1]}}),500);
+  if(analysisMode) setTimeout(()=>onMapClick({latlng:{lat:s.center[0],lng:s.center[1]}}),500);
 }
 
 function flyTarget(lat,lng) {
   map.flyTo([lat,lng],15);
-  setTimeout(()=>onMapClick({latlng:{lat,lng}}),500);
+  if(analysisMode) setTimeout(()=>onMapClick({latlng:{lat,lng}}),500);
 }
 
 // ================================================================
