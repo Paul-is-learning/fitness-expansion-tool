@@ -1279,18 +1279,31 @@ const CLUB_AGE = {
 // For old clubs (>10 years): ratio lower because review fatigue + member churn
 const REVIEWS_ANNUAL_MULT = 43; // members per (review/year) — recalibrated with 16 verified review counts
 
-function getReviewData(name) {
+function getReviewData(name, club) {
+  // Priority: live Google data (gRating/gReviews) > static REVIEWS_DB
+  let reviewCount, rating;
   const rv = REVIEWS_DB[name];
-  if(!rv) return null;
+
+  if(club && club.gEnriched && club.gReviews > 0) {
+    // USE LIVE GOOGLE DATA
+    reviewCount = club.gReviews;
+    rating = club.gRating;
+  } else if(rv) {
+    reviewCount = rv.r;
+    rating = rv.g;
+  } else {
+    return null;
+  }
+
   const age = CLUB_AGE[name] || estimateAge(name);
-  const reviewsPerYear = rv.r / Math.max(1, age);
-  // Correction factor by age: young clubs get reviewed more per capita
+  const reviewsPerYear = reviewCount / Math.max(1, age);
   let ageFactor = 1.0;
-  if(age <= 2) ageFactor = 0.7; // new club = many reviews per member (novelty effect)
+  if(age <= 2) ageFactor = 0.7;
   else if(age <= 4) ageFactor = 0.85;
-  else if(age >= 12) ageFactor = 1.2; // old club = review fatigue, fewer reviews per member
+  else if(age >= 12) ageFactor = 1.2;
   const mB_corrected = Math.round(reviewsPerYear * REVIEWS_ANNUAL_MULT * ageFactor);
-  return {...rv, age, reviewsPerYear: Math.round(reviewsPerYear*10)/10, ageFactor, mB: mB_corrected};
+  const src = (club && club.gEnriched) ? 'google' : 'static';
+  return {r: reviewCount, g: rating, age, reviewsPerYear: Math.round(reviewsPerYear*10)/10, ageFactor, mB: mB_corrected, src};
 }
 
 // Fallback age estimation when not in database
@@ -1748,8 +1761,37 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
 }
 
 // Cannibalization analysis between sites
-function cannibalizeRisk(site1,site2) {
+async function cannibalizeRisk(site1,site2) {
   const dist = haversine(site1.lat,site1.lng,site2.lat,site2.lng);
+
+  // Try Google Distance Matrix for real driving time
+  let driveMins = null;
+  if(_googleHasKey()) {
+    try {
+      const resp = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY,
+          'X-Goog-FieldMask': 'routes.duration' },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude: site1.lat, longitude: site1.lng } } },
+          destination: { location: { latLng: { latitude: site2.lat, longitude: site2.lng } } },
+          travelMode: 'DRIVE'
+        })
+      });
+      const data = await resp.json();
+      if(data.routes?.[0]?.duration) driveMins = Math.round(parseInt(data.routes[0].duration.replace('s',''))/60);
+    } catch(e) {}
+  }
+
+  // Use driving time if available, else haversine distance
+  if(driveMins !== null) {
+    if(driveMins > 15) return {risk:'faible',pct:0,dist,driveMins};
+    if(driveMins > 10) return {risk:'modere',pct:Math.round((1-driveMins/15)*30),dist,driveMins};
+    if(driveMins > 5) return {risk:'significatif',pct:Math.round((1-driveMins/15)*50),dist,driveMins};
+    return {risk:'critique',pct:Math.round((1-driveMins/10)*70),dist,driveMins};
+  }
+
+  // Fallback: haversine
   if(dist > 5000) return {risk:'faible',pct:0,dist};
   if(dist > 3000) return {risk:'modere',pct:Math.round((1-dist/5000)*30),dist};
   if(dist > 1500) return {risk:'significatif',pct:Math.round((1-dist/5000)*50),dist};
@@ -2219,7 +2261,9 @@ function dedup(list){const r=[];list.forEach(c=>{if(!r.some(x=>Math.abs(x.lat-c.
 function getDemoInRadius(lat,lng,r){
   return VERIFIED_CLUBS.filter(c=>haversine(lat,lng,c.lat,c.lng)<=r).map(c=>{
     const m=matchDB(c.name);
-    const rv=getReviewData(c.name);
+    // Find enriched version from allComps if available
+    const enriched = allComps.find(ac => ac.name === c.name && ac.gEnriched);
+    const rv=getReviewData(c.name, enriched || c);
     const mA=c.members||0;
     const mB=rv?rv.mB:0;
     const membersAvg=mB>0?Math.round((mA+mB)/2):mA;
@@ -2238,11 +2282,9 @@ function threatScore(c,dist) {
   // Proximity 40% — use driving time if available, else haversine distance
   let prox;
   if(c.driveMins !== undefined) {
-    // Time-based scoring (minutes driving)
     if(c.driveMins<=3)prox=100;else if(c.driveMins<=5)prox=90;else if(c.driveMins<=8)prox=70;
     else if(c.driveMins<=12)prox=50;else if(c.driveMins<=15)prox=35;else if(c.driveMins<=20)prox=20;else prox=8;
   } else {
-    // Fallback: distance-based scoring (meters haversine)
     if(dist<300)prox=100;else if(dist<500)prox=90;else if(dist<1000)prox=70;
     else if(dist<1500)prox=50;else if(dist<2000)prox=35;else if(dist<3000)prox=20;else prox=8;
   }
@@ -2251,13 +2293,24 @@ function threatScore(c,dist) {
   let sz=30;
   if(c.size){if(c.size>1500)sz=100;else if(c.size>1000)sz=80;else if(c.size>600)sz=55;else if(c.size>300)sz=35;else sz=15}
 
-  // Positioning 20% — same target segment = more dangerous
+  // Positioning 15% — same target segment = more dangerous
   const pos={premium:95,'mid-premium':75,mid:50,lowcost:35,independent:18,crossfit:12,boutique:10,aggregator:40};
 
-  // Brand strength 15%
+  // Brand strength 10%
   const br=c.est?25:c.brand==='international'?90:c.brand==='local'?55:30;
 
-  return Math.round(prox*.40+sz*.25+(pos[c.segment]||20)*.20+br*.15);
+  // Quality/Reputation 10% — Google rating + review volume (NEW)
+  let qual = 50; // default neutral
+  const gR = c.gRating, gN = c.gReviews || 0;
+  if(gR) {
+    if(gR >= 4.5 && gN > 500) qual = 95;       // excellent + well-known = very threatening
+    else if(gR >= 4.2 && gN > 200) qual = 75;   // good + established
+    else if(gR >= 4.0) qual = 55;                // decent
+    else if(gR >= 3.5) qual = 35;                // mediocre = vulnerable
+    else qual = 20;                               // poorly rated = easy to beat
+  }
+
+  return Math.round(prox*.40 + sz*.25 + (pos[c.segment]||20)*.15 + br*.10 + qual*.10);
 }
 
 // ================================================================
@@ -2445,8 +2498,19 @@ function calcFluxScore(lat,lng) {
   });
   pedScore=Math.min(100,Math.round(pedScore));
 
-  // Composite: Metro/Transport 40% (was 30%), Mall 25%, Office 15% (was 25%), Uni 10%, Ped 10%
-  const composite = Math.round(metroScore*.40 + mallScore*.25 + officeScore*.15 + uniScore*.10 + pedScore*.10);
+  // Composite: Metro/Transport 40%, Mall 25%, Office 15%, Uni 10%, Ped 10%
+  let composite = Math.round(metroScore*.40 + mallScore*.25 + officeScore*.15 + uniScore*.10 + pedScore*.10);
+
+  // Google Activity Bonus: if Google-enriched clubs nearby have high review volume = busy area
+  if(allComps && allComps.length > 0) {
+    const nearbyEnriched = allComps.filter(c => c.gEnriched && haversine(lat,lng,c.lat,c.lng) < 800);
+    if(nearbyEnriched.length > 0) {
+      const avgReviews = nearbyEnriched.reduce((a,c) => a + (c.gReviews||0), 0) / nearbyEnriched.length;
+      // High review volume near = high-activity zone → flux bonus
+      if(avgReviews > 500) composite = Math.round(composite * 1.08); // +8% for very active zones
+      else if(avgReviews > 200) composite = Math.round(composite * 1.04); // +4% for active zones
+    }
+  }
 
   return {total:Math.min(100,composite),metro:metroScore,mall:mallScore,office:officeScore,uni:uniScore,ped:pedScore};
 }
@@ -2677,7 +2741,7 @@ function showCompsOnMap(comps) {
     const mk=L.marker([c.lat,c.lng],{icon});
     const tierColors={W:'#a855f7',Platinum:'#e2e8f0',Gold:'#fbbf24',Silver:'#94a3b8',Bronze:'#cd7f32'};
     const tierLabel=c.tier?`<div class="ps"><span>Tier</span><span class="pv" style="color:${tierColors[c.tier]||'#fff'};font-weight:800">${c.tier}</span></div>`:'';
-    const rv=getReviewData(c.name);
+    const rv=getReviewData(c.name, c);
     const mA=c.members||0;
     const mB=rv?rv.mB:0;
     const mAvg=mB>0?Math.round((mA+mB)/2):mA;
@@ -2891,7 +2955,7 @@ function updateCompareSelects() {
   if(el('compareB')) el('compareB').innerHTML = opts;
 }
 
-function runComparison() {
+async function runComparison() {
   const vA = el('compareA')?.value;
   const vB = el('compareB')?.value;
   if(!vA || !vB) { el('comparisonResult').innerHTML='<p style="font-size:11px;color:var(--gray2)">Selectionnez 2 sites</p>'; return; }
@@ -2904,7 +2968,7 @@ function runComparison() {
   const cB = runCaptageAnalysis(latB, lngB, 3000);
 
   const dist = haversine(latA,lngA,latB,lngB);
-  const cannibal = cannibalizeRisk({lat:latA,lng:lngA},{lat:latB,lng:lngB});
+  const cannibal = await cannibalizeRisk({lat:latA,lng:lngA},{lat:latB,lng:lngB});
 
   function bar(a,b,label){
     const max=Math.max(a,b,1);
@@ -3473,7 +3537,18 @@ const CAPTURE_RATES = {
   boutique: {rate:0.02, reason:'Experience unique non substituable'},
 };
 
-function distanceDecay(dist) {
+function distanceDecay(dist, driveMins) {
+  // Use real driving time if available (Google Distance Matrix)
+  if(driveMins !== undefined) {
+    if(driveMins <= 3) return 1.0;
+    if(driveMins <= 5) return 0.85;
+    if(driveMins <= 8) return 0.65;
+    if(driveMins <= 12) return 0.45;
+    if(driveMins <= 15) return 0.25;
+    if(driveMins <= 20) return 0.12;
+    return 0.05;
+  }
+  // Fallback: haversine distance
   if(dist < 500) return 1.0;
   if(dist < 1000) return 0.85;
   if(dist < 1500) return 0.65;
@@ -3483,14 +3558,21 @@ function distanceDecay(dist) {
   return 0.05;
 }
 
-// NEW: Google rating factor — low-rated clubs lose more members
+// Rating factor — uses live Google rating (gRating) with fallback to REVIEWS_DB
 function ratingFactor(googleRating) {
   if(!googleRating) return 1.0;
-  // Each 0.1 below 4.0 = +3% capture bonus (unhappy members switch more)
-  // Each 0.1 above 4.3 = -2% capture malus (happy members stay)
   if(googleRating < 4.0) return 1 + (4.0 - googleRating) * 0.3;  // e.g. 3.6★ = +12%
   if(googleRating > 4.3) return 1 - (googleRating - 4.3) * 0.2;  // e.g. 4.6★ = -6%
   return 1.0;
+}
+
+// Competitor strength factor — more reviews = more established = harder to capture
+function competitorStrength(reviewCount) {
+  if(!reviewCount) return 1.0;
+  if(reviewCount < 100) return 1.15;  // small/new club, easier to poach
+  if(reviewCount <= 500) return 1.0;  // standard
+  if(reviewCount <= 1000) return 0.85; // well-established
+  return 0.75; // dominant player (1000+ reviews), very hard to capture
 }
 
 // NEW: Price elasticity — bigger price gap = more capture
@@ -3555,15 +3637,18 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   const comps = getDemoInRadius(lat, lng, captageRadius);
 
   // === SOURCE 1: CAPTIFS (competitor capture) ===
+  // Enhanced with Google Distance Matrix (real driving time) + live ratings + competitor strength
   const captageDetails = comps.map(c => {
     const dist = haversine(lat, lng, c.lat, c.lng);
     const baseRate = (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).rate;
-    const decay = distanceDecay(dist);
-    const rv = getReviewData(c.name);
-    const rating = rv ? rv.g : null;
+    const decay = distanceDecay(dist, c.driveMins); // uses driving time if available
+    // Use live Google rating, fallback to static DB
+    const rv = getReviewData(c.name, c);
+    const rating = c.gRating || (rv ? rv.g : null);
     const rFactor = ratingFactor(rating);
     const pFactor = priceElasticity(c.segment);
-    const effectiveRate = baseRate * decay * rFactor * pFactor;
+    const sFactor = competitorStrength(c.gReviews || (rv ? rv.r : null)); // new: established club harder to capture
+    const effectiveRate = baseRate * decay * rFactor * pFactor * sFactor;
     const mA = c.members || 0;
     const mB = rv ? rv.mB : 0;
     const membersEst = mB > 0 ? Math.round((mA + mB) / 2) : mA;
@@ -3571,13 +3656,15 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
 
     return {
       name: c.name, segment: c.segment, color: c.color,
-      dist: Math.round(dist), membersA: mA, membersB: mB, membersEst,
+      dist: Math.round(dist), driveMins: c.driveMins, membersA: mA, membersB: mB, membersEst,
       baseRate: Math.round(baseRate * 100),
       decay: Math.round(decay * 100),
       ratingFactor: Math.round(rFactor * 100),
       priceFactor: Math.round(pFactor * 100),
+      strengthFactor: Math.round(sFactor * 100),
       effectiveRate: Math.round(effectiveRate * 100 * 10) / 10,
-      captured, rating,
+      captured, rating, reviewCount: c.gReviews || (rv ? rv.r : null),
+      dataSrc: c.gEnriched ? 'Google Live' : 'DB statique',
       reason: (CAPTURE_RATES[c.segment] || CAPTURE_RATES.independent).reason
     };
   }).sort((a, b) => b.captured - a.captured);
@@ -3712,7 +3799,8 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${comp.name}</div>
               <div style="color:var(--gray2);font-size:9px">${comp.segment} | ${(comp.dist/1000).toFixed(1)}km | ~${fmt(comp.membersEst)} mbr ${comp.rating?'| '+comp.rating+'★':''}</div>
-              <div style="color:var(--gray2);font-size:8px">base ${comp.baseRate}% × dist ${comp.decay}% × note ${comp.ratingFactor}% × prix ${comp.priceFactor}%</div>
+              <div style="color:var(--gray2);font-size:8px">base ${comp.baseRate}% × dist ${comp.decay}%${comp.driveMins?' ('+comp.driveMins+'min)':''} × note ${comp.ratingFactor}% × prix ${comp.priceFactor}% × force ${comp.strengthFactor||100}%</div>
+              <div style="color:var(--gray2);font-size:7px;margin-top:1px">${comp.dataSrc||'DB'} | ${comp.reviewCount?comp.reviewCount+' avis':'?'} | ★${comp.rating||'?'}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div style="font-weight:800;color:#f97316">+${comp.captured}</div>
@@ -3737,9 +3825,10 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="line-height:1.6">
         <b>Captifs</b> = Σ (membres × taux_base × decay_dist × note_Google × elasticite_prix)<br>
         Taux base: Premium 8%, Mid-prem 12%, Mid 15%, Low-cost 4%, Indep 10%<br>
-        Note: <4.0★ = +30%/0.1pt (insatisfaits), >4.3★ = -20%/0.1pt (fideles)<br>
+        Note Google: <4.0★ = +30%/0.1pt (insatisfaits), >4.3★ = -20%/0.1pt (fideles)<br>
         Prix: ecart_€/10 × 15% bonus (WC 80€→FP 28€ = +78% boost)<br>
-        Decay: <500m=100%, 1km=85%, 2km=45%, 3km=25%<br><br>
+        Force: <100 avis=+15% (petit), >500 avis=-15% (etabli), >1000=-25%<br>
+        Decay: temps reel Google (3min=100%, 8min=65%) ou distance (500m=100%, 2km=45%)<br><br>
         <b>Natifs</b> = Pop_non_inscrite × uplift_FP<br>
         <b>Walk-in</b> = visiteurs_mall/an × 0.7% conversion (benchmark fitness en CC)<br>
         <b>Ramp-up</b> = courbe S M1-M12 (promo→bouche-a-oreille→contrats expirent)<br>
@@ -3986,7 +4075,7 @@ function updateCaptureRatesSite() {
   }
 }
 
-function updateCannibalization() {
+async function updateCannibalization() {
   const card = el('cannibalizationCard');
   if(customSites.length < 2) { card.style.display='none'; return; }
   card.style.display = 'block';
@@ -3995,12 +4084,13 @@ function updateCannibalization() {
   let rows = '';
   for(let i=0;i<allSites.length;i++){
     for(let j=i+1;j<allSites.length;j++){
-      const risk = cannibalizeRisk(allSites[i],allSites[j]);
+      const risk = await cannibalizeRisk(allSites[i],allSites[j]);
       if(risk.dist < 6000) {
         const riskColor = risk.risk==='critique'?'var(--red)':risk.risk==='significatif'?'var(--orange)':risk.risk==='modere'?'var(--yellow)':'var(--green)';
+        const driveLabel = risk.driveMins ? ` • ${risk.driveMins}min 🚗` : '';
         rows += `<div class="metric-row">
           <span class="metric-label" style="font-size:10px">${allSites[i].name} ↔ ${allSites[j].name}</span>
-          <span class="metric-value" style="color:${riskColor};font-size:10px">${(risk.dist/1000).toFixed(1)}km | ${risk.risk} (${risk.pct}%)</span>
+          <span class="metric-value" style="color:${riskColor};font-size:10px">${(risk.dist/1000).toFixed(1)}km${driveLabel} | ${risk.risk} (${risk.pct}%)</span>
         </div>`;
       }
     }
