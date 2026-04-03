@@ -2374,12 +2374,13 @@ function extractBrand(name) {
 }
 
 function buildBrandFilters(comps) {
-  // Always count from VERIFIED_CLUBS (83 clubs) for accurate brand totals
+  // Count from allComps (full map data) when available, else VERIFIED_CLUBS
+  const source = allComps.length > 0 ? allComps : VERIFIED_CLUBS;
   const brands = {};
-  VERIFIED_CLUBS.forEach(c => {
+  source.forEach(c => {
     const b = extractBrand(c.name);
-    const col = segColor(c.segment);
-    if(!brands[b]) brands[b] = {count:0, color:col||'#22c55e'};
+    const col = c.color || segColor(c.segment) || '#22c55e';
+    if(!brands[b]) brands[b] = {count:0, color:col};
     brands[b].count++;
   });
   Object.keys(brands).forEach(b => { if(brandVisibility[b]===undefined) brandVisibility[b]=true; });
