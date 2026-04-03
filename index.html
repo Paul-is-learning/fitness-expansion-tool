@@ -2055,18 +2055,27 @@ const TRAFFIC_GENERATORS = {
     {name:'Basarab',lat:44.4490,lng:26.0630,dailyPax:35000},
     {name:'Nicolae Grigorescu',lat:44.4170,lng:26.1510,dailyPax:30000},
     {name:'Gara de Nord',lat:44.4470,lng:26.0710,dailyPax:55000}],
-  malls: [{name:'AFI Cotroceni',lat:44.4315,lng:26.0520,dailyVisitors:60000},
-    {name:'Mega Mall',lat:44.4418,lng:26.1522,dailyVisitors:35000},
-    {name:'ParkLake',lat:44.4207,lng:26.1496,dailyVisitors:30000},
-    {name:'Baneasa Shopping',lat:44.5073,lng:26.0895,dailyVisitors:30000},
-    {name:'Sun Plaza',lat:44.3954,lng:26.1231,dailyVisitors:28000},
-    {name:'Promenada',lat:44.4782,lng:26.1034,dailyVisitors:25000},
-    {name:'Unirea Shopping',lat:44.4275,lng:26.1019,dailyVisitors:25000},
-    {name:'Plaza Romania',lat:44.4285,lng:26.0352,dailyVisitors:20000},
-    {name:'Militari Shopping',lat:44.4367,lng:25.9827,dailyVisitors:18000},
-    {name:'Veranda Mall',lat:44.4521,lng:26.1290,dailyVisitors:15000},
-    {name:'Grand Arena',lat:44.3742,lng:26.1204,dailyVisitors:15000},
-    {name:'Bucuresti Mall',lat:44.4203,lng:26.1267,dailyVisitors:18000}],
+  malls: [
+    // Tier 1: >40k visitors/day — regional destination malls
+    {name:'AFI Cotroceni',lat:44.4315,lng:26.0520,dailyVisitors:60000},       // 90k m2 GLA, largest in Romania
+    {name:'Mega Mall',lat:44.4418,lng:26.1522,dailyVisitors:35000},           // S2, 70k m2 GLA
+    {name:'ParkLake',lat:44.4207,lng:26.1496,dailyVisitors:30000},            // S3, 70k m2 GLA, near Titan park
+    {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,dailyVisitors:30000},// S1 nord, 85k m2 GLA
+    // Tier 2: 20-30k visitors/day — major district malls
+    {name:'Sun Plaza',lat:44.3954,lng:26.1231,dailyVisitors:28000},           // S4, metro Piata Sudului
+    {name:'Promenada Mall',lat:44.4782,lng:26.1034,dailyVisitors:25000},      // S1, Floreasca, 45k m2 GLA
+    {name:'Unirea Shopping Center',lat:44.4275,lng:26.1019,dailyVisitors:25000},// S3, Piata Unirii, 84k m2 GLA
+    {name:'Plaza Romania',lat:44.4285,lng:26.0352,dailyVisitors:20000},       // S6, metro Lujerului
+    {name:'Bucuresti Mall',lat:44.4203,lng:26.1267,dailyVisitors:18000},      // S4, 1st mall in Romania (1999)
+    // Tier 3: 10-20k visitors/day — neighborhood malls
+    {name:'Militari Shopping',lat:44.4367,lng:25.9827,dailyVisitors:18000},    // S6 ouest, Militari Residence
+    {name:'Veranda Mall',lat:44.4521,lng:26.1290,dailyVisitors:15000},        // S2, Obor district
+    {name:'Grand Arena',lat:44.3742,lng:26.1204,dailyVisitors:15000},         // S4 sud, Berceni
+    {name:'Liberty Center',lat:44.4102,lng:26.0937,dailyVisitors:10000},      // S5, Calea Rahovei/Progresului
+    {name:'City Mall',lat:44.4130,lng:26.0920,dailyVisitors:8000},            // S5, Eroii Revolutiei (partly closed, low traffic)
+    // Planned/Under construction
+    {name:'Dambovita Center',lat:44.4360,lng:26.0880,dailyVisitors:5000},     // S6, under development
+  ],
   pedestrian: [{name:'Calea Victoriei',lat:44.4440,lng:26.0930,dailyPed:50000},
     {name:'Old Town Lipscani',lat:44.4320,lng:26.1000,dailyPed:40000},
     {name:'Bd Magheru',lat:44.4430,lng:26.0980,dailyPed:35000},
@@ -2104,46 +2113,61 @@ let sazWeights = {flux:33, densite:33, jeunesse:34};
 function calcFluxScore(lat,lng) {
   let metroScore=0, mallScore=0, officeScore=0, uniScore=0, pedScore=0;
 
-  // 1. Metro proximity & ridership (weight: 30% of flux)
+  // 1. Metro & Transport (weight: 40% of flux) — CRUCIAL for site viability
+  //    Methodology: exponential distance decay + ridership normalization
+  //    A metro station at <200m is a game-changer (direct footfall capture)
+
+  // Metro interchanges (multiple lines = massive flux multiplier)
   TRAFFIC_GENERATORS.metroInterchange.forEach(m=>{
     const d=haversine(lat,lng,m.lat,m.lng);
-    if(d<500) metroScore+=m.dailyPax/1000;
-    else if(d<1000) metroScore+=m.dailyPax/2000;
-    else if(d<2000) metroScore+=m.dailyPax/5000;
+    if(d<200) metroScore+=m.dailyPax/600;       // au pied = max impact
+    else if(d<500) metroScore+=m.dailyPax/800;
+    else if(d<1000) metroScore+=m.dailyPax/1500;
+    else if(d<2000) metroScore+=m.dailyPax/4000;
   });
-  // Per-station ridership scoring
+
+  // Per-station ridership (all 53 stations)
+  let stationsNear = 0;
   METRO.forEach(m=>{
     const d=haversine(lat,lng,m.lat,m.lng);
     const pax=getMetroRidership(m.n)/1000;
-    if(d<400) metroScore+=pax*1.5;
-    else if(d<800) metroScore+=pax*0.8;
-    else if(d<1500) metroScore+=pax*0.3;
+    if(d<200) { metroScore+=pax*3.0; stationsNear++; }      // au pied du site
+    else if(d<500) { metroScore+=pax*2.0; stationsNear++; }  // 5 min a pied
+    else if(d<1000) { metroScore+=pax*1.0; stationsNear++; } // 10 min a pied
+    else if(d<1500) metroScore+=pax*0.4;
+    else if(d<2000) metroScore+=pax*0.15;
   });
-  // Tram/bus corridors
+  // Bonus multi-stations: several stations nearby = transit hub effect
+  if(stationsNear >= 3) metroScore *= 1.3;
+  else if(stationsNear >= 2) metroScore *= 1.15;
+
+  // Tram/bus corridors (surface transit)
   TRAFFIC_GENERATORS.tramCorridor.forEach(t=>{
     const d=haversine(lat,lng,t.lat,t.lng);
-    if(d<300) metroScore+=t.dailyPax/3000;
-    else if(d<800) metroScore+=t.dailyPax/6000;
+    if(d<300) metroScore+=t.dailyPax/2000;
+    else if(d<800) metroScore+=t.dailyPax/4000;
+    else if(d<1500) metroScore+=t.dailyPax/8000;
   });
   metroScore=Math.min(100,Math.round(metroScore));
 
   // 2. Mall proximity & footfall (weight: 25% of flux)
   TRAFFIC_GENERATORS.malls.forEach(m=>{
     const d=haversine(lat,lng,m.lat,m.lng);
-    if(d<300) mallScore+=m.dailyVisitors/500;
-    else if(d<800) mallScore+=m.dailyVisitors/1500;
-    else if(d<1500) mallScore+=m.dailyVisitors/4000;
-    else if(d<3000) mallScore+=m.dailyVisitors/10000;
+    if(d<200) mallScore+=m.dailyVisitors/400;       // dans le mall
+    else if(d<500) mallScore+=m.dailyVisitors/700;   // adjacent
+    else if(d<1000) mallScore+=m.dailyVisitors/1500;  // 10 min a pied
+    else if(d<2000) mallScore+=m.dailyVisitors/4000;
+    else if(d<3000) mallScore+=m.dailyVisitors/8000;
   });
   mallScore=Math.min(100,Math.round(mallScore));
 
-  // 3. Office/Employee flux (weight: 25% of flux)
+  // 3. Office/Employee flux (weight: 15% of flux)
   POIS.filter(p=>p.type==='office').forEach(p=>{
     const d=haversine(lat,lng,p.lat,p.lng);
     const emp=p.employees||0;
-    if(d<500) officeScore+=emp/500;
-    else if(d<1500) officeScore+=emp/2000;
-    else if(d<3000) officeScore+=emp/5000;
+    if(d<500) officeScore+=emp/400;
+    else if(d<1500) officeScore+=emp/1500;
+    else if(d<3000) officeScore+=emp/4000;
   });
   officeScore=Math.min(100,Math.round(officeScore));
 
@@ -2151,22 +2175,23 @@ function calcFluxScore(lat,lng) {
   POIS.filter(p=>p.type==='university').forEach(p=>{
     const d=haversine(lat,lng,p.lat,p.lng);
     const stu=p.students||0;
-    if(d<500) uniScore+=stu/300;
-    else if(d<1500) uniScore+=stu/1000;
-    else if(d<3000) uniScore+=stu/3000;
+    if(d<500) uniScore+=stu/250;
+    else if(d<1500) uniScore+=stu/800;
+    else if(d<3000) uniScore+=stu/2500;
   });
   uniScore=Math.min(100,Math.round(uniScore));
 
   // 5. Pedestrian zone proximity (weight: 10% of flux)
   TRAFFIC_GENERATORS.pedestrian.forEach(p=>{
     const d=haversine(lat,lng,p.lat,p.lng);
-    if(d<300) pedScore+=p.dailyPed/500;
-    else if(d<800) pedScore+=p.dailyPed/2000;
-    else if(d<2000) pedScore+=p.dailyPed/5000;
+    if(d<300) pedScore+=p.dailyPed/400;
+    else if(d<800) pedScore+=p.dailyPed/1500;
+    else if(d<2000) pedScore+=p.dailyPed/4000;
   });
   pedScore=Math.min(100,Math.round(pedScore));
 
-  const composite = Math.round(metroScore*.30 + mallScore*.25 + officeScore*.25 + uniScore*.10 + pedScore*.10);
+  // Composite: Metro/Transport 40% (was 30%), Mall 25%, Office 15% (was 25%), Uni 10%, Ped 10%
+  const composite = Math.round(metroScore*.40 + mallScore*.25 + officeScore*.15 + uniScore*.10 + pedScore*.10);
 
   return {total:Math.min(100,composite),metro:metroScore,mall:mallScore,office:officeScore,uni:uniScore,ped:pedScore};
 }
@@ -2309,9 +2334,9 @@ function displaySAZ(saz) {
       </div>
     </div>
     <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">FLUX — Generateurs de traffic</div>
-    <div class="metric-row"><span class="metric-label">Metro (prox.+freq.)</span><span class="metric-weight">30%</span>${bar(saz.fluxMetro)}</div>
+    <div class="metric-row"><span class="metric-label">Metro & transports</span><span class="metric-weight">40%</span>${bar(saz.fluxMetro)}</div>
     <div class="metric-row"><span class="metric-label">Malls (footfall)</span><span class="metric-weight">25%</span>${bar(saz.fluxMall)}</div>
-    <div class="metric-row"><span class="metric-label">Bureaux (employes)</span><span class="metric-weight">25%</span>${bar(saz.fluxOffice)}</div>
+    <div class="metric-row"><span class="metric-label">Bureaux (employes)</span><span class="metric-weight">15%</span>${bar(saz.fluxOffice)}</div>
     <div class="metric-row"><span class="metric-label">Universites (etud.)</span><span class="metric-weight">10%</span>${bar(saz.fluxUni)}</div>
     <div class="metric-row"><span class="metric-label">Zones pietonnes</span><span class="metric-weight">10%</span>${bar(saz.fluxPed)}</div>
     <div style="font-size:9px;font-weight:700;color:var(--purple);margin:8px 0 4px">DENSITE — Population & marche</div>
