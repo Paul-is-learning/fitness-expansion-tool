@@ -449,8 +449,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div id="brandFiltersExplorer" style="display:flex;flex-wrap:wrap;gap:4px"></div>
       </div>
 
+      <!-- Analysis Mode Toggle -->
+      <div class="card" style="border:1px solid var(--accent)40">
+        <div class="layer-row" style="margin-bottom:0">
+          <div class="toggle" id="tglAnalysis" onclick="toggleAnalysisMode()"></div>
+          <div>
+            <div class="layer-label" onclick="toggleAnalysisMode()" style="font-weight:700;color:var(--accent)">Mode analyse</div>
+            <span class="layer-hint">Activez puis cliquez sur la carte</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Catchment -->
-      <div class="card">
+      <div class="card" id="catchmentCard">
         <div class="card-header">
           <div class="card-title"><span class="icon">&#9898;</span> Zone de chalandise</div>
           <span class="info-tip">?<div class="tip-content"><strong>Zone de chalandise</strong><br>Definit le rayon d'analyse autour du point selectionne. Le rayon standard en fitness urbain est de <strong>2 km</strong> (zone de commodite). Un club premium attire jusqu'a 5 km.<div class="tip-source">Source : Benchmark FP France</div></div></span>
@@ -460,6 +471,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <div class="radius-pill active" data-r="2000" onclick="setRadius(2000)">2 km</div>
           <div class="radius-pill" data-r="3000" onclick="setRadius(3000)">3 km</div>
           <div class="radius-pill" data-r="5000" onclick="setRadius(5000)">5 km</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input type="range" id="radiusSlider" min="500" max="5000" step="100" value="2000" oninput="setRadiusFromSlider(this.value)" style="flex:1;accent-color:var(--accent);height:4px;cursor:pointer">
+          <span id="radiusSliderLabel" style="font-size:11px;font-weight:700;color:var(--accent);min-width:42px;text-align:right">2.0 km</span>
         </div>
         <div style="margin-top:8px">
           <div style="display:flex;gap:4px;margin-bottom:4px">
@@ -472,7 +487,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
             <a href="https://openrouteservice.org/dev/#/home" target="_blank" style="font-size:9px;color:var(--cyan)">Obtenir une cle gratuite →</a>
           </div>
         </div>
-        <p style="font-size:11px;color:var(--gray2);margin-top:6px">&#128073; Cliquez sur la carte pour analyser un point</p>
       </div>
 
       <!-- SAZ Weight Sliders -->
@@ -871,7 +885,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
   </div>
   <div class="map-overlay-tr">
     <div class="map-box" id="pointBox" style="display:none">
-      <div class="map-box-title">Point selectionne</div>
+      <div class="map-box-title">Point selectionne<button onclick="clearAnalysis()" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--gray2);border-radius:4px;cursor:pointer;font-size:11px;padding:1px 7px;transition:all .2s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--gray2)';this.style.borderColor='var(--border)'">&times; Fermer</button></div>
       <div id="pointBoxContent"></div>
     </div>
     <div class="map-box" id="sazBox" style="display:none">
@@ -1623,7 +1637,7 @@ function init() {
   map.on('click', function(e) {
     if(addingSite) {
       addingSite = false;
-      map.getContainer().style.cursor = '';
+      map.getContainer().style.cursor = analysisMode ? 'crosshair' : '';
       setStatus('ok','APIs connectees');
       const name = prompt('Nom du site :', 'Site '+(customSites.length+1)) || 'Site '+(customSites.length+1);
       const notes = prompt('Notes (optionnel) :', '') || '';
@@ -1632,11 +1646,13 @@ function init() {
       runSiteAnalysis(site);
       return;
     }
+    if(!analysisMode) return; // Analysis mode must be active
     onMapClick(e);
   });
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){
-      if(addingSite){addingSite=false;map.getContainer().style.cursor='';setStatus('ok','APIs connectees');return}
+      if(addingSite){addingSite=false;map.getContainer().style.cursor=analysisMode?'crosshair':'';setStatus('ok','APIs connectees');return}
+      if(analysisMode){toggleAnalysisMode();return}
       closePanel();
     }
   });
@@ -1724,6 +1740,7 @@ function poisInRadius(lat,lng,r) {
 function updateRadiusLabel() {
   if(!circle || !selectedPt) return;
   const r = circle.getRadius();
+  syncRadiusSlider();
   const est = estimatePopInRadiusGranular(selectedPt.lat, selectedPt.lng, r);
   const compsInRadius = VERIFIED_CLUBS.filter(c=>haversine(selectedPt.lat,selectedPt.lng,c.lat,c.lng)<=r).length;
   const poi = poisInRadius(selectedPt.lat, selectedPt.lng, r);
@@ -3806,12 +3823,62 @@ function toggleDemoMode() {
 }
 
 // ================================================================
+// ANALYSIS MODE
+// ================================================================
+let analysisMode = false;
+
+function toggleAnalysisMode() {
+  analysisMode = !analysisMode;
+  el('tglAnalysis').classList.toggle('on', analysisMode);
+  map.getContainer().style.cursor = analysisMode ? 'crosshair' : '';
+  if(!analysisMode) clearAnalysis();
+}
+
+function clearAnalysis() {
+  if(circle) { map.removeLayer(circle); circle = null; }
+  if(radiusHandle) { map.removeLayer(radiusHandle); radiusHandle = null; }
+  if(popLabel) { map.removeLayer(popLabel); popLabel = null; }
+  if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+  selectedPt = null;
+  el('pointBox').style.display = 'none';
+  el('sazBox').style.display = 'none';
+}
+
+// ================================================================
 // RADIUS
 // ================================================================
+let _radiusDebounce = null;
+
 function setRadius(r) {
   radius=r;
   document.querySelectorAll('.radius-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.r)===r));
+  syncRadiusSlider();
   if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+function setRadiusFromSlider(val) {
+  radius = parseInt(val);
+  el('radiusSliderLabel').textContent = (radius/1000).toFixed(1) + ' km';
+  // Highlight matching pill or deselect all
+  document.querySelectorAll('.radius-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.r)===radius));
+  // Update circle live if visible
+  if(circle) circle.setRadius(radius);
+  if(radiusHandle && selectedPt) {
+    const handleLng = selectedPt.lng + (radius / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
+    radiusHandle.setLatLng([selectedPt.lat, handleLng]);
+  }
+  // Debounce the full re-analysis (avoid spamming API on every slider tick)
+  if(_radiusDebounce) clearTimeout(_radiusDebounce);
+  _radiusDebounce = setTimeout(() => {
+    if(selectedPt) onMapClick({latlng:selectedPt});
+  }, 400);
+}
+
+function syncRadiusSlider() {
+  const s = el('radiusSlider');
+  if(s) { s.value = radius; }
+  const l = el('radiusSliderLabel');
+  if(l) l.textContent = (radius/1000).toFixed(1) + ' km';
 }
 
 // ================================================================
