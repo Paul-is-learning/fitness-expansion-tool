@@ -482,10 +482,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
             <button class="btn btn-sm" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px">&#128663; 10min voiture</button>
             <button class="btn btn-sm" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)">&#9898; Cercle</button>
           </div>
-          <div id="orsKeyWrap" style="display:none;margin-top:4px">
-            <input type="text" id="orsApiKey" placeholder="Cle API Openrouteservice (gratuite)" style="width:100%;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;font-family:var(--font)" onchange="localStorage.setItem('orsKey',this.value)">
-            <a href="https://openrouteservice.org/dev/#/home" target="_blank" style="font-size:9px;color:var(--cyan)">Obtenir une cle gratuite →</a>
-          </div>
+          <div style="margin-top:2px;font-size:8px;color:var(--gray2)">Powered by Google Routes API</div>
         </div>
       </div>
 
@@ -1825,7 +1822,43 @@ function init() {
   L.control.zoom({position:'topright'}).addTo(map);
   L.control.attribution({position:'bottomright',prefix:false}).addTo(map).addAttribution('&copy; OSM &copy; CARTO');
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  // Map tile layers
+  const tileDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
+  const tileSatellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'&copy; Google'});
+  const tileStreet = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'&copy; Google'});
+  const tileHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'&copy; Google'});
+  let currentTile = tileDark;
+  tileDark.addTo(map);
+
+  // Tile selector control
+  const tileCtrl = L.control({position:'bottomright'});
+  tileCtrl.onAdd = function(){
+    const div = L.DomUtil.create('div','tile-selector');
+    div.innerHTML = `
+      <button class="tile-btn active" data-tile="dark" title="Dark">🌙</button>
+      <button class="tile-btn" data-tile="satellite" title="Satellite">🛰️</button>
+      <button class="tile-btn" data-tile="street" title="Street">🗺️</button>
+      <button class="tile-btn" data-tile="hybrid" title="Hybrid">🌐</button>
+    `;
+    div.style.cssText = 'display:flex;gap:3px;background:rgba(17,24,39,.85);padding:4px 6px;border-radius:8px;border:1px solid rgba(71,85,115,.35);backdrop-filter:blur(8px)';
+    div.querySelectorAll('.tile-btn').forEach(btn => {
+      btn.style.cssText = 'width:28px;height:28px;border:1px solid transparent;border-radius:6px;background:transparent;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s';
+      btn.addEventListener('click', function(e){
+        L.DomEvent.stopPropagation(e);
+        const tiles = {dark:tileDark,satellite:tileSatellite,street:tileStreet,hybrid:tileHybrid};
+        map.removeLayer(currentTile);
+        currentTile = tiles[this.dataset.tile];
+        currentTile.addTo(map);
+        currentTile.bringToBack();
+        div.querySelectorAll('.tile-btn').forEach(b=>b.style.borderColor='transparent');
+        this.style.borderColor='var(--accent)';
+      });
+    });
+    div.querySelector('[data-tile="dark"]').style.borderColor='var(--accent)';
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  tileCtrl.addTo(map);
 
   map.addLayer(compCluster);
   map.addLayer(transportLayer);
@@ -2074,6 +2107,12 @@ async function analyzePoint(lat,lng,sector) {
 
   curComps = comps;
 
+  // Enrich with Google Distance Matrix (real driving times)
+  if (_googleHasKey() && comps.length > 0) {
+    showLoad('Calcul distances reelles...', `${comps.length} concurrents via Google Distance Matrix`);
+    await googleDistanceMatrix(lat, lng, comps);
+  }
+
   const saz = calcSAZ(lat,lng,sector,comps);
   displaySAZ(saz);
   displayComps(comps,lat,lng);
@@ -2196,10 +2235,17 @@ function segThreat(s){return{premium:'high','mid-premium':'medium',mid:'medium',
 // THREAT SCORE
 // ================================================================
 function threatScore(c,dist) {
-  // Proximity 40%
+  // Proximity 40% — use driving time if available, else haversine distance
   let prox;
-  if(dist<300)prox=100;else if(dist<500)prox=90;else if(dist<1000)prox=70;
-  else if(dist<1500)prox=50;else if(dist<2000)prox=35;else if(dist<3000)prox=20;else prox=8;
+  if(c.driveMins !== undefined) {
+    // Time-based scoring (minutes driving)
+    if(c.driveMins<=3)prox=100;else if(c.driveMins<=5)prox=90;else if(c.driveMins<=8)prox=70;
+    else if(c.driveMins<=12)prox=50;else if(c.driveMins<=15)prox=35;else if(c.driveMins<=20)prox=20;else prox=8;
+  } else {
+    // Fallback: distance-based scoring (meters haversine)
+    if(dist<300)prox=100;else if(dist<500)prox=90;else if(dist<1000)prox=70;
+    else if(dist<1500)prox=50;else if(dist<2000)prox=35;else if(dist<3000)prox=20;else prox=8;
+  }
 
   // Size 25%
   let sz=30;
@@ -2657,8 +2703,8 @@ function showCompsOnMap(comps) {
         :`<div class="ps"><span>B: Reviews</span><span class="pv" style="color:var(--gray2)">N/A</span></div>`}
       </div>
       ${gLine}
-      ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km</span></div>`:''}
-      ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100</span></div>`:''}
+      ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km${c.driveMins!==undefined?' <span style="color:var(--blue);font-size:9px">🚗 '+c.driveMins+' min</span>':''}</span></div>`:''}
+      ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100${c.driveMins!==undefined?' <span style="font-size:8px;color:var(--gray2)">(temps reel)</span>':''}</span></div>`:''}
       <div class="ps"><span>Prix</span><span class="pv">${c.price||'?'} EUR/mois</span></div>
     `);
     compCluster.addLayer(mk);
@@ -2682,7 +2728,7 @@ function displayComps(comps,refLat,refLng) {
       <div class="comp-dot" style="color:${c.color};background:${c.color}"></div>
       <div class="comp-body">
         <div class="comp-name">${c.name} ${tierBadge} ${c.est?'<span class="badge-est">est.</span>':''}${c.gEnriched?'<span style="color:var(--accent);font-size:8px;margin-left:3px">G✓</span>':''}</div>
-        <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km | ${c.size?c.size+'m2':'?'} | ${c.members?fmt(c.members)+' mbr':''}${c.gRating?' | ★'+c.gRating:''}</div>
+        <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km${c.driveMins!==undefined?' • '+c.driveMins+'min':''} | ${c.size?c.size+'m2':'?'} | ${c.members?fmt(c.members)+' mbr':''}${c.gRating?' | ★'+c.gRating:''}</div>
       </div>
       <div class="comp-threat" style="color:${c.ts>70?'var(--red)':c.ts>40?'var(--yellow)':'var(--green)'}">${c.ts}</div>
     </div>`}).join('');
@@ -4157,7 +4203,6 @@ let isoLayer = null;
 
 function setIsoMode(mode) {
   isoMode = mode;
-  // Update button styles
   ['isoWalkBtn','isoDriveBtn','isoCircleBtn'].forEach(id => {
     const b = el(id);
     if(b) b.style.cssText = 'font-size:9px;' + (
@@ -4165,92 +4210,219 @@ function setIsoMode(mode) {
       ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : ''
     );
   });
-  // Show/hide API key input
-  const wrap = el('orsKeyWrap');
-  if(wrap) wrap.style.display = mode==='circle' ? 'none' : 'block';
-  // Load saved key
-  const keyInput = el('orsApiKey');
-  if(keyInput && !keyInput.value) keyInput.value = localStorage.getItem('orsKey') || '';
-  // Re-analyze if point selected
   if(selectedPt) onMapClick({latlng:selectedPt});
 }
 
-async function fetchIsochrone(lat, lng, profile, rangeSeconds) {
-  const apiKey = el('orsApiKey')?.value || localStorage.getItem('orsKey');
-  if(!apiKey) {
-    alert('Cle API Openrouteservice requise pour les isochrones.\nInscription gratuite: openrouteservice.org/dev');
-    setIsoMode('circle');
-    return null;
-  }
+// Google Routes API — Isochrone generation
+// Sends routes in N directions from center, collects reachable points to build polygon
+async function googleIsochrone(lat, lng, travelMode, timeLimitSec) {
+  if (!_googleHasKey()) return null;
+  const DIRECTIONS = 24; // 24 rays every 15°
+  const destinations = [];
+  const maxDist = travelMode === 'WALK' ? 0.015 : 0.06; // ~1.5km walk, ~6km drive
 
-  const url = `https://api.openrouteservice.org/v2/isochrones/${profile}`;
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        locations: [[lng, lat]], // ORS uses [lng, lat]
-        range: [rangeSeconds],
-        range_type: 'time',
-        smoothing: 25,
-        attributes: ['area']
-      })
+  for (let i = 0; i < DIRECTIONS; i++) {
+    const angle = (i * 360 / DIRECTIONS) * Math.PI / 180;
+    destinations.push({
+      lat: lat + maxDist * Math.cos(angle),
+      lng: lng + maxDist * Math.sin(angle)
     });
-
-    if(!resp.ok) {
-      const err = await resp.text();
-      if(resp.status === 403) alert('Cle API invalide ou quota epuise (500 isochrones/jour gratuit)');
-      else if(resp.status === 429) alert('Rate limit atteint. Attendez 1 minute.');
-      else console.error('ORS error:', resp.status, err);
-      return null;
-    }
-
-    const data = await resp.json();
-    return data;
-  } catch(e) {
-    console.error('Isochrone error:', e);
-    return null;
   }
+
+  // Use Routes API computeRoutes for each direction
+  const points = [];
+  const batchSize = 6;
+  for (let i = 0; i < destinations.length; i += batchSize) {
+    const batch = destinations.slice(i, i + batchSize);
+    const promises = batch.map(async (dest, idx) => {
+      try {
+        const resp = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': GOOGLE_API_KEY,
+            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs.steps.endLocation'
+          },
+          body: JSON.stringify({
+            origin: { location: { latLng: { latitude: lat, longitude: lng } } },
+            destination: { location: { latLng: { latitude: dest.lat, longitude: dest.lng } } },
+            travelMode: travelMode,
+            routingPreference: travelMode === 'DRIVE' ? 'TRAFFIC_AWARE' : undefined
+          })
+        });
+        const data = await resp.json();
+        if (data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          const durationSec = parseInt(route.duration?.replace('s','') || '9999');
+          const distM = route.distanceMeters || 0;
+          // If route is within time limit, use endpoint; otherwise interpolate
+          if (durationSec <= timeLimitSec) {
+            return { lat: dest.lat, lng: dest.lng, dur: durationSec };
+          } else {
+            // Scale back proportionally
+            const ratio = timeLimitSec / durationSec;
+            const steps = route.legs?.[0]?.steps;
+            if (steps && steps.length > 1) {
+              const targetIdx = Math.min(Math.floor(steps.length * ratio), steps.length - 1);
+              const step = steps[targetIdx];
+              return { lat: step.endLocation?.latLng?.latitude || lat, lng: step.endLocation?.latLng?.longitude || lng, dur: timeLimitSec };
+            }
+            return { lat: lat + (dest.lat-lat)*ratio, lng: lng + (dest.lng-lng)*ratio, dur: timeLimitSec };
+          }
+        }
+        return null;
+      } catch(e) { return null; }
+    });
+    const results = await Promise.all(promises);
+    results.forEach(r => { if(r) points.push(r); });
+  }
+
+  if (points.length < 3) return null;
+
+  // Sort points by angle to create a proper polygon
+  points.sort((a,b) => {
+    const angA = Math.atan2(a.lng - lng, a.lat - lat);
+    const angB = Math.atan2(b.lng - lng, b.lat - lat);
+    return angA - angB;
+  });
+
+  // Build GeoJSON polygon
+  const coords = points.map(p => [p.lng, p.lat]);
+  coords.push(coords[0]); // close polygon
+  return {
+    type: 'Feature',
+    properties: { duration: timeLimitSec, mode: travelMode, points: points.length },
+    geometry: { type: 'Polygon', coordinates: [coords] }
+  };
+}
+
+// Fallback to ORS if Google fails
+async function fetchIsochroneORS(lat, lng, profile, rangeSeconds) {
+  const apiKey = localStorage.getItem('orsKey');
+  if(!apiKey) return null;
+  try {
+    const resp = await fetch(`https://api.openrouteservice.org/v2/isochrones/${profile}`, {
+      method: 'POST',
+      headers: { 'Authorization': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locations: [[lng, lat]], range: [rangeSeconds], range_type: 'time', smoothing: 25, attributes: ['area'] })
+    });
+    if(!resp.ok) return null;
+    const data = await resp.json();
+    return data?.features?.[0] || null;
+  } catch(e) { return null; }
 }
 
 async function drawIsochrone(lat, lng) {
-  if(isoMode === 'circle') return; // normal circle mode, handled elsewhere
+  if(isoMode === 'circle') return;
 
   if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
 
-  const profile = isoMode === 'walk' ? 'foot-walking' : 'driving-car';
-  const rangeSeconds = 600; // 10 minutes
+  const travelMode = isoMode === 'walk' ? 'WALK' : 'DRIVE';
   const color = isoMode === 'walk' ? '#22c55e' : '#3b82f6';
+  const label = isoMode === 'walk' ? '10 min a pied' : '10 min en voiture';
 
-  showLoad('Calcul isochrone...', `${isoMode==='walk'?'10 min a pied':'10 min en voiture'} via Openrouteservice`);
+  showLoad('Calcul isochrone...', `${label} via Google Routes API`);
 
-  const data = await fetchIsochrone(lat, lng, profile, rangeSeconds);
+  let geojson = null;
 
-  if(data && data.features && data.features.length > 0) {
-    const geojson = data.features[0];
+  // Try Google Routes API first
+  if (_googleHasKey()) {
+    geojson = await googleIsochrone(lat, lng, travelMode, 600);
+    if (geojson) console.log(`[Google Routes] Isochrone ${travelMode}: ${geojson.properties.points} points`);
+  }
+
+  // Fallback to OpenRouteService
+  if (!geojson) {
+    const orsProfile = isoMode === 'walk' ? 'foot-walking' : 'driving-car';
+    geojson = await fetchIsochroneORS(lat, lng, orsProfile, 600);
+    if (geojson) console.log('[ORS fallback] Isochrone loaded');
+  }
+
+  if (geojson) {
     isoLayer = L.geoJSON(geojson, {
-      style: {
-        color: color,
-        weight: 2,
-        fillColor: color,
-        fillOpacity: 0.1,
-        dashArray: '6,4'
-      }
+      style: { color, weight: 2, fillColor: color, fillOpacity: 0.1, dashArray: '6,4' }
     }).addTo(map);
 
-    // Calculate area
-    const areaKm2 = geojson.properties?.area ? (geojson.properties.area / 1000000).toFixed(1) : '?';
-
     isoLayer.bindTooltip(
-      `<b>${isoMode==='walk'?'10 min a pied':'10 min en voiture'}</b><br>Surface: ${areaKm2} km2`,
+      `<b>${label}</b><br>Google Routes API`,
       {className:'custom-tooltip', permanent:false, direction:'center'}
     );
+  } else {
+    console.warn('Isochrone unavailable (Google + ORS both failed)');
   }
 
   hideLoad();
+}
+
+// ================================================================
+// GOOGLE DISTANCE MATRIX
+// ================================================================
+const _distMatrixCache = {};
+
+async function googleDistanceMatrix(originLat, originLng, competitors) {
+  if (!_googleHasKey() || competitors.length === 0) return competitors;
+
+  const cacheKey = `dm_${originLat.toFixed(3)}_${originLng.toFixed(3)}`;
+  if (_distMatrixCache[cacheKey]) {
+    // Apply cached results
+    const cached = _distMatrixCache[cacheKey];
+    competitors.forEach(c => {
+      const key = `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`;
+      if (cached[key]) { c.driveMins = cached[key].mins; c.driveMeters = cached[key].meters; }
+    });
+    return competitors;
+  }
+
+  // Google Routes Matrix API — batch up to 25 destinations
+  const results = {};
+  const batches = [];
+  for (let i = 0; i < competitors.length; i += 25) {
+    batches.push(competitors.slice(i, i + 25));
+  }
+
+  for (const batch of batches) {
+    try {
+      const body = {
+        origins: [{ waypoint: { location: { latLng: { latitude: originLat, longitude: originLng } } } }],
+        destinations: batch.map(c => ({
+          waypoint: { location: { latLng: { latitude: c.lat, longitude: c.lng } } }
+        })),
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE'
+      };
+
+      const resp = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_API_KEY,
+          'X-Goog-FieldMask': 'originIndex,destinationIndex,duration,distanceMeters,status'
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await resp.json();
+      if (Array.isArray(data)) {
+        data.forEach(entry => {
+          if (entry.status === 'OK' || entry.duration) {
+            const c = batch[entry.destinationIndex];
+            if (c) {
+              const durSec = parseInt(entry.duration?.replace('s','') || '0');
+              const mins = Math.round(durSec / 60);
+              const meters = entry.distanceMeters || 0;
+              c.driveMins = mins;
+              c.driveMeters = meters;
+              const key = `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`;
+              results[key] = { mins, meters };
+            }
+          }
+        });
+      }
+    } catch(e) { console.warn('[Distance Matrix] Batch error:', e); }
+  }
+
+  _distMatrixCache[cacheKey] = results;
+  return competitors;
 }
 
 // ================================================================
