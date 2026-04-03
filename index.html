@@ -783,7 +783,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <div>&#8226; <b>83 quartiers (cartiere)</b> — Population estimee par repartition densite relative au sein de chaque secteur, calee sur totaux census</div>
           <div>&#8226; <b>Facteur population reelle x1.7</b> — Census = residents legaux. Population reelle ~2.9M (navetteurs Ilfov, non-declares, expats). Source: estimations INS + Eurostat</div>
 
-          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">CONCURRENTS (83 clubs)</div>
+          <div style="font-weight:700;color:var(--cyan);margin:10px 0 4px">CONCURRENTS (92 clubs)</div>
           <div>&#8226; <b>World Class</b> (34 clubs) — worldclass.ro/harta-cluburi, business-review.eu. 84,000 membres / 45 clubs = 1,867 moy.</div>
           <div>&#8226; <b>Stay Fit Gym</b> (21 clubs) — stayfit.ro/cluburi-bucuresti, morphosiscapital.com. 67 clubs nationaux, 50k+ membres</div>
           <div>&#8226; <b>18GYM</b> (6 clubs) — 18gym.ro. 40 clubs nationaux, 15k+ membres Cluj</div>
@@ -919,6 +919,192 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 const BUCHAREST = [44.4268, 26.1025];
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
+
+// ================================================================
+// GOOGLE MAPS PLATFORM API
+// ================================================================
+const GOOGLE_API_KEY = 'AIzaSyDPj1aNT8HICzvPOXHSyQtl1oKf3vSu3so';
+const GOOGLE_PLACES_URL = 'https://places.googleapis.com/v1/places';
+const GOOGLE_GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
+const _googleHasKey = () => GOOGLE_API_KEY && GOOGLE_API_KEY !== 'YOUR_GOOGLE_API_KEY';
+const _googleCache = {}; // in-memory cache for session
+const GOOGLE_CACHE_KEY = 'fp_google_cache';
+const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
+
+function loadGoogleCache() {
+  try {
+    const raw = localStorage.getItem(GOOGLE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    // Purge expired entries
+    Object.keys(parsed).forEach(k => { if (now - parsed[k]._ts > GOOGLE_CACHE_TTL) delete parsed[k]; });
+    return parsed;
+  } catch(e) { return {}; }
+}
+function saveGoogleCache(cache) {
+  try { localStorage.setItem(GOOGLE_CACHE_KEY, JSON.stringify(cache)); } catch(e) {}
+}
+let googlePlacesCache = loadGoogleCache();
+
+// Rate limiter: max 5 requests/sec
+const _gQueue = [];
+let _gRunning = 0;
+async function googleFetch(url, opts = {}) {
+  if (!_googleHasKey()) return null;
+  return new Promise((resolve, reject) => {
+    _gQueue.push({ url, opts, resolve, reject });
+    _drainGQueue();
+  });
+}
+function _drainGQueue() {
+  while (_gQueue.length > 0 && _gRunning < 5) {
+    _gRunning++;
+    const { url, opts, resolve, reject } = _gQueue.shift();
+    fetch(url, opts).then(r => r.json()).then(d => { _gRunning--; resolve(d); _drainGQueue(); })
+      .catch(e => { _gRunning--; resolve(null); _drainGQueue(); });
+  }
+  if (_gQueue.length > 0 && _gRunning >= 5) {
+    setTimeout(_drainGQueue, 220);
+  }
+}
+
+// Google Geocoding
+async function googleGeocode(address) {
+  const url = `${GOOGLE_GEOCODE_URL}?address=${encodeURIComponent(address)}&key=${GOOGLE_API_KEY}&region=ro`;
+  const data = await googleFetch(url);
+  if (data && data.results && data.results.length > 0) {
+    const loc = data.results[0].geometry.location;
+    return { lat: loc.lat, lng: loc.lng, formatted: data.results[0].formatted_address };
+  }
+  return null;
+}
+
+// Google Places Text Search (New API)
+async function googlePlaceSearch(query) {
+  const cacheKey = 'ts_' + query.toLowerCase().replace(/\s+/g, '_');
+  if (googlePlacesCache[cacheKey]) return googlePlacesCache[cacheKey];
+
+  const data = await googleFetch(`${GOOGLE_PLACES_URL}:searchText`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_API_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.currentOpeningHours,places.websiteUri,places.location,places.formattedAddress'
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 30000 } }
+    })
+  });
+  if (data && data.places && data.places.length > 0) {
+    const p = data.places[0];
+    const result = {
+      placeId: p.id,
+      name: p.displayName?.text || query,
+      rating: p.rating || null,
+      reviewCount: p.userRatingCount || 0,
+      isOpen: p.currentOpeningHours?.openNow ?? null,
+      website: p.websiteUri || null,
+      address: p.formattedAddress || null,
+      lat: p.location?.latitude,
+      lng: p.location?.longitude,
+      _ts: Date.now()
+    };
+    googlePlacesCache[cacheKey] = result;
+    saveGoogleCache(googlePlacesCache);
+    return result;
+  }
+  return null;
+}
+
+// Google Nearby Search for gyms
+async function googleNearbyGyms(lat, lng, radiusM) {
+  if (!_googleHasKey()) return [];
+  const cacheKey = `nearby_${lat.toFixed(3)}_${lng.toFixed(3)}_${radiusM}`;
+  if (_googleCache[cacheKey]) return _googleCache[cacheKey];
+
+  const data = await googleFetch(`${GOOGLE_PLACES_URL}:searchNearby`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_API_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.location,places.types,places.formattedAddress'
+    },
+    body: JSON.stringify({
+      includedTypes: ['gym', 'fitness_center'],
+      locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: Math.min(radiusM, 50000) } },
+      maxResultCount: 20
+    })
+  });
+
+  const results = [];
+  if (data && data.places) {
+    data.places.forEach(p => {
+      results.push({
+        name: p.displayName?.text || 'Unknown Gym',
+        lat: p.location?.latitude,
+        lng: p.location?.longitude,
+        rating: p.rating || null,
+        reviewCount: p.userRatingCount || 0,
+        address: p.formattedAddress || '',
+        source: 'google',
+        segment: guessSeg(p.displayName?.text),
+        size: guessSize(p.displayName?.text),
+        members: Math.round(guessSize(p.displayName?.text) * 1.1),
+        est: true,
+        color: segColor(guessSeg(p.displayName?.text)),
+        threat: segThreat(guessSeg(p.displayName?.text)),
+        brand: 'google',
+        id: Math.random()
+      });
+    });
+  }
+  _googleCache[cacheKey] = results;
+  return results;
+}
+
+// Enrich VERIFIED_CLUBS with Google Places data (ratings, reviews, hours)
+async function enrichWithGoogle(clubs) {
+  if (!_googleHasKey()) { console.warn('[Google] No API key — skipping enrichment'); return clubs; }
+
+  setStatus('loading', 'Enrichissement Google Places...');
+  let enriched = 0;
+  const batchSize = 5;
+
+  for (let i = 0; i < clubs.length; i += batchSize) {
+    const batch = clubs.slice(i, i + batchSize);
+    const promises = batch.map(async (c) => {
+      const cacheKey = 'ts_' + c.name.toLowerCase().replace(/\s+/g, '_');
+      // Check cache first
+      if (googlePlacesCache[cacheKey] && (Date.now() - googlePlacesCache[cacheKey]._ts < GOOGLE_CACHE_TTL)) {
+        const cached = googlePlacesCache[cacheKey];
+        c.gRating = cached.rating;
+        c.gReviews = cached.reviewCount;
+        c.gOpen = cached.isOpen;
+        c.gWebsite = cached.website;
+        c.gEnriched = true;
+        enriched++;
+        return;
+      }
+      const result = await googlePlaceSearch(c.name + ' gym Bucharest');
+      if (result) {
+        c.gRating = result.rating;
+        c.gReviews = result.reviewCount;
+        c.gOpen = result.isOpen;
+        c.gWebsite = result.website;
+        c.gEnriched = true;
+        enriched++;
+      }
+    });
+    await Promise.all(promises);
+    // Brief pause between batches to respect rate limits
+    if (i + batchSize < clubs.length) await new Promise(r => setTimeout(r, 250));
+  }
+
+  setStatus('ok', `${enriched}/${clubs.length} clubs enrichis via Google Places`);
+  return clubs;
+}
 
 let map, circle, radius = 2000;
 let compCluster = L.markerClusterGroup({maxClusterRadius:40,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
@@ -1134,7 +1320,7 @@ const TARGETS = [
 ];
 
 // ================================================================
-// VERIFIED CLUBS DATABASE — 83 clubs, geocoded via Nominatim + manual corrections
+// VERIFIED CLUBS DATABASE — 92 clubs, geocoded via Nominatim + manual corrections
 // All coordinates verified against official websites & Google Maps
 // ================================================================
 // Estimation method: DUAL MODEL
@@ -1212,11 +1398,11 @@ const VERIFIED_CLUBS = [
   {name:'18GYM Pipera',lat:44.490000,lng:26.118000,segment:'mid',size:1200,members:1200},
   // === DOWNTOWN FITNESS (5 clubs) — Source: downtownfitness.ro ===
   // DF Vitan confirmed 1,800m2. Obor = 2,000m2. Mihalache = 1,000m2. Ratio ~1.1 mbr/m2
-  {name:'Downtown Fitness Vitan',lat:44.422982,lng:26.124447,segment:'mid-premium',size:1800,members:1980,sv:true},
-  {name:'Downtown Fitness Mihai Bravu',lat:44.417438,lng:26.136058,segment:'mid-premium',size:1400,members:1540},
+  {name:'Downtown Fitness Vitan',lat:44.4227,lng:26.1241,segment:'mid-premium',size:1800,members:1980,sv:true},
+  {name:'Downtown Fitness Mihai Bravu',lat:44.4175,lng:26.1359,segment:'mid-premium',size:1400,members:1540},
   {name:'Downtown Fitness Mihalache',lat:44.458420,lng:26.077576,segment:'mid-premium',size:1000,members:1100,sv:true},
-  {name:'Downtown Fitness Matei Basarab',lat:44.431249,lng:26.128556,segment:'mid-premium',size:1500,members:1650},
-  {name:'Downtown Fitness Obor',lat:44.450142,lng:26.127928,segment:'mid-premium',size:2000,members:2200,sv:true},
+  {name:'Downtown Fitness Matei Basarab',lat:44.4314,lng:26.1288,segment:'mid-premium',size:1500,members:1650},
+  {name:'Downtown Fitness Obor',lat:44.4503,lng:26.1276,segment:'mid-premium',size:2000,members:2200,sv:true},
   // === NR1 FITNESS (5 clubs, 24/7) — Source: outsourcing-today.ro ===
   // Nr1: low-cost 24/7 model, small format. Militari confirmed 400m2. Ratio low-cost: 1.5 mbr/m2
   {name:'Nr1 Fitness Militari',lat:44.434294,lng:26.000327,segment:'mid',size:400,members:600,sv:true},
@@ -1239,6 +1425,18 @@ const VERIFIED_CLUBS = [
   {name:'WoWGym Fundeni',lat:44.463244,lng:26.153917,segment:'independent',size:1000,members:900},
   {name:'Sweat Concept Promenada',lat:44.476000,lng:26.104000,segment:'boutique',size:300,members:250},
   {name:'Best Fitness Gym',lat:44.423755,lng:26.011406,segment:'independent',size:1000,members:900},
+  // === BANLIEUE / ILFOV — Clubs peri-urbains ===
+  // Stay Fit banlieue (7 clubs) — Source: stayfit.ro/cluburi
+  {name:'Stay Fit Otopeni',lat:44.5359,lng:26.0605,segment:'mid',size:1000,members:1100},
+  {name:'Stay Fit Voluntari',lat:44.4872,lng:26.1824,segment:'mid',size:900,members:990},
+  {name:'Stay Fit Lemon Park',lat:44.4925,lng:26.1509,segment:'mid',size:1000,members:1100},
+  {name:'Stay Fit Balotesti',lat:44.6044,lng:26.0676,segment:'mid',size:900,members:990},
+  {name:'Stay Fit Popesti Leordeni',lat:44.3603,lng:26.1509,segment:'mid',size:1000,members:1100},
+  {name:'Stay Fit Stefanesti',lat:44.5285,lng:26.1975,segment:'mid',size:900,members:990},
+  {name:'Stay Fit Crevedia',lat:44.6180,lng:25.9132,segment:'mid',size:800,members:880},
+  // World Class banlieue (2 clubs)
+  {name:'World Class Cosmopolis',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,sv:true},
+  {name:'World Class Otopeni',lat:44.5477,lng:26.0746,segment:'premium',size:1500,members:1275},
 ];
 
 // Use same as demo — the verified database IS the real data
@@ -1617,6 +1815,12 @@ let mapInitialized = false;
 function init() {
   if(mapInitialized) return;
   mapInitialized = true;
+  // Google API key check
+  if (!_googleHasKey()) {
+    console.warn('[Google API] No API key configured. Set GOOGLE_API_KEY in source to enable Google Places, Geocoding, and Nearby Search. Using Nominatim/Overpass fallbacks.');
+  } else {
+    console.log('[Google API] Key detected — Google Places, Geocoding, and Nearby Search active');
+  }
   map = L.map('map',{center:BUCHAREST,zoom:12,zoomControl:false,attributionControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
   L.control.attribution({position:'bottomright',prefix:false}).addTo(map).addAttribution('&copy; OSM &copy; CARTO');
@@ -1638,7 +1842,7 @@ function init() {
     if(addingSite) {
       addingSite = false;
       map.getContainer().style.cursor = analysisMode ? 'crosshair' : '';
-      setStatus('ok','APIs connectees');
+      setStatus('ok','APIs connectees'+(_googleHasKey()?' + Google':''));
       const name = prompt('Nom du site :', 'Site '+(customSites.length+1)) || 'Site '+(customSites.length+1);
       const notes = prompt('Notes (optionnel) :', '') || '';
       const site = addCustomSite(e.latlng.lat, e.latlng.lng, name, notes);
@@ -1651,7 +1855,7 @@ function init() {
   });
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){
-      if(addingSite){addingSite=false;map.getContainer().style.cursor=analysisMode?'crosshair':'';setStatus('ok','APIs connectees');return}
+      if(addingSite){addingSite=false;map.getContainer().style.cursor=analysisMode?'crosshair':'';setStatus('ok','APIs connectees'+(_googleHasKey()?' + Google':''));return}
       if(analysisMode){toggleAnalysisMode();return}
       closePanel();
     }
@@ -1846,7 +2050,7 @@ async function onMapClick(e) {
 }
 
 async function analyzePoint(lat,lng,sector) {
-  showLoad('Detection des concurrents...','Croisement base verifiee (83 clubs) + Overpass API');
+  showLoad('Detection des concurrents...','Croisement base verifiee (92 clubs) + Overpass API');
 
   // Always start with verified database
   let verifiedInRadius = getDemoInRadius(lat,lng,radius);
@@ -1955,7 +2159,7 @@ async function fetchAllBucharest() {
     return dd;
   } catch(e) {
     hideLoad();
-    setStatus('warn','Overpass indisponible — base verifiee (83 clubs)');
+    setStatus('warn','Overpass indisponible — base verifiee (92 clubs)');
     // Always fallback to verified DB, never return empty
     const fallback = VERIFIED_CLUBS.map(c=>({...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
     opCache[key]=fallback;
@@ -2431,7 +2635,16 @@ function showCompsOnMap(comps) {
     const mA=c.members||0;
     const mB=rv?rv.mB:0;
     const mAvg=mB>0?Math.round((mA+mB)/2):mA;
-    mk.bindPopup(`<h3>${c.name}</h3>
+    // Google enrichment data
+    const gLine = c.gEnriched ? `
+      <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.2)">
+        <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:3px">GOOGLE PLACES <span style="font-size:7px;background:rgba(212,160,23,.15);padding:1px 4px;border-radius:3px">LIVE</span></div>
+        ${c.gRating?`<div class="ps"><span>Note Google</span><span class="pv" style="color:var(--accent)">★ ${c.gRating}/5 <span style="font-size:8px;color:var(--gray2)">(${fmt(c.gReviews)} avis)</span></span></div>`:''}
+        ${c.gOpen!==null?`<div class="ps"><span>Statut</span><span class="pv" style="color:${c.gOpen?'var(--green)':'var(--red)'}"> ${c.gOpen?'Ouvert maintenant':'Ferme'}</span></div>`:''}
+        ${c.gWebsite?`<div class="ps"><span>Site</span><span class="pv"><a href="${c.gWebsite}" target="_blank" style="color:var(--blue);font-size:9px">Visiter ↗</a></span></div>`:''}
+      </div>` : '';
+
+    mk.bindPopup(`<h3>${c.name}${c.gEnriched?' <span style="font-size:8px;color:var(--accent)">G✓</span>':''}</h3>
       <div class="ps"><span>Segment</span><span class="pv" style="color:${c.color}">${c.segment}</span></div>
       ${tierLabel}
       <div class="ps"><span>Surface</span><span class="pv">${c.size?c.size+' m2':'N/A'} ${c.sv?'<span style="color:var(--green);font-size:8px">verifie</span>':'<span style="color:var(--yellow);font-size:8px">est.</span>'}</span></div>
@@ -2443,6 +2656,7 @@ function showCompsOnMap(comps) {
         <div class="ps"><span><b>Moyenne A+B</b></span><span class="pv" style="font-weight:800;color:var(--cyan)">${fmt(mAvg)}</span></div>`
         :`<div class="ps"><span>B: Reviews</span><span class="pv" style="color:var(--gray2)">N/A</span></div>`}
       </div>
+      ${gLine}
       ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km</span></div>`:''}
       ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100</span></div>`:''}
       <div class="ps"><span>Prix</span><span class="pv">${c.price||'?'} EUR/mois</span></div>
@@ -2467,8 +2681,8 @@ function displayComps(comps,refLat,refLng) {
     <div class="comp-card" onclick="map.flyTo([${c.lat},${c.lng}],16)">
       <div class="comp-dot" style="color:${c.color};background:${c.color}"></div>
       <div class="comp-body">
-        <div class="comp-name">${c.name} ${tierBadge} ${c.est?'<span class="badge-est">est.</span>':''}</div>
-        <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km | ${c.size?c.size+'m2':'?'} | ${c.members?fmt(c.members)+' mbr':''}</div>
+        <div class="comp-name">${c.name} ${tierBadge} ${c.est?'<span class="badge-est">est.</span>':''}${c.gEnriched?'<span style="color:var(--accent);font-size:8px;margin-left:3px">G✓</span>':''}</div>
+        <div class="comp-meta">${c.segment} | ${(c.dist/1000).toFixed(1)}km | ${c.size?c.size+'m2':'?'} | ${c.members?fmt(c.members)+' mbr':''}${c.gRating?' | ★'+c.gRating:''}</div>
       </div>
       <div class="comp-threat" style="color:${c.ts>70?'var(--red)':c.ts>40?'var(--yellow)':'var(--green)'}">${c.ts}</div>
     </div>`}).join('');
@@ -2925,7 +3139,7 @@ function toggleLayer(name) {
 }
 
 async function loadAllCompetitors() {
-  // Always start with VERIFIED_CLUBS (83 clubs, accurate data)
+  // Always start with VERIFIED_CLUBS (92 clubs, accurate data)
   const verified = VERIFIED_CLUBS.map(c=>({...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
 
   let comps;
@@ -2939,6 +3153,20 @@ async function loadAllCompetitors() {
       const alreadyExists = merged.some(vc => haversine(vc.lat,vc.lng,oc.lat,oc.lng) < 150);
       if(!alreadyExists) merged.push(oc);
     });
+
+    // Google Nearby Search as additional source (if API key available)
+    if (_googleHasKey()) {
+      try {
+        const googleGyms = await googleNearbyGyms(BUCHAREST[0], BUCHAREST[1], 25000);
+        let googleAdded = 0;
+        googleGyms.forEach(gc => {
+          const alreadyExists = merged.some(vc => haversine(vc.lat,vc.lng,gc.lat,gc.lng) < 150);
+          if (!alreadyExists) { merged.push(gc); googleAdded++; }
+        });
+        if (googleAdded > 0) console.log(`[Google] +${googleAdded} clubs supplementaires detectes`);
+      } catch(e) { console.warn('[Google Nearby] Error:', e); }
+    }
+
     comps = merged;
   }
   allComps=comps;
@@ -2947,6 +3175,13 @@ async function loadAllCompetitors() {
   buildBrandFilters(comps);
   if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
   setStatus('ok',`${comps.length} concurrents charges`);
+
+  // Enrich with Google Places data (async, non-blocking)
+  if (_googleHasKey()) {
+    enrichWithGoogle(comps).then(() => {
+      showCompsOnMap(comps);
+    });
+  }
 }
 
 async function genHeatmap() {
@@ -3516,17 +3751,24 @@ async function addSiteByAddress() {
   const addr = el('newSiteAddr').value.trim();
   if(!addr) return;
   try {
-    const resp = await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(addr+', Bucharest, Romania')}&limit=1`);
-    const data = await resp.json();
-    if(data.length > 0) {
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
+    let lat, lng;
+    // Try Google Geocoding first (more accurate)
+    if (_googleHasKey()) {
+      const gResult = await googleGeocode(addr + ', Bucharest, Romania');
+      if (gResult) { lat = gResult.lat; lng = gResult.lng; }
+    }
+    // Fallback to Nominatim
+    if (lat === undefined) {
+      const resp = await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(addr+', Bucharest, Romania')}&limit=1`);
+      const data = await resp.json();
+      if (data.length > 0) { lat = parseFloat(data[0].lat); lng = parseFloat(data[0].lon); }
+    }
+    if (lat !== undefined) {
       const name = prompt('Nom du site :', addr.substring(0,40)) || addr.substring(0,40);
       const notes = prompt('Notes (optionnel) :', '') || '';
       const site = addCustomSite(lat, lng, name, notes);
       map.flyTo([lat,lng],15);
       el('newSiteAddr').value = '';
-      // Auto-analyze
       setTimeout(()=>runSiteAnalysis(site),500);
     } else {
       alert('Adresse non trouvee. Essayez avec plus de details.');
@@ -3539,7 +3781,7 @@ async function runSiteAnalysis(site) {
   const sector = findSector(lat,lng);
   const cartier = findCartier(lat,lng);
 
-  // Always use verified database first (83 clubs, works offline)
+  // Always use verified database first (92 clubs, works offline)
   let comps = getDemoInRadius(lat,lng,3000);
   // Try to enrich with Overpass if not in demo mode (non-blocking)
   if(!demo) {
@@ -3732,12 +3974,40 @@ function initSearch() {
 
 async function searchAddr(q) {
   try{
+    // Try Google Places Autocomplete if key available
+    if (_googleHasKey()) {
+      const gData = await googleFetch(`${GOOGLE_PLACES_URL}:searchText`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_API_KEY,
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location'
+        },
+        body: JSON.stringify({
+          textQuery: q + ' Bucharest',
+          locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 30000 } },
+          maxResultCount: 5
+        })
+      });
+      if (gData && gData.places && gData.places.length > 0) {
+        const res = el('searchResults');
+        res.innerHTML = gData.places.map(p => {
+          const lat = p.location?.latitude;
+          const lng = p.location?.longitude;
+          const label = (p.displayName?.text || '') + ' — ' + (p.formattedAddress || '').substring(0, 60);
+          return `<div class="search-result-item" onclick="pickSearch(${lat},${lng})">${label} <span style="color:var(--accent);font-size:8px">Google</span></div>`;
+        }).join('');
+        res.classList.add('active');
+        return;
+      }
+    }
+    // Fallback: Nominatim
     const r=await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(q+', Bucharest, Romania')}&limit=5&addressdetails=1`);
     const data=await r.json();
     const res=el('searchResults');
     res.innerHTML=data.length===0?'<div class="search-result-item">Aucun resultat</div>':data.map(d=>`<div class="search-result-item" onclick="pickSearch(${d.lat},${d.lon})">${d.display_name.substring(0,80)}</div>`).join('');
     res.classList.add('active');
-  }catch(e){console.error('Nominatim:',e)}
+  }catch(e){console.error('Search:',e)}
 }
 
 function pickSearch(lat,lng) {
@@ -3810,7 +4080,7 @@ function flyTarget(lat,lng) {
 function toggleDemoMode() {
   demo=!demo;
   el('demoBanner').classList.toggle('on',demo);
-  setStatus(demo?'warn':'ok',demo?'Mode demo actif':'APIs connectees');
+  setStatus(demo?'warn':'ok',demo?'Mode demo actif':'APIs connectees'+(_googleHasKey()?' + Google':''));
   if(demo) {
     allComps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
     lastDisplayedComps=allComps;
