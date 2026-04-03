@@ -3600,38 +3600,6 @@ async function runSiteAnalysis(site) {
       ${top3.map((c,i)=>`<div class="metric-row"><span class="metric-label">#${i+1} ${c.name}</span><span class="metric-value">${(c.dist/1000).toFixed(1)}km | menace ${c.ts}</span></div>`).join('')}
     </div>
 
-    <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">PROJECTION BP V17 — 28EUR TTC (23,14 HT) | Penetration ${scenarios.penetration}%</div>
-
-      <div style="margin:4px 0;font-size:9px;font-weight:700;color:var(--gray)">RAMP-UP ANNUEL</div>
-      <div class="metric-row"><span class="metric-label">A1 (70%) — 2,800 mbr BP</span><span class="metric-value" style="color:${Math.round(scenarios.realistic.members*0.7)>=2800?'var(--green)':'var(--yellow)'}">${fmt(Math.round(scenarios.realistic.members*0.7))} mbr | ${Math.round(scenarios.realistic.members*0.7*23.14*12/1000)}k EUR <span style="font-size:8px">(BP: 415k)</span></span></div>
-      <div class="metric-row"><span class="metric-label">A2 (90%) — 3,600 mbr BP</span><span class="metric-value">${fmt(Math.round(scenarios.realistic.members*0.9))} mbr | ${Math.round(scenarios.realistic.members*0.9*23.14*12/1000)}k EUR <span style="font-size:8px">(BP: 948k)</span></span></div>
-      <div class="metric-row" style="font-weight:700"><span class="metric-label">A3 (100%) — 4,000 mbr BP</span><span class="metric-value" style="color:var(--cyan)">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR <span style="font-size:8px">(BP: 1,185k)</span></span></div>
-
-      <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">ECART vs BP</div>
-      ${[{y:'A1',r:0.7,bpMbr:2800,bpCA:415},{y:'A2',r:0.9,bpMbr:3600,bpCA:948},{y:'A3',r:1.0,bpMbr:4000,bpCA:1185}].map(a=>{
-        const mbr=Math.round(scenarios.realistic.members*a.r);
-        const ca=Math.round(mbr*23.14*12/1000);
-        const delta=mbr-a.bpMbr;
-        const pct=Math.round(delta/a.bpMbr*100);
-        return `<div class="metric-row"><span class="metric-label">${a.y}</span><span class="metric-value" style="color:${delta>=0?'var(--green)':'var(--red)'}"><b>${delta>=0?'+':''}${fmt(delta)} mbr (${pct>=0?'+':''}${pct}%)</b> | ${delta>=0?'+':''}${ca-a.bpCA}k EUR</span></div>`;
-      }).join('')}
-
-      <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">SCENARIOS MATURITE</div>
-      <div class="metric-row" style="color:var(--red)"><span class="metric-label">Pessimiste (x0.65)</span><span class="metric-value">${fmt(scenarios.pessimistic.members)} mbr | ${scenarios.pessimistic.ca}k EUR/an</span></div>
-      <div class="metric-row" style="color:var(--yellow)"><span class="metric-label"><b>Realiste</b></span><span class="metric-value" style="font-weight:800">${fmt(scenarios.realistic.members)} mbr | ${scenarios.realistic.ca}k EUR/an</span></div>
-      <div class="metric-row" style="color:var(--green)"><span class="metric-label">Optimiste (x1.4)</span><span class="metric-value">${fmt(scenarios.optimistic.members)} mbr | ${scenarios.optimistic.ca}k EUR/an</span></div>
-
-      <div style="margin:8px 0 4px;font-size:9px;font-weight:700;color:var(--gray)">SENSITIVITY — Si taux de capture varie</div>
-      ${[-10,-5,0,5,10].map(delta=>{
-        // Re-run captage with modified rates
-        const factor = 1 + delta/100;
-        const adjMembers = Math.round(scenarios.realistic.members * factor);
-        const adjCA = Math.round(adjMembers*23.14*12/1000);
-        const color = delta===0?'var(--white)':delta>0?'var(--green)':'var(--red)';
-        return `<div class="metric-row"><span class="metric-label" style="color:${color}">${delta>=0?'+':''}${delta}% taux capture</span><span class="metric-value" style="color:${color}">${fmt(adjMembers)} mbr | ${adjCA}k EUR ${adjMembers>=4000?'&#9989;':adjMembers>=2800?'&#9888;':'&#10060;'}</span></div>`;
-      }).join('')}
-    </div>
   `;
 
   // Trigger captage analysis
