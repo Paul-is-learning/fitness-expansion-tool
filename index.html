@@ -1484,7 +1484,7 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   // REVISED penetration model — FP is a NEW premium low-cost concept in Romania
   // FP advantage: international franchise, best price/quality ratio, brand new equipment
   // Romania fitness penetration: 5% national → 10-15% urban Bucharest potential
-  // FP at 22-28 EUR/month = BELOW all mid-range competitors = massive market creation
+  // FP at 28 EUR/month = BELOW all mid-range competitors = massive market creation
 
   // Base penetration by income zone (price proxy)
   let basePenetration;
@@ -2513,9 +2513,9 @@ function initCharts() {
   priceChart=new Chart(el('pricingChart'),{
     type:'bar',
     data:{
-      labels:['Fitness Park\n(cible)','BeFIT','Stay Fit','18GYM','Downtown\nFitness','World Class\n(Bronze)','World Class\n(Gold)'],
+      labels:['Fitness Park','BeFIT','Stay Fit','18GYM','Downtown\nFitness','World Class\n(Bronze)','World Class\n(Gold)'],
       datasets:[{
-        data:[22,28,30,36,42,46,145],
+        data:[28,30,32,36,42,46,145],
         backgroundColor:['rgba(212,160,23,.7)','#f97316','#f97316','#f97316','#f97316','#ef4444','#ef4444'],
         borderRadius:4,borderWidth:0
       }]
