@@ -1746,9 +1746,7 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   const optimistic = Math.round(realistic * 1.4);
 
   const capMembers = n => Math.min(n, 6000);
-  const FP_PRICE_TTC = 28; // EUR TTC/month — prix affiche client
-  const FP_PRICE_HT = 23.14; // EUR HT/month (28 / 1.21 TVA Romania)
-  const monthlyARPU = FP_PRICE_HT; // CA calculations use HT
+  const monthlyARPU = toHT(USER_PARAMS.priceBaseTTC);
 
   return {
     pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
@@ -3523,11 +3521,61 @@ function showOverlapAnalysis() {
 }
 
 // ================================================================
+// USER-EDITABLE PARAMS — persisted in localStorage, impact BP en direct
+// 3 subscription tiers + loyer — calibre BP V17 (MF FP - BP RO)
+// ================================================================
+const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400 };
+const TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46)
+const TVA_RO = 0.21;   // TVA Roumanie (BP V17 C24)
+
+function loadUserParams() {
+  try { const s = localStorage.getItem('fp_user_params'); return s ? {...FP_DEFAULTS, ...JSON.parse(s)} : {...FP_DEFAULTS}; }
+  catch(e) { return {...FP_DEFAULTS}; }
+}
+function saveUserParams(p) { try { localStorage.setItem('fp_user_params', JSON.stringify(p)); } catch(e){} }
+let USER_PARAMS = loadUserParams();
+
+// Live update: change a param, save, and re-render captage analysis
+function updateUserParam(key, value) {
+  const v = parseFloat(value);
+  if(isNaN(v) || v <= 0) return;
+  USER_PARAMS[key] = v;
+  saveUserParams(USER_PARAMS);
+  if(window._lastCaptageLocation) {
+    const {lat, lng, radius, containerId} = window._lastCaptageLocation;
+    renderCaptageAnalysis(containerId, lat, lng, radius);
+  }
+}
+function resetUserParams() {
+  USER_PARAMS = {...FP_DEFAULTS};
+  saveUserParams(USER_PARAMS);
+  if(window._lastCaptageLocation) {
+    const {lat, lng, radius, containerId} = window._lastCaptageLocation;
+    renderCaptageAnalysis(containerId, lat, lng, radius);
+  }
+}
+window._lastCaptageLocation = null;
+
+// BP V17 convention: HT = TTC × (1 - TVA) [not TTC/(1+TVA)]
+function toHT(ttc) { return ttc * (1 - TVA_RO); }
+function getPanierMoyenHT() {
+  const baseHT = toHT(USER_PARAMS.priceBaseTTC);
+  const premHT = toHT(USER_PARAMS.pricePremiumTTC);
+  const ultiHT = toHT(USER_PARAMS.priceUltimateTTC);
+  const avgVAD = (premHT + ultiHT) / 2;
+  return (1 - TAUX_VAD) * baseHT + TAUX_VAD * avgVAD;
+}
+function getEffectiveRentAnnual() {
+  return USER_PARAMS.loyerAnnuel || FP_DEFAULTS.loyerAnnuel;
+}
+
+// ================================================================
 // CAPTAGE ENGINE v2 — 3 sources: Captifs + Natifs + Walk-in
 // ================================================================
-// FP positioning: 28 EUR TTC/month, premium low-cost international franchise
-const FP_MONTHLY_TTC = 28;
-const FP_MONTHLY_HT = 23.14;
+// FP positioning: prix TTC/month dynamique, premium low-cost international franchise
+const FP_MONTHLY_TTC = USER_PARAMS.priceBaseTTC;
+function getFP_MONTHLY_HT() { return getPanierMoyenHT(); }
+const FP_MONTHLY_HT = getPanierMoyenHT();
 
 // Competitor average prices TTC — VERIFIED March 2026
 // Sources: worldclass.ro, stayfit.ro, downtownfitness.ro, 18gym.ro, nr1fitness
@@ -3668,11 +3716,12 @@ function getPersonaMix(cartiereList) {
   return mix;
 }
 
-// Blended ARPU based on persona mix
+// Blended ARPU based on persona mix — uses dynamic panier moyen from user params
 function blendedARPU(personaMix) {
+  const basePanier = getPanierMoyenHT();
   let arpu = 0;
   for(const [key, pct] of Object.entries(personaMix)) {
-    arpu += pct * PERSONAS[key].arpuMult * FP_MONTHLY_HT;
+    arpu += pct * PERSONAS[key].arpuMult * basePanier;
   }
   return Math.round(arpu * 100) / 100;
 }
@@ -3795,7 +3844,7 @@ function scenarioRampUp(totalTheorique, months, scenarioKey) {
       month: m,
       pct: effectiveM > 0 ? Math.round(members / effectiveM * 100) : 0,
       members,
-      ca: Math.round(members * FP_MONTHLY_HT / 1000)
+      ca: Math.round(members * getPanierMoyenHT() / 1000)
     });
   }
   return result;
@@ -3806,48 +3855,198 @@ function monthlyRampUp(totalTheorique) {
   return scenarioRampUp(totalTheorique, 12, 'base');
 }
 
+// --- SEASONALITY MODEL ---
+// Fitness has strong seasonal patterns (source: IHRSA, Deloitte fitness industry reports)
+// Index: 1.0 = average month. >1 = above average acquisition, <1 = below average
+const SEASONALITY = [
+  1.35, // Jan — New Year resolutions, peak inscriptions
+  1.20, // Feb — Momentum from Jan, still strong
+  1.10, // Mar — Spring motivation
+  0.95, // Apr — Declining, Easter holidays
+  0.85, // May — Pre-summer drop
+  0.75, // Jun — Summer starts, vacations begin
+  0.70, // Jul — Peak vacation, lowest
+  0.72, // Aug — Still vacation, slight uptick end of month
+  1.15, // Sep — Rentrée, strong comeback
+  1.05, // Oct — Stable
+  0.95, // Nov — Pre-holiday slowdown
+  1.03  // Dec — Slight bump (gift subscriptions, pre-Jan)
+];
+// Normalized so annual average = 1.0 (sum = 11.80, avg = 0.983 → close enough)
+
 // --- COHORT MODEL ---
 // Spain data = NET members (real observed, already reflects churn implicitly)
-// We use the Spain curves directly as net member trajectories
-// Churn rate is computed for LTV/CAC metrics but NOT applied on top (would double-count)
+// We apply seasonality modulation on top for monthly CA variation
 function cohortModel(totalTheorique, months, personaMix, scenarioKey) {
   months = months || 60;
   scenarioKey = scenarioKey || 'base';
   const arpu = blendedARPU(personaMix);
   const baseChurn = blendedChurn(personaMix);
   const sc = SCENARIOS[scenarioKey];
-  const churnRate = baseChurn * sc.churnAdj; // For metrics display only
+  const churnRate = baseChurn * sc.churnAdj;
 
   const data = [];
   let cumulCA = 0;
   let prevMembers = 0;
 
   for(let m = 1; m <= months; m++) {
-    // Net members = scaled Spain curve (already includes churn implicitly)
     const netMembers = scenarioMembers(m, totalTheorique, scenarioKey);
     const newMembers = Math.max(0, netMembers - prevMembers);
-    // Implied churn = gross new - net growth (for display purposes)
     const impliedChurned = prevMembers > 0 ? Math.max(0, Math.round(prevMembers * churnRate)) : 0;
     prevMembers = netMembers;
 
-    const monthCA = netMembers * arpu;
+    // Apply seasonality: affects ARPU (attendance-linked revenue) and acquisition
+    const monthIdx = (m - 1) % 12; // 0=Jan, 11=Dec
+    const seasonFactor = SEASONALITY[monthIdx];
+    const seasonalARPU = arpu * (0.85 + 0.15 * seasonFactor); // 85% base + 15% seasonal
+    // Seasonality also modulates effective members (some pause in summer)
+    const effectiveMembers = Math.round(netMembers * (0.90 + 0.10 * seasonFactor));
+
+    const monthCA = effectiveMembers * seasonalARPU;
     cumulCA += monthCA;
 
     data.push({
       month: m,
       year: Math.ceil(m / 12),
-      grossMembers: netMembers, // Spain curve IS the net trajectory
+      grossMembers: netMembers,
       newMembers,
       churned: impliedChurned,
-      netMembers,
+      netMembers: effectiveMembers,
       churnRate,
+      seasonFactor,
       monthlyCA: Math.round(monthCA),
       cumulCA: Math.round(cumulCA),
-      arpu
+      arpu: Math.round(seasonalARPU * 100) / 100
     });
   }
 
   return data;
+}
+
+// --- SENSITIVITY / TORNADO ANALYSIS ---
+// Varies each key parameter ±20% while holding others at base, measures IRR impact
+const SENSITIVITY_PARAMS = [
+  { key:'churn',    label:'Churn mensuel',    baseField:'churnRate', unit:'%',   pctRange:0.30 },
+  { key:'capex',    label:'CAPEX ouverture',  baseField:'capex',     unit:'EUR', pctRange:0.25 },
+  { key:'arpu',     label:'ARPU mensuel',     baseField:'arpu',      unit:'EUR', pctRange:0.20 },
+  { key:'rent',     label:'Loyer mensuel',    baseField:'rent',      unit:'EUR', pctRange:0.30 },
+  { key:'rampSpeed',label:'Vitesse ramp-up',  baseField:'rampSpeed', unit:'x',   pctRange:0.25 },
+  { key:'opex',     label:'OPEX fixe',        baseField:'fixedOpex', unit:'EUR', pctRange:0.20 }
+];
+
+function runSensitivity(totalTheorique, personaMix, avgQuartierPrice) {
+  // Base case IRR (using 'base' scenario)
+  const baseCohort = cohortModel(totalTheorique, 60, personaMix, 'base');
+  const basePnl = buildPnL(baseCohort, avgQuartierPrice);
+  const baseIRR = basePnl.irr;
+  const baseNPV = basePnl.npv;
+
+  const results = [];
+
+  for(const param of SENSITIVITY_PARAMS) {
+    const lowMult = 1 - param.pctRange;
+    const highMult = 1 + param.pctRange;
+
+    // Run low scenario
+    const irrLow = runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, param.key, lowMult);
+    // Run high scenario
+    const irrHigh = runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, param.key, highMult);
+
+    // For churn/capex/rent/opex: low value = better IRR (inverse relationship)
+    // For arpu/rampSpeed: low value = worse IRR (direct relationship)
+    const isInverse = ['churn','capex','rent','opex'].includes(param.key);
+
+    results.push({
+      key: param.key,
+      label: param.label,
+      pctRange: param.pctRange,
+      irrLow: irrLow,   // IRR when parameter is at -pctRange%
+      irrHigh: irrHigh,  // IRR when parameter is at +pctRange%
+      irrSpread: Math.abs(irrHigh - irrLow), // Total IRR swing
+      isInverse
+    });
+  }
+
+  // Sort by spread (most impactful first)
+  results.sort((a, b) => b.irrSpread - a.irrSpread);
+
+  return { baseIRR, baseNPV, params: results };
+}
+
+function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramKey, multiplier) {
+  let adjCapex = PNL_DEFAULTS.capex;
+  let adjArpuMult = 1.0;
+  let adjChurnMult = 1.0;
+  let adjRampMult = 1.0;
+  let adjRentMult = 1.0;
+  let adjOpexMult = 1.0; // applies to staff + FP Cloud
+
+  switch(paramKey) {
+    case 'churn': adjChurnMult = multiplier; break;
+    case 'capex': adjCapex = Math.round(PNL_DEFAULTS.capex * multiplier); break;
+    case 'arpu': adjArpuMult = multiplier; break;
+    case 'rent': adjRentMult = multiplier; break;
+    case 'rampSpeed': adjRampMult = multiplier; break;
+    case 'opex': adjOpexMult = multiplier; break;
+  }
+
+  // Build adjusted cohort
+  const arpu = blendedARPU(personaMix) * adjArpuMult;
+  const baseChurnRate = blendedChurn(personaMix) * SCENARIOS.base.churnAdj;
+  const adjChurnRate = baseChurnRate * adjChurnMult;
+  const extraChurnDelta = adjChurnRate - baseChurnRate;
+  const data = [];
+  let cumulCA = 0;
+
+  for(let m = 1; m <= 60; m++) {
+    const adjMonth = Math.round(m * (adjRampMult > 0 ? adjRampMult : 1));
+    let netMembers = scenarioMembers(Math.min(adjMonth, 60), totalTheorique, 'base');
+    if(extraChurnDelta !== 0) {
+      netMembers = Math.round(netMembers * Math.pow(1 - extraChurnDelta, m));
+    }
+    const monthIdx = (m - 1) % 12;
+    const seasonFactor = SEASONALITY[monthIdx];
+    const seasonalARPU = arpu * (0.85 + 0.15 * seasonFactor);
+    const effectiveMembers = Math.round(netMembers * (0.90 + 0.10 * seasonFactor));
+    const monthCA = effectiveMembers * seasonalARPU;
+    cumulCA += monthCA;
+
+    data.push({
+      month: m, year: Math.ceil(m/12), netMembers: effectiveMembers,
+      monthlyCA: Math.round(monthCA), cumulCA: Math.round(cumulCA), arpu: seasonalARPU
+    });
+  }
+
+  // Build adjusted P&L (mirrors buildPnL structure from BP V17)
+  const baseRentMonthly = getEffectiveRentAnnual() / 12;
+  const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
+  const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
+  let cumulCashFlow = -adjCapex;
+  const cashflows = [-adjCapex];
+
+  for(let i = 0; i < data.length; i++) {
+    const yearIdx = Math.floor(i / 12);
+    const yearNum = yearIdx + 1;
+    const caAdherents = data[i].monthlyCA;
+    const ptRevenue = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yearIdx));
+    const totalCA = caAdherents + ptRevenue;
+    const costOfSales = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
+    const margeBrute = totalCA - costOfSales;
+    const staffM = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx) * adjOpexMult);
+    const rentM = Math.round(baseRentMonthly * Math.pow(1 + PNL_DEFAULTS.rentGrowth, yearIdx) * adjRentMult);
+    const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx) * adjOpexMult);
+    const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+    const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
+    const fondsPub = Math.round(caAdherents * PNL_DEFAULTS.fondsPubRate);
+    const leasing = yearNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
+    const totalOpex = staffM + rentM + fpCloud + opexOps + redevance + fondsPub;
+    const ebitda = margeBrute - totalOpex;
+    const cashFlow = ebitda - leasing;
+    cumulCashFlow += cashFlow;
+    cashflows.push(cashFlow);
+  }
+
+  return calcIRR(cashflows);
 }
 
 // --- LTV / CAC ---
@@ -3858,58 +4057,85 @@ function calcLTV(arpu, churnRate) {
 
 const DEFAULT_CAC = 50; // EUR — marketing local estimation
 
-// --- P&L / IRR / FINANCIAL MODEL ---
+// --- P&L / IRR / FINANCIAL MODEL --- Calibre sur BP V17 (MF FP - BP RO)
 const PNL_DEFAULTS = {
-  capex: 1000000,        // EUR — CAPEX ouverture (800k-1.2M, median 1M)
-  staffMonthly: 15000,   // 10 employes × 1.5k avg
-  energyMonthly: 5000,   // Energie + maintenance
-  marketingMonthly: 3000,// Marketing local
-  franchiseFee: 0.05,    // 5% du CA
-  rentPerSqm: 10,        // EUR/m2/month baseline (adjusted by quartier)
-  clubSurface: 1400,     // m2 standard FP
-  discountRate: 0.10     // 10% for NPV
+  capex: 1176000,            // EUR — Travaux 840k + Equip CAPEX 40%=336k (BP V17 C79)
+  leasingAnnual: 100800,     // EUR/an — 504k equip leasing 60% / 5 ans (BP V17 C86)
+  leasingYears: 5,           // Duree leasing
+  staffAnnualA1: 85890,      // EUR/an — 4 ETP + charges 2.25% (BP V17 C60)
+  staffGrowth: 0.06,         // +6%/an (BP V17 C61)
+  rentAnnualBase: 236400,    // EUR/an — loyer+charges base (BP V17 C53) — overridden by user input
+  rentGrowth: 0.02,          // +2%/an (BP V17 C54)
+  fpCloudMonthly: 600,       // EUR/mois (BP V17 C64)
+  fpCloudGrowth: 0.01,       // ~1%/an
+  opexOpsRate: 0.26,         // % du CA Total — maint/secu/menage/energie (BP V17 C65)
+  costOfSalesRate: 0.05,     // % du CA Total — accessoires VAD (BP V17 C63)
+  redevanceRate: 0.06,       // % du CA Adherents — marque → FP France (BP V17 C21)
+  fondsPubRate: 0.02,        // % du CA Adherents — fonds publicitaire (BP V17 C17)
+  ptMonthlyRevenue: 2000,    // EUR/mois — 4 PT × 500€ (BP V17 C48)
+  ptGrowth: 0.05,            // +5%/an
+  clubSurface: 1400,         // m2 (BP V17 C50)
+  dapAnnual: 117600,         // EUR/an — CAPEX / 10 ans (BP V17 C80)
+  citRate: 0.16,             // CIT Roumanie 16% (BP V17 C23)
+  discountRate: 0.12,        // WACC 12% (BP V17 C112)
+  caGrowthA4A6: 0.05,        // +5%/an post-maturite A4-A6 (BP V17 C38)
+  caGrowthA7Plus: 0.02,      // +2%/an long terme A7+ (BP V17 C39)
+  targetMembers: 4000        // Cible maturite A3 (BP V17 C34)
 };
 
-function estimateRent(avgPrice) {
-  // Rent proxy: quartier price → monthly rent/m2
-  // High price area = expensive rent
-  if(!avgPrice) return PNL_DEFAULTS.rentPerSqm * PNL_DEFAULTS.clubSurface;
-  let rentSqm;
-  if(avgPrice < 1000) rentSqm = 6;
-  else if(avgPrice < 1500) rentSqm = 8;
-  else if(avgPrice < 2000) rentSqm = 10;
-  else if(avgPrice < 2500) rentSqm = 13;
-  else rentSqm = 16;
-  return rentSqm * PNL_DEFAULTS.clubSurface;
-}
-
 function buildPnL(cohortData, avgQuartierPrice) {
-  const rent = estimateRent(avgQuartierPrice);
   const capex = PNL_DEFAULTS.capex;
-  const fixedOpex = PNL_DEFAULTS.staffMonthly + PNL_DEFAULTS.energyMonthly + PNL_DEFAULTS.marketingMonthly;
+  const baseRentAnnual = getEffectiveRentAnnual();
+  const baseRentMonthly = baseRentAnnual / 12;
+  const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
+  const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
+  const arpu = getFP_MONTHLY_HT();
 
-  let cumulCashFlow = -capex; // Initial investment
+  let cumulCashFlow = -capex;
   const monthly = [];
   const annualCA = [0,0,0,0,0];
   const annualEBITDA = [0,0,0,0,0];
   let breakevenMonth = null;
   let paybackMonth = null;
-
-  // Monthly cashflows for IRR (starts with -CAPEX)
   const cashflows = [-capex];
 
   for(let i = 0; i < cohortData.length && i < 60; i++) {
     const d = cohortData[i];
-    const ca = d.monthlyCA;
-    const franchiseFee = Math.round(ca * PNL_DEFAULTS.franchiseFee);
-    const margeBrute = ca - franchiseFee;
-    const ebitda = margeBrute - fixedOpex;
-    const cashFlow = ebitda - rent;
+    const yearIdx = Math.floor(i / 12);
+    const yearNum = yearIdx + 1; // A1, A2, ...
+
+    // --- REVENUE ---
+    const caAdherents = d.monthlyCA;
+    const ptRevenue = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yearIdx));
+    const totalCA = caAdherents + ptRevenue;
+
+    // --- COST OF SALES ---
+    const costOfSales = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
+    const margeBrute = totalCA - costOfSales;
+
+    // --- OPEX ---
+    // Staff (grows 6%/yr)
+    const staffMonthly = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx));
+    // Rent (grows 2%/yr) — uses user-defined base
+    const rentMonthly = Math.round(baseRentMonthly * Math.pow(1 + PNL_DEFAULTS.rentGrowth, yearIdx));
+    // FP Cloud
+    const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx));
+    // OPEX Ops (26% of Total CA)
+    const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+    // Redevance marque (6% of CA Adherents)
+    const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
+    // Fonds publicitaire (2% of CA Adherents)
+    const fondsPub = Math.round(caAdherents * PNL_DEFAULTS.fondsPubRate);
+    // Leasing (Y1-Y5 only)
+    const leasing = yearNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
+
+    const totalOpex = staffMonthly + rentMonthly + fpCloud + opexOps + redevance + fondsPub;
+    const ebitda = margeBrute - totalOpex;
+    const cashFlow = ebitda - leasing; // Operating CF after leasing
     cumulCashFlow += cashFlow;
 
-    const yearIdx = Math.floor(i / 12);
     if(yearIdx < 5) {
-      annualCA[yearIdx] += ca;
+      annualCA[yearIdx] += totalCA;
       annualEBITDA[yearIdx] += ebitda;
     }
 
@@ -3919,21 +4145,28 @@ function buildPnL(cohortData, avgQuartierPrice) {
     cashflows.push(cashFlow);
 
     monthly.push({
-      month: i + 1, year: yearIdx + 1,
-      ca, franchiseFee, fixedOpex, rent, margeBrute, ebitda, cashFlow, cumulCashFlow
+      month: i + 1, year: yearNum,
+      ca: totalCA, caAdherents, ptRevenue, costOfSales, margeBrute,
+      staffMonthly, rentMonthly, fpCloud, opexOps, redevance, fondsPub, leasing,
+      totalOpex, ebitda, cashFlow, cumulCashFlow,
+      fixedOpex: staffMonthly + fpCloud, // for display compat
+      rent: rentMonthly, franchiseFee: redevance + fondsPub
     });
   }
 
   const irr = calcIRR(cashflows);
   const npv = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
+  const rentDisplay = Math.round(baseRentMonthly);
+  const fixedOpexDisplay = Math.round(staffMonthlyA1 + PNL_DEFAULTS.fpCloudMonthly);
 
   return {
     monthly, annualCA: annualCA.map(Math.round), annualEBITDA: annualEBITDA.map(Math.round),
-    capex, rent, fixedOpex,
+    capex, rent: rentDisplay, fixedOpex: fixedOpexDisplay,
     breakevenMonth, paybackMonth,
     irr, npv,
     totalCA5y: Math.round(annualCA.reduce((a,b)=>a+b,0)),
-    avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0
+    avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0,
+    rentAnnual: baseRentAnnual, leasingMonthly
   };
 }
 
@@ -4137,6 +4370,9 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   const ltv = calcLTV(arpu, churnRate);
   const ltvCacRatio = Math.round(ltv / DEFAULT_CAC * 10) / 10;
 
+  // Sensitivity / Tornado analysis
+  const sensitivity = runSensitivity(totalTheorique, personaMix, avgPrice);
+
   return {
     captageRadius, comps: captageDetails,
     totalCaptifs, totalMembersZone,
@@ -4150,7 +4386,7 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
     breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
     // Bain-level data
     personaMix, arpu, churnRate,
-    scenarios, pnl,
+    scenarios, pnl, sensitivity,
     ltv, ltvCacRatio, cac: DEFAULT_CAC,
     avgQuartierPrice: Math.round(avgPrice),
     nearbyCARTIERE
@@ -4159,6 +4395,7 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
 
 // Render captage analysis in a container
 function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
+  window._lastCaptageLocation = {lat, lng, radius: captageRadius, containerId};
   const r = runCaptageAnalysis(lat, lng, captageRadius);
   const c = el(containerId);
   if(!c) return;
@@ -4245,8 +4482,35 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       </div>
     </div>
 
+    <div style="background:linear-gradient(135deg,rgba(212,160,23,.08),rgba(212,160,23,.02));border:1px solid rgba(212,160,23,.25);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#d4a017;margin-bottom:8px">⚙ HYPOTHESES MODIFIABLES — Impact BP en direct</div>
+      <div style="font-size:7px;color:var(--gray2);margin-bottom:8px">Modifiez les valeurs ci-dessous pour recalculer le Business Plan en temps reel. Sauvegarde automatique.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <div>
+          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Prix Standard TTC (EUR)</label>
+          <input id="inputPriceBase" type="number" step="0.5" min="15" max="60" value="${USER_PARAMS.priceBaseTTC}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:13px;font-weight:700;font-family:var(--font)" onchange="updateUserParam('priceBaseTTC',this.value)">
+        </div>
+        <div>
+          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Loyer annuel (EUR)</label>
+          <input id="inputLoyer" type="number" step="1000" min="50000" max="600000" value="${USER_PARAMS.loyerAnnuel}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:13px;font-weight:700;font-family:var(--font)" onchange="updateUserParam('loyerAnnuel',this.value)">
+        </div>
+        <div>
+          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Prix Premium TTC (EUR)</label>
+          <input id="inputPricePremium" type="number" step="0.5" min="20" max="80" value="${USER_PARAMS.pricePremiumTTC}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:12px;font-family:var(--font)" onchange="updateUserParam('pricePremiumTTC',this.value)">
+        </div>
+        <div>
+          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Prix Ultimate TTC (EUR)</label>
+          <input id="inputPriceUltimate" type="number" step="0.5" min="25" max="100" value="${USER_PARAMS.priceUltimateTTC}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:12px;font-family:var(--font)" onchange="updateUserParam('priceUltimateTTC',this.value)">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid rgba(212,160,23,.15)">
+        <div style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b></div>
+        <button onclick="resetUserParams()" style="font-size:8px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--gray2);cursor:pointer;font-family:var(--font)">Reset</button>
+      </div>
+    </div>
+
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">P&L / MODELE FINANCIER 5 ANS</div>
+      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">P&L / MODELE FINANCIER 5 ANS — Calibre BP V17</div>
       <div style="position:relative;height:160px;width:100%;margin-bottom:8px"><canvas id="pnlChart"></canvas></div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         ${Object.entries(SCENARIOS).map(([k,sc]) => `<div style="font-size:8px;color:${sc.color}">● ${sc.label}</div>`).join('')}
@@ -4282,7 +4546,54 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
-        CAPEX 1M EUR | OPEX fixe ${fmt(r.pnl.base.fixedOpex)} EUR/mois (staff+energie+mktg) | Fee 5% CA | Loyer estime ${fmt(r.pnl.base.rent)} EUR/mois (zone ${r.avgQuartierPrice} EUR/m2)
+        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${fmt(r.pnl.base.fixedOpex)}/mois | OPEX Ops 26% CA | Redev 6%+2% | Loyer ${fmt(r.pnl.base.rent)}/mois | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:8px">SENSIBILITE — Tornado Chart (scenario Base)</div>
+      <div style="font-size:8px;color:var(--gray2);margin-bottom:8px">Impact sur l'IRR (${r.sensitivity.baseIRR}% base) quand chaque variable est modifiee ±</div>
+      ${r.sensitivity.params.map(p => {
+        const maxSpread = Math.max(...r.sensitivity.params.map(x=>x.irrSpread));
+        const barScale = maxSpread > 0 ? 100 / maxSpread : 1;
+        // For inverse params: low value = high IRR (green on left), high value = low IRR (red on right)
+        // For direct params: low value = low IRR (red on left), high value = high IRR (green on right)
+        const leftIRR = p.isInverse ? p.irrHigh : p.irrLow;
+        const rightIRR = p.isInverse ? p.irrLow : p.irrHigh;
+        const leftLabel = p.isInverse ? '+'+Math.round(p.pctRange*100)+'%' : '-'+Math.round(p.pctRange*100)+'%';
+        const rightLabel = p.isInverse ? '-'+Math.round(p.pctRange*100)+'%' : '+'+Math.round(p.pctRange*100)+'%';
+        const leftDelta = leftIRR - r.sensitivity.baseIRR;
+        const rightDelta = rightIRR - r.sensitivity.baseIRR;
+        const leftW = Math.abs(leftDelta) * barScale;
+        const rightW = Math.abs(rightDelta) * barScale;
+        const leftColor = leftDelta < 0 ? '#ef4444' : '#34d399';
+        const rightColor = rightDelta < 0 ? '#ef4444' : '#34d399';
+        return `<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:9px">
+          <div style="width:80px;text-align:right;color:var(--gray2);flex-shrink:0;font-size:8px">${p.label}</div>
+          <div style="flex:1;display:flex;align-items:center;height:18px;position:relative">
+            <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--gray2)40"></div>
+            <div style="width:50%;display:flex;justify-content:flex-end;padding-right:2px">
+              <div style="height:14px;width:${Math.min(leftW,48)}%;background:${leftColor};border-radius:2px 0 0 2px;display:flex;align-items:center;justify-content:flex-start;padding-left:3px">
+                <span style="font-size:7px;color:white;white-space:nowrap">${leftDelta>0?'+':''}${leftDelta.toFixed(1)}%</span>
+              </div>
+            </div>
+            <div style="width:50%;display:flex;justify-content:flex-start;padding-left:2px">
+              <div style="height:14px;width:${Math.min(rightW,48)}%;background:${rightColor};border-radius:0 2px 2px 0;display:flex;align-items:center;justify-content:flex-end;padding-right:3px">
+                <span style="font-size:7px;color:white;white-space:nowrap">${rightDelta>0?'+':''}${rightDelta.toFixed(1)}%</span>
+              </div>
+            </div>
+          </div>
+          <div style="width:25px;text-align:left;color:var(--gray2);font-size:7px;flex-shrink:0">±${Math.round(p.pctRange*100)}%</div>
+        </div>`;
+      }).join('')}
+      <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--gray2);margin-top:6px;padding:0 84px 0 84px">
+        <span style="color:#ef4444">← Defavorable</span>
+        <span>Base: ${r.sensitivity.baseIRR}%</span>
+        <span style="color:#34d399">Favorable →</span>
+      </div>
+      <div style="font-size:7px;color:var(--gray2);margin-top:6px;line-height:1.4">
+        Variable la plus impactante: <b style="color:var(--white)">${r.sensitivity.params[0]?.label}</b> (swing IRR: ${r.sensitivity.params[0]?.irrSpread.toFixed(1)}pp)
+        ${r.sensitivity.params[1] ? '| 2e: <b style="color:var(--white)">'+r.sensitivity.params[1].label+'</b> ('+r.sensitivity.params[1].irrSpread.toFixed(1)+'pp)' : ''}
       </div>
     </div>
 
@@ -4341,8 +4652,13 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         Calibre sur donnees reelles FP Espagne (2 clubs)<br><br>
         <b>Churn/LTV</b> : Modele cohortes mensuel. LTV = ARPU/churn. CAC ≈ 50 EUR<br>
         Membres_net(t) = Membres(t-1) + Nouveaux(t) - Churned(t)<br><br>
-        <b>P&L</b> : CAPEX 1M EUR | OPEX fixe ~23k/mois | Fee 5% CA | Loyer selon zone<br>
-        IRR = Newton-Raphson sur 60 cashflows mensuels | NPV @10%
+        <b>P&L</b> : Calibre BP V17 — CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an<br>
+        Staff ${fmt(Math.round(PNL_DEFAULTS.staffAnnualA1/1000))}k/an (+6%/an) | OPEX Ops 26% CA | Redev 6%+2% | CIT 16%<br>
+        IRR = bisection 60 mois | NPV @WACC ${PNL_DEFAULTS.discountRate*100}%<br><br>
+        <b>Saisonnalite</b> : Jan +35%, Fev +20%, Jun-Aout -25 a -30%, Sep +15% (IHRSA)<br>
+        Appliquee sur ARPU (15% saisonnier) + frequentation (10% saisonnier)<br><br>
+        <b>Sensibilite</b> : Tornado chart — 6 variables cles variees ±20-30%<br>
+        Churn, CAPEX, ARPU, Loyer, Vitesse ramp-up, OPEX fixe
       </div>
     </div>
   `;
