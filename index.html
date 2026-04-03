@@ -2925,9 +2925,22 @@ function toggleLayer(name) {
 }
 
 async function loadAllCompetitors() {
+  // Always start with VERIFIED_CLUBS (83 clubs, accurate data)
+  const verified = VERIFIED_CLUBS.map(c=>({...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
+
   let comps;
-  if(demo) comps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
-  else comps=await fetchAllBucharest();
+  if(demo) {
+    comps = verified;
+  } else {
+    // Fetch Overpass and merge: verified DB is the base, Overpass adds extras
+    const overpass = await fetchAllBucharest();
+    const merged = [...verified];
+    overpass.forEach(oc => {
+      const alreadyExists = merged.some(vc => haversine(vc.lat,vc.lng,oc.lat,oc.lng) < 150);
+      if(!alreadyExists) merged.push(oc);
+    });
+    comps = merged;
+  }
   allComps=comps;
   lastDisplayedComps=comps;
   showCompsOnMap(comps);
