@@ -2458,7 +2458,7 @@ function displayComps(comps,refLat,refLng) {
   `;
 
   showCompsOnMap(sorted);
-  buildBrandFilters(comps);
+  buildBrandFilters(allComps.length ? allComps : comps);
 }
 
 // ================================================================
