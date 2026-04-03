@@ -1955,7 +1955,12 @@ async function fetchAllBucharest() {
     return dd;
   } catch(e) {
     hideLoad();
-    return demo?DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'})):[];
+    setStatus('warn','Overpass indisponible — base verifiee (83 clubs)');
+    // Always fallback to verified DB, never return empty
+    const fallback = VERIFIED_CLUBS.map(c=>({...c,id:Math.random(),source:'verified',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
+    opCache[key]=fallback;
+    allComps=fallback;
+    return fallback;
   }
 }
 
