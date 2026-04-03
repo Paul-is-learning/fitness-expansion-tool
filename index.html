@@ -2513,7 +2513,7 @@ function initCharts() {
   priceChart=new Chart(el('pricingChart'),{
     type:'bar',
     data:{
-      labels:['Fitness Park','BeFIT','Stay Fit','18GYM','Downtown\nFitness','World Class\n(Bronze)','World Class\n(Gold)'],
+      labels:['Fitness Park\n28 EUR','Nr1 Fitness\n30 EUR','Stay Fit\n32 EUR','18GYM\n36 EUR','Downtown\n42 EUR','World Class\n(Bronze) 46 EUR','World Class\n(Gold+) 80-145 EUR'],
       datasets:[{
         data:[28,30,32,36,42,46,145],
         backgroundColor:['rgba(212,160,23,.7)','#f97316','#f97316','#f97316','#f97316','#ef4444','#ef4444'],
@@ -3103,8 +3103,17 @@ function showOverlapAnalysis() {
 const FP_MONTHLY_TTC = 28;
 const FP_MONTHLY_HT = 23.14;
 
-// Competitor average prices TTC (for price elasticity calculation)
-const COMP_PRICES = {premium:80, 'mid-premium':32, mid:32, lowcost:18, independent:20, crossfit:40, boutique:35};
+// Competitor average prices TTC — VERIFIED March 2026
+// Sources: worldclass.ro, stayfit.ro, downtownfitness.ro, 18gym.ro, nr1fitness
+const COMP_PRICES = {
+  premium:80,       // WC Silver/Gold avg (range 46-145 EUR)
+  'mid-premium':42, // Downtown Fitness = 42 EUR (source: Paul / terrain)
+  mid:32,           // Stay Fit = 32 EUR, 18GYM ~36 EUR (source: Paul / terrain)
+  lowcost:30,       // Nr1 Fitness ~30 EUR (149 RON)
+  independent:25,   // estimated
+  crossfit:50,      // premium niche
+  boutique:40       // estimated
+};
 
 // Capture rates RECALIBRATED — conservative & realistic
 // Reality check: annual churn in fitness = 25-30%. Not all churners switch to FP.
@@ -3112,8 +3121,8 @@ const COMP_PRICES = {premium:80, 'mid-premium':32, mid:32, lowcost:18, independe
 // FP captures a fraction. Net capture = churn × consideration × conversion.
 const CAPTURE_RATES = {
   premium: {rate:0.08, reason:'WC 46-145EUR → FP 28EUR. Fort ecart prix mais clientele attachee aux services premium (piscine, spa). Churn WC ~20%, dont ~40% considere alternatives = 8%'},
-  'mid-premium': {rate:0.12, reason:'Downtown ~35EUR → FP 28EUR. Positionnement proche, FP gagne sur marque. Churn ~25%, consideration ~50% = 12%'},
-  mid: {rate:0.15, reason:'Stay Fit/18GYM ~30-36EUR → FP 28EUR. Ecart prix modere, equipements neufs. Churn ~30%, consideration ~50% = 15%'},
+  'mid-premium': {rate:0.12, reason:'Downtown 42EUR → FP 28EUR = -14EUR/mois. Positionnement proche, FP gagne sur marque + prix. Churn ~25%, consideration ~50% = 12%'},
+  mid: {rate:0.15, reason:'Stay Fit 32EUR / 18GYM 36EUR → FP 28EUR = -4 a -8EUR/mois. Ecart modere mais equipements neufs + marque internationale. Churn ~30%, consideration ~50% = 15%'},
   lowcost: {rate:0.04, reason:'Deja moins cher que FP. Seuls les insatisfaits qualite migrent vers le haut'},
   independent: {rate:0.10, reason:'Equipement vieillissant mais clients fideles par habitude. Churn ~35%, consideration ~30% = 10%'},
   crossfit: {rate:0.03, reason:'Niche communautaire, quasi zero transferabilite'},
