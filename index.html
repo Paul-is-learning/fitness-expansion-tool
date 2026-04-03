@@ -2327,10 +2327,12 @@ function extractBrand(name) {
 }
 
 function buildBrandFilters(comps) {
+  // Always count from VERIFIED_CLUBS (83 clubs) for accurate brand totals
   const brands = {};
-  comps.forEach(c => {
+  VERIFIED_CLUBS.forEach(c => {
     const b = extractBrand(c.name);
-    if(!brands[b]) brands[b] = {count:0, color:c.color||'#22c55e'};
+    const col = segColor(c.segment);
+    if(!brands[b]) brands[b] = {count:0, color:col||'#22c55e'};
     brands[b].count++;
   });
   Object.keys(brands).forEach(b => { if(brandVisibility[b]===undefined) brandVisibility[b]=true; });
@@ -3936,8 +3938,25 @@ function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').
 function simpleHash(str){let h=0;for(let i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0}return Math.abs(h).toString(36)}
 
 // Users with passwords stored in localStorage
-let currentUser = JSON.parse(localStorage.getItem('fpCurrentUser')||'null');
+// Session uses sessionStorage (cleared on tab close) — user must log in each visit
+let currentUser = JSON.parse(sessionStorage.getItem('fpCurrentUser')||'null');
 let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
+
+// ── Inactivity timeout: auto-logout after 10 minutes ──
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+let _inactivityTimer = null;
+function resetInactivityTimer() {
+  if(_inactivityTimer) clearTimeout(_inactivityTimer);
+  _inactivityTimer = setTimeout(() => {
+    if(currentUser) {
+      alert('Session expirée — veuillez vous reconnecter');
+      doLogout();
+    }
+  }, SESSION_TIMEOUT_MS);
+}
+['click','mousemove','keydown','scroll','touchstart'].forEach(evt =>
+  document.addEventListener(evt, resetInactivityTimer, {passive:true})
+);
 
 // Seed default admin if no users exist
 if(userList.length === 0) {
@@ -3961,7 +3980,9 @@ function doLogin() {
 
   // Success
   currentUser = user;
-  localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+  sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+  localStorage.setItem('fpLastEmail', user.email);
+  resetInactivityTimer();
   document.getElementById('loginPage').style.display='none';
   document.getElementById('app').style.display='';
   if(document.getElementById('userAvatar')) document.getElementById('userAvatar').textContent = (user.name||user.email)[0].toUpperCase();
@@ -3969,25 +3990,29 @@ function doLogin() {
   applyRole();
 }
 
-// Check if already logged in
+// Check if already logged in (session-based — must re-login each visit)
 function checkAuth() {
   if(currentUser && userList.find(u=>u.email===currentUser.email)) {
     document.getElementById('loginPage').style.display='none';
     document.getElementById('app').style.display='';
     if(document.getElementById('userAvatar')) document.getElementById('userAvatar').textContent = (currentUser.name||currentUser.email)[0].toUpperCase();
+    resetInactivityTimer();
     init();
     applyRole();
   }
-  // Pre-fill email if returning user
-  if(currentUser?.email && document.getElementById('loginEmail')) {
-    document.getElementById('loginEmail').value = currentUser.email;
+  // Pre-fill email from localStorage for convenience (not session)
+  const lastEmail = localStorage.getItem('fpLastEmail');
+  if(lastEmail && document.getElementById('loginEmail')) {
+    document.getElementById('loginEmail').value = lastEmail;
   }
 }
 
 // Logout
 function doLogout() {
+  if(currentUser?.email) localStorage.setItem('fpLastEmail', currentUser.email);
   currentUser = null;
-  localStorage.removeItem('fpCurrentUser');
+  sessionStorage.removeItem('fpCurrentUser');
+  if(_inactivityTimer) clearTimeout(_inactivityTimer);
   window.location.reload();
 }
 
@@ -4000,7 +4025,7 @@ function doLogout() {
       const data = JSON.parse(atob(invite));
       if(data.email && data.role) {
         currentUser = {email:data.email, role:data.role, name:data.email.split('@')[0]};
-        localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+        sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
         // Add to list if not exists
         if(!userList.find(u=>u.email===data.email)) {
           userList.push(currentUser);
@@ -4111,7 +4136,7 @@ function switchUser() {
   const user = userList.find(u=>u.email===email);
   if(user) {
     currentUser = user;
-    localStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+    sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
     document.getElementById('userPanel').remove();
     applyRole();
     showUserPanel();
