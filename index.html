@@ -1491,6 +1491,39 @@ const METRO = [
 // Pop estimees = pop secteur repartie par densite relative des quartiers
 // Prix = EUR/m2 moyen 2025, proxy pouvoir d'achat
 // ================================================================
+
+// --- INS CENSUS 2021 — Population par tranche d'âge × secteur ---
+// Source: INSSE Recensământul 2021 (Table 1.03) + Populaţia după domiciliu 01.01.2022
+// Census resident pop per sector applied with domicile-based age proportions
+// https://www.recensamantromania.ro/rezultate-rpl-2021/
+const INS_SECTOR_AGE = {
+  1: { pop: 217367, age15_19: 8930, age20_24: 7934, age25_29: 10156, age30_34: 16960, age35_39: 19557, age40_44: 19918, pct1544: 0.384 },
+  2: { pop: 291557, age15_19: 11233, age20_24: 10593, age25_29: 13205, age30_34: 22255, age35_39: 25829, age40_44: 28649, pct1544: 0.383 },
+  3: { pop: 374737, age15_19: 14413, age20_24: 13987, age25_29: 18676, age30_34: 32127, age35_39: 35779, age40_44: 37169, pct1544: 0.406 },
+  4: { pop: 268018, age15_19: 9993, age20_24: 9560, age25_29: 13694, age30_34: 23924, age35_39: 25405, age40_44: 25825, pct1544: 0.404 },
+  5: { pop: 240288, age15_19: 10646, age20_24: 10440, age25_29: 12879, age30_34: 20792, age35_39: 21595, age40_44: 22266, pct1544: 0.411 },
+  6: { pop: 324994, age15_19: 12319, age20_24: 11274, age25_29: 16514, age30_34: 27547, age35_39: 30118, age40_44: 33122, pct1544: 0.403 }
+};
+
+// Compute real target population ratio for a given sector (INS-based)
+function getINSTargetRatio(sectorNum) {
+  const d = INS_SECTOR_AGE[sectorNum];
+  if(!d) return 0.40; // fallback
+  return d.pct1544;
+}
+
+// Compute real age sub-distribution within 15-44 for a sector (for persona mapping)
+function getINSAgeDistribution(sectorNum) {
+  const d = INS_SECTOR_AGE[sectorNum];
+  if(!d) return { young: 0.20, active: 0.33, mature: 0.47 }; // fallback
+  const total1544 = d.age15_19 + d.age20_24 + d.age25_29 + d.age30_34 + d.age35_39 + d.age40_44;
+  return {
+    young:  (d.age15_19 + d.age20_24) / total1544,        // 15-24 → Étudiants
+    active: (d.age25_29 + d.age30_34) / total1544,         // 25-34 → Jeunes Actifs
+    mature: (d.age35_39 + d.age40_44) / total1544           // 35-44 → Familles/CSP+
+  };
+}
+
 const CARTIERE = [
   // SECTOR 1 (pop 217,367)
   {name:'Dorobanti',lat:44.4530,lng:26.0900,sector:1,pop:18000,price:2800,young:.42,desc:'Quartier diplomatique premium'},
@@ -1685,15 +1718,17 @@ function estimatePopInRadiusGranular(lat,lng,r) {
   let totalPop=0,totalTarget=0,avgPrice=0,priceCount=0;
   CARTIERE.forEach(c=>{
     const d=haversine(lat,lng,c.lat,c.lng);
+    // Use real INS age ratio per sector instead of hardcoded c.young
+    const targetRatio = getINSTargetRatio(c.sector);
     if(d<=r) {
       totalPop+=c.pop;
-      totalTarget+=Math.round(c.pop*c.young);
+      totalTarget+=Math.round(c.pop*targetRatio);
       avgPrice+=c.price;priceCount++;
     } else if(d<=r*1.5) {
       // Partial overlap — weighted by distance
       const weight=Math.max(0,1-(d-r)/(r*0.5));
       totalPop+=Math.round(c.pop*weight);
-      totalTarget+=Math.round(c.pop*c.young*weight);
+      totalTarget+=Math.round(c.pop*targetRatio*weight);
       avgPrice+=c.price;priceCount++;
     }
   });
@@ -3710,34 +3745,60 @@ const PERSONAS = {
   cspPlus:     { label:'CSP+',           age:'25-45', pctBase:0.15, propension:0.14, arpuMult:1.30, churn:0.018, color:'#fbbf24' }
 };
 
-// Distribution shifts based on quartier price level (proxy socio-economic)
+// Distribution based on REAL INS age data per sector + price proxy for CSP+ split
 function getPersonaMix(cartiereList) {
   if(!cartiereList || cartiereList.length === 0) {
-    // Default mix
-    return { etudiants:0.25, jeunesActifs:0.35, familles:0.25, cspPlus:0.15 };
+    return { etudiants:0.20, jeunesActifs:0.33, familles:0.32, cspPlus:0.15 };
   }
-  // Weighted average price of nearby cartiere
+
+  // Weighted average of INS age distributions across nearby sectors
   const totalPop = cartiereList.reduce((a,c) => a + c.pop, 0);
+  let wYoung = 0, wActive = 0, wMature = 0;
+  const sectorPops = {};
+
+  cartiereList.forEach(c => {
+    const ageDist = getINSAgeDistribution(c.sector);
+    const w = c.pop / totalPop;
+    wYoung  += ageDist.young * w;   // 15-24
+    wActive += ageDist.active * w;  // 25-34
+    wMature += ageDist.mature * w;  // 35-44
+    sectorPops[c.sector] = (sectorPops[c.sector] || 0) + c.pop;
+  });
+
+  // Price proxy splits mature (35-44) into familles vs CSP+
   const avgPrice = totalPop > 0
     ? cartiereList.reduce((a,c) => a + c.price * c.pop, 0) / totalPop
     : 1500;
 
-  // Shift mix based on price level
-  // Low price (<1200): more students & families, fewer CSP+
-  // Mid price (1200-2000): balanced
-  // High price (>2000): more CSP+ & jeunes actifs, fewer students
-  let mix;
-  if(avgPrice < 1200) {
-    mix = { etudiants:0.35, jeunesActifs:0.30, familles:0.28, cspPlus:0.07 };
-  } else if(avgPrice < 1600) {
-    mix = { etudiants:0.28, jeunesActifs:0.34, familles:0.28, cspPlus:0.10 };
-  } else if(avgPrice < 2000) {
-    mix = { etudiants:0.22, jeunesActifs:0.36, familles:0.25, cspPlus:0.17 };
-  } else if(avgPrice < 2500) {
-    mix = { etudiants:0.15, jeunesActifs:0.35, familles:0.22, cspPlus:0.28 };
-  } else {
-    mix = { etudiants:0.10, jeunesActifs:0.30, familles:0.20, cspPlus:0.40 };
+  // CSP+ fraction of the mature band — higher in premium quartiers
+  let cspFraction;
+  if(avgPrice >= 2500)     cspFraction = 0.50; // Premium: half of 35-44 are CSP+
+  else if(avgPrice >= 2000) cspFraction = 0.35;
+  else if(avgPrice >= 1500) cspFraction = 0.20;
+  else if(avgPrice >= 1200) cspFraction = 0.12;
+  else                      cspFraction = 0.06; // Popular: very few CSP+
+
+  // Also extract some CSP+ from active band (25-34 high earners)
+  const cspFromActive = avgPrice >= 2000 ? 0.10 : avgPrice >= 1500 ? 0.05 : 0.02;
+
+  const mix = {
+    etudiants:   Math.round(wYoung * 100) / 100,
+    jeunesActifs: Math.round((wActive * (1 - cspFromActive)) * 100) / 100,
+    familles:    Math.round((wMature * (1 - cspFraction)) * 100) / 100,
+    cspPlus:     Math.round((wMature * cspFraction + wActive * cspFromActive) * 100) / 100
+  };
+
+  // Normalize to sum = 1.0
+  const sum = mix.etudiants + mix.jeunesActifs + mix.familles + mix.cspPlus;
+  if(sum > 0) {
+    mix.etudiants   = Math.round(mix.etudiants / sum * 100) / 100;
+    mix.jeunesActifs = Math.round(mix.jeunesActifs / sum * 100) / 100;
+    mix.familles    = Math.round(mix.familles / sum * 100) / 100;
+    mix.cspPlus     = Math.round(1 - mix.etudiants - mix.jeunesActifs - mix.familles, 2);
+    // Fix floating point
+    mix.cspPlus = Math.round(mix.cspPlus * 100) / 100;
   }
+
   return mix;
 }
 
@@ -4979,7 +5040,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div class="metric-row"><span class="metric-label">Churn blended</span><span class="metric-value">${(r.churnRate*100).toFixed(1)}%/mois (${Math.round((1-Math.pow(1-r.churnRate,12))*100)}%/an)</span></div>
       <div class="metric-row"><span class="metric-label">LTV</span><span class="metric-value" style="color:var(--green);font-weight:700">${fmt(r.ltv)} EUR</span></div>
       <div class="metric-row"><span class="metric-label">LTV/CAC ratio</span><span class="metric-value" style="color:${r.ltvCacRatio>=10?'var(--green)':r.ltvCacRatio>=5?'var(--yellow)':'var(--red)'};font-weight:700">${r.ltvCacRatio}x</span></div>
-      <div style="font-size:7px;color:var(--gray2);margin-top:4px">Prix moyen quartier: ${r.avgQuartierPrice} EUR/m2 | CAC estime: ${r.cac} EUR</div>
+      <div style="font-size:7px;color:var(--gray2);margin-top:4px">Source: INS Recensământ 2021 (pop. par âge × secteur) | Prix quartier: ${r.avgQuartierPrice} EUR/m2 | CAC: ${r.cac} EUR</div>
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
@@ -5237,7 +5298,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <b>Natifs</b> = Pop_cible × (Pen_WE − Pen_RO) × Part_FP — Modèle expansion marché low-cost (source: EuropeActive)<br>
         <b>Walk-in</b> = trafic_mall × 0.2%<br><br>
         <b>Personas</b> : Etudiants (ARPU×0.7, churn 3.5%), Jeunes Actifs (×1.0, 2.5%), Familles (×1.1, 2.0%), CSP+ (×1.3, 1.8%)<br>
-        Mix determine par prix moyen quartier (proxy socio-economique CARTIERE)<br><br>
+        Mix base sur donnees INS Recensement 2021 (pop. par tranche d'age × secteur) + prix quartier (proxy CSP+)<br><br>
         <b>Bass Diffusion</b> : F(t) = (1-e<sup>-(p+q)t</sup>) / (1+(q/p)e<sup>-(p+q)t</sup>)<br>
         Standard: p=0.02, q=0.35 (60-70% ouvertures) | Fort: p=0.05, q=0.42 (30-40%)<br>
         Calibre sur donnees reelles FP Espagne (2 clubs)<br><br>
