@@ -4239,6 +4239,265 @@ function calcNPV(cashflows, annualRate) {
   return Math.round(npv);
 }
 
+// --- EXECUTIVE SUMMARY / GO-NO-GO SCORING ---
+// Weighted scoring algorithm — 100 points, Bain-level decision framework
+function computeExecSummary(r) {
+  const scores = {};
+
+  // 1. MARKET SIZE (25 pts) — population cible + gap de pénétration
+  const popPts = Math.min(12, r.popTarget / 5000); // 60k = 12pts max
+  const gapPts = Math.min(8, r.native.penGap / 1.2); // 8.5pp gap = 8pts
+  const mixPts = Math.min(5, (r.personaMix.jeunesActifs + r.personaMix.cspPlus) * 10); // Profil attractif
+  scores.market = { score: Math.round((popPts + gapPts + mixPts) * 10) / 10, max: 25, label: 'Potentiel Marché',
+    details: `Pop. cible ${fmt(r.popTarget)} | Gap pénétration +${r.native.penGap}pp | Mix JA+CSP+ ${Math.round((r.personaMix.jeunesActifs+r.personaMix.cspPlus)*100)}%` };
+
+  // 2. FINANCIAL VIABILITY (25 pts) — IRR + payback + breakeven
+  const basePnl = r.pnl.base;
+  const irrPts = Math.min(10, Math.max(0, basePnl.irr / 3)); // 30%+ = 10pts
+  const paybackPts = basePnl.paybackMonth ? Math.min(8, Math.max(0, (48 - basePnl.paybackMonth) / 5)) : 0;
+  const bevenPts = basePnl.breakevenMonth ? Math.min(7, Math.max(0, (18 - basePnl.breakevenMonth) / 2)) : 0;
+  scores.financial = { score: Math.round((irrPts + paybackPts + bevenPts) * 10) / 10, max: 25, label: 'Viabilité Financière',
+    details: `IRR ${basePnl.irr}% | Payback M${basePnl.paybackMonth||'>60'} | Breakeven M${basePnl.breakevenMonth||'>60'}` };
+
+  // 3. COMPETITIVE LANDSCAPE (20 pts) — capture volume + faible saturation
+  const capturePts = Math.min(8, r.totalTheorique / 700); // 5600 = 8pts
+  const saturationPts = Math.min(7, r.comps.length <= 3 ? 7 : r.comps.length <= 6 ? 5 : r.comps.length <= 10 ? 3 : 1);
+  const ltvCacPts = Math.min(5, r.ltvCacRatio / 4); // 20x = 5pts
+  scores.competitive = { score: Math.round((capturePts + saturationPts + ltvCacPts) * 10) / 10, max: 20, label: 'Paysage Concurrentiel',
+    details: `${fmt(r.totalTheorique)} mbr théo | ${r.comps.length} concurrents | LTV/CAC ${r.ltvCacRatio}x` };
+
+  // 4. LOCATION QUALITY (15 pts) — SAZ + accessibility
+  const sazScore = r.saz ? Math.min(8, r.saz.total / 10) : 4;
+  const walkInPts = Math.min(4, r.walkIn.walkInMembers / 100); // 400 walk-in = 4pts
+  const accessPts = Math.min(3, r.native.captured > 1000 ? 3 : r.native.captured > 500 ? 2 : 1);
+  scores.location = { score: Math.round((sazScore + walkInPts + accessPts) * 10) / 10, max: 15, label: 'Qualité Emplacement',
+    details: `SAZ ${r.saz?.total||'?'}/100 | Walk-in ${fmt(r.walkIn.walkInMembers)} | Natifs ${fmt(r.native.captured)}` };
+
+  // 5. RISK PROFILE (15 pts) — sensitivity resilience + downside protection
+  const conservPnl = r.pnl.conservateur;
+  const downsidePts = conservPnl.irr > 0 ? Math.min(7, conservPnl.irr / 2) : 0; // Even conservative is profitable
+  const resilPts = Math.min(5, r.sensitivity.params.length > 0 ? Math.max(0, 5 - r.sensitivity.params[0].irrSpread / 3) : 2.5);
+  const diversPts = Math.min(3, (r.totalCaptifs > 0 ? 1 : 0) + (r.native.captured > 0 ? 1 : 0) + (r.walkIn.walkInMembers > 0 ? 1 : 0));
+  scores.risk = { score: Math.round((downsidePts + resilPts + diversPts) * 10) / 10, max: 15, label: 'Profil Risque',
+    details: `IRR conservateur ${conservPnl.irr}% | Swing max ${r.sensitivity.params[0]?.irrSpread.toFixed(1)||'?'}pp | ${diversPts}/3 sources` };
+
+  const total = Math.round(Object.values(scores).reduce((a, s) => a + s.score, 0) * 10) / 10;
+  let verdict, verdictColor, verdictDesc;
+  if (total >= 75) { verdict = 'GO'; verdictColor = '#10b981'; verdictDesc = 'Site recommandé — potentiel élevé, fondamentaux solides'; }
+  else if (total >= 60) { verdict = 'GO CONDITIONNEL'; verdictColor = '#fbbf24'; verdictDesc = 'Site viable sous conditions — négocier loyer, optimiser lancement'; }
+  else if (total >= 45) { verdict = 'WATCH'; verdictColor = '#f97316'; verdictDesc = 'Site à surveiller — potentiel insuffisant ou risques élevés'; }
+  else { verdict = 'NO-GO'; verdictColor = '#ef4444'; verdictDesc = 'Site non recommandé — risque trop élevé vs. rendement'; }
+
+  // Key risks & opportunities
+  const risks = [];
+  const opportunities = [];
+  if (basePnl.irr < 15) risks.push('IRR base < 15% — marge de sécurité faible');
+  if (r.comps.length > 8) risks.push(`Saturation concurrentielle (${r.comps.length} clubs dans ${r.captageRadius/1000}km)`);
+  if (conservPnl.irr <= 0) risks.push('Scénario conservateur déficitaire — risque de perte');
+  if (r.totalTheorique < 3000) risks.push(`Potentiel théorique < 3000 (${fmt(r.totalTheorique)}) — sous le seuil BP`);
+  if (r.sensitivity.params[0]?.irrSpread > 12) risks.push(`Haute sensibilité au ${r.sensitivity.params[0].label}`);
+
+  if (basePnl.irr > 25) opportunities.push(`IRR attractif (${basePnl.irr}%) — rendement bien au-dessus du WACC`);
+  if (r.ltvCacRatio > 15) opportunities.push(`LTV/CAC exceptionnel (${r.ltvCacRatio}x) — acquisition client très efficiente`);
+  if (r.native.captured > 1500) opportunities.push(`Fort potentiel de création de marché (${fmt(r.native.captured)} natifs)`);
+  if (r.walkIn.walkInMembers > 200) opportunities.push(`Walk-in significatif (${fmt(r.walkIn.walkInMembers)} mbr) — flux captif`);
+  if (r.popTarget > 40000) opportunities.push(`Bassin de population large (${fmt(r.popTarget)} cible 15-45)`);
+
+  return { total, scores, verdict, verdictColor, verdictDesc, risks, opportunities };
+}
+
+// --- MULTI-SITE RANKING ---
+// Store all analyzed sites for comparison
+window._siteAnalyses = JSON.parse(localStorage.getItem('fpSiteAnalyses') || '[]');
+
+function saveSiteAnalysis(name, lat, lng, r, exec) {
+  const existing = window._siteAnalyses.findIndex(s => Math.abs(s.lat - lat) < 0.001 && Math.abs(s.lng - lng) < 0.001);
+  const entry = {
+    name, lat, lng, timestamp: Date.now(),
+    totalTheo: r.totalTheorique, irrBase: r.pnl.base.irr, irrConserv: r.pnl.conservateur.irr,
+    payback: r.pnl.base.paybackMonth, breakeven: r.pnl.base.breakevenMonth,
+    execScore: exec.total, verdict: exec.verdict, verdictColor: exec.verdictColor,
+    popTarget: r.popTarget, compsCount: r.comps.length, ltvCac: r.ltvCacRatio,
+    arpu: r.arpu, npvBase: r.pnl.base.npv, caA1: r.pnl.base.annualCA[0],
+    caA3: r.pnl.base.annualCA[2], captifs: r.totalCaptifs, natifs: r.native.captured,
+    walkIn: r.walkIn.walkInMembers
+  };
+  if (existing >= 0) window._siteAnalyses[existing] = entry;
+  else window._siteAnalyses.push(entry);
+  window._siteAnalyses.sort((a, b) => b.execScore - a.execScore);
+  localStorage.setItem('fpSiteAnalyses', JSON.stringify(window._siteAnalyses));
+}
+
+function renderSiteRanking() {
+  const analyses = window._siteAnalyses;
+  if (analyses.length < 2) return '';
+  return `
+    <div style="background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(139,92,246,.02));border:1px solid rgba(139,92,246,.25);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#8b5cf6;margin-bottom:8px">MATRICE DE PRIORISATION — ${analyses.length} sites analysés</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:8px;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:3px 4px;color:var(--gray2)">#</th>
+              <th style="text-align:left;padding:3px 4px;color:var(--gray2)">Site</th>
+              <th style="text-align:center;padding:3px 4px;color:var(--gray2)">Score</th>
+              <th style="text-align:center;padding:3px 4px;color:var(--gray2)">Verdict</th>
+              <th style="text-align:right;padding:3px 4px;color:var(--gray2)">Mbr théo</th>
+              <th style="text-align:right;padding:3px 4px;color:var(--gray2)">IRR</th>
+              <th style="text-align:right;padding:3px 4px;color:var(--gray2)">Payback</th>
+              <th style="text-align:right;padding:3px 4px;color:var(--gray2)">NPV</th>
+              <th style="text-align:right;padding:3px 4px;color:var(--gray2)">CA A3</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${analyses.map((s, i) => `<tr style="border-bottom:1px solid rgba(71,85,115,.08)${i===0?';background:rgba(16,185,129,.06)':''}">
+              <td style="padding:3px 4px;color:${i===0?'var(--green)':'var(--gray2)'};font-weight:700">${i+1}</td>
+              <td style="padding:3px 4px;font-weight:600;color:var(--white)">${s.name}</td>
+              <td style="text-align:center;padding:3px 4px;font-weight:800;color:${s.execScore>=75?'#10b981':s.execScore>=60?'#fbbf24':s.execScore>=45?'#f97316':'#ef4444'}">${s.execScore}</td>
+              <td style="text-align:center;padding:3px 4px"><span style="font-size:7px;padding:1px 5px;border-radius:3px;font-weight:700;color:${s.verdictColor};background:${s.verdictColor}15;border:1px solid ${s.verdictColor}30">${s.verdict}</span></td>
+              <td style="text-align:right;padding:3px 4px">${fmt(s.totalTheo)}</td>
+              <td style="text-align:right;padding:3px 4px;color:${s.irrBase>15?'var(--green)':s.irrBase>8?'var(--yellow)':'var(--red)'};font-weight:700">${s.irrBase}%</td>
+              <td style="text-align:right;padding:3px 4px">${s.payback?'M'+s.payback:'>60M'}</td>
+              <td style="text-align:right;padding:3px 4px;color:${s.npvBase>0?'var(--green)':'var(--red)'}">${fmt(Math.round(s.npvBase/1000))}k</td>
+              <td style="text-align:right;padding:3px 4px">${fmt(Math.round(s.caA3/1000))}k</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:7px;color:var(--gray2);margin-top:6px">Classement par score global (marché + financier + concurrence + emplacement + risque). Cliquez "Analyser" sur chaque site pour mettre à jour.</div>
+      <button onclick="clearSiteRanking()" style="margin-top:6px;font-size:8px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--gray2);cursor:pointer;font-family:var(--font)">Réinitialiser classement</button>
+    </div>`;
+}
+
+function clearSiteRanking() {
+  window._siteAnalyses = [];
+  localStorage.removeItem('fpSiteAnalyses');
+  // Re-render if visible
+  if(window._lastCaptageLocation) {
+    const {lat, lng, radius} = window._lastCaptageLocation;
+    if(el('captageContent') && el('captageContent').innerHTML) renderCaptageAnalysis('captageContent', lat, lng, radius);
+    if(el('captageContentSite') && el('captageContentSite').innerHTML) renderCaptageAnalysis('captageContentSite', lat, lng, radius);
+  }
+}
+
+// --- PDF EXPORT ---
+function exportPDF() {
+  const container = el('captageContentSite') || el('captageContent');
+  if(!container || !container.innerHTML) { alert('Analysez un site d\'abord'); return; }
+
+  const siteName = window._lastCaptageLocation?.siteName || 'Site Analyse';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>FP Romania — Rapport ${siteName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;background:#fff;color:#1a1a2e;padding:40px;font-size:11px;line-height:1.5}
+    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #d4a017;padding-bottom:16px;margin-bottom:24px}
+    .header h1{font-size:22px;font-weight:800;color:#1a1a2e}
+    .header .subtitle{font-size:11px;color:#666;margin-top:4px}
+    .logo-text{font-size:16px;font-weight:800;color:#d4a017;text-align:right}
+    .logo-text .isseo{font-size:10px;color:#888;font-weight:400}
+    .section{margin-bottom:20px;page-break-inside:avoid}
+    .section-title{font-size:13px;font-weight:700;color:#1a1a2e;border-left:4px solid #d4a017;padding-left:8px;margin-bottom:10px}
+    .metric-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .metric-box{background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px;padding:8px;text-align:center}
+    .metric-box .label{font-size:8px;color:#666;font-weight:600;text-transform:uppercase}
+    .metric-box .value{font-size:18px;font-weight:800;margin-top:2px}
+    .verdict-box{text-align:center;padding:16px;border-radius:8px;margin-bottom:16px}
+    .verdict-box .score{font-size:48px;font-weight:900}
+    .verdict-box .verdict{font-size:20px;font-weight:800;margin-top:4px}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th{text-align:left;padding:4px 6px;border-bottom:2px solid #d4a017;font-weight:700;color:#666;font-size:9px;text-transform:uppercase}
+    td{padding:4px 6px;border-bottom:1px solid #eee}
+    .footer{margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:9px;color:#999;display:flex;justify-content:space-between}
+    .go{color:#10b981} .nogo{color:#ef4444} .watch{color:#f97316} .cond{color:#fbbf24}
+    @media print{body{padding:20px}@page{margin:15mm;size:A4}}
+  </style></head><body>
+    <div class="header">
+      <div><h1>Rapport d'Analyse — ${siteName}</h1><div class="subtitle">Fitness Park Romania — Expansion Intelligence Platform | ${new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'})}</div></div>
+      <div class="logo-text">FITNESS PARK<br><span class="isseo">powered by ISSEO</span></div>
+    </div>
+    <div id="pdfBody"></div>
+    <div class="footer">
+      <span>Confidentiel — Usage interne FP Master Franchise Romania</span>
+      <span>Généré le ${new Date().toLocaleString('fr-FR')} | Méthodologie Bain-level v2</span>
+    </div>
+  </body></html>`);
+
+  // Populate with data from last analysis
+  const data = window._lastExecData;
+  if(!data) { win.document.getElementById('pdfBody').innerHTML = container.innerHTML; win.print(); return; }
+  const {r, exec} = data;
+  const vClass = exec.verdict === 'GO' ? 'go' : exec.verdict === 'NO-GO' ? 'nogo' : exec.verdict === 'WATCH' ? 'watch' : 'cond';
+
+  win.document.getElementById('pdfBody').innerHTML = `
+    <div class="verdict-box" style="background:${exec.verdictColor}08;border:2px solid ${exec.verdictColor}">
+      <div class="score" style="color:${exec.verdictColor}">${exec.total}/100</div>
+      <div class="verdict ${vClass}">${exec.verdict}</div>
+      <div style="font-size:11px;color:#666;margin-top:4px">${exec.verdictDesc}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Scoring Détaillé</div>
+      <table>
+        <tr><th>Dimension</th><th>Score</th><th>Max</th><th>Détails</th></tr>
+        ${Object.values(exec.scores).map(s => `<tr><td style="font-weight:600">${s.label}</td><td style="font-weight:700;color:${s.score/s.max>=0.7?'#10b981':s.score/s.max>=0.5?'#fbbf24':'#ef4444'}">${s.score}</td><td>/${s.max}</td><td style="font-size:9px;color:#666">${s.details}</td></tr>`).join('')}
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Métriques Clés</div>
+      <div class="metric-grid">
+        <div class="metric-box"><div class="label">Membres Théoriques</div><div class="value">${fmt(r.totalTheorique)}</div></div>
+        <div class="metric-box"><div class="label">IRR Base</div><div class="value" style="color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</div></div>
+        <div class="metric-box"><div class="label">NPV Base</div><div class="value" style="color:${r.pnl.base.npv>0?'#10b981':'#ef4444'}">${fmt(Math.round(r.pnl.base.npv/1000))}k€</div></div>
+        <div class="metric-box"><div class="label">Payback</div><div class="value">${r.pnl.base.paybackMonth?'M'+r.pnl.base.paybackMonth:'>60M'}</div></div>
+        <div class="metric-box"><div class="label">LTV/CAC</div><div class="value">${r.ltvCacRatio}x</div></div>
+        <div class="metric-box"><div class="label">CAPEX</div><div class="value">${fmt(Math.round(r.pnl.base.capex/1000))}k€</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Décomposition Captage</div>
+      <div class="metric-grid">
+        <div class="metric-box" style="border-left:3px solid #f97316"><div class="label">Captifs (vols concurrents)</div><div class="value" style="color:#f97316">${fmt(r.totalCaptifs)}</div></div>
+        <div class="metric-box" style="border-left:3px solid #10b981"><div class="label">Natifs (création marché)</div><div class="value" style="color:#10b981">${fmt(r.native.captured)}</div></div>
+        <div class="metric-box" style="border-left:3px solid #06b6d4"><div class="label">Walk-in (trafic)</div><div class="value" style="color:#06b6d4">${fmt(r.walkIn.walkInMembers)}</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">P&L 5 ans — 3 Scénarios</div>
+      <table>
+        <tr><th>Année</th><th>Conservateur</th><th>Base</th><th>Optimiste</th></tr>
+        ${[0,1,2,3,4].map(i => `<tr><td style="font-weight:600">A${i+1}</td><td>${fmt(Math.round(r.pnl.conservateur.annualCA[i]/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.annualCA[i]/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.annualCA[i]/1000))}k€</td></tr>`).join('')}
+        <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr}%</td></tr>
+        <tr><td style="font-weight:700">NPV</td><td>${fmt(Math.round(r.pnl.conservateur.npv/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.npv/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.npv/1000))}k€</td></tr>
+      </table>
+    </div>
+
+    ${exec.risks.length > 0 ? `<div class="section">
+      <div class="section-title" style="border-left-color:#ef4444">Risques Identifiés</div>
+      <ul style="padding-left:16px">${exec.risks.map(r => `<li style="color:#ef4444;margin-bottom:3px"><span style="color:#333">${r}</span></li>`).join('')}</ul>
+    </div>` : ''}
+
+    ${exec.opportunities.length > 0 ? `<div class="section">
+      <div class="section-title" style="border-left-color:#10b981">Opportunités</div>
+      <ul style="padding-left:16px">${exec.opportunities.map(o => `<li style="color:#10b981;margin-bottom:3px"><span style="color:#333">${o}</span></li>`).join('')}</ul>
+    </div>` : ''}
+
+    ${window._siteAnalyses.length >= 2 ? `<div class="section">
+      <div class="section-title" style="border-left-color:#8b5cf6">Matrice Comparative</div>
+      <table>
+        <tr><th>#</th><th>Site</th><th>Score</th><th>Verdict</th><th>Mbr Théo</th><th>IRR</th><th>NPV</th></tr>
+        ${window._siteAnalyses.map((s,i) => `<tr${i===0?' style="background:#f0fdf4"':''}><td>${i+1}</td><td style="font-weight:600">${s.name}</td><td style="font-weight:800;color:${s.execScore>=75?'#10b981':s.execScore>=60?'#fbbf24':'#ef4444'}">${s.execScore}</td><td>${s.verdict}</td><td>${fmt(s.totalTheo)}</td><td>${s.irrBase}%</td><td>${fmt(Math.round(s.npvBase/1000))}k€</td></tr>`).join('')}
+      </table>
+    </div>` : ''}
+  `;
+
+  setTimeout(() => { win.print(); }, 500);
+}
+
 // --- ISOCHRONE OVERLAP ---
 // Uses CARTIERE point-in-polygon to compute population overlap between 2 isochrones
 function pointInPolygon(point, polygon) {
@@ -4461,10 +4720,53 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   const c = el(containerId);
   if(!c) return;
 
+  // Executive Summary scoring
+  const exec = computeExecSummary(r);
+  window._lastExecData = {r, exec};
+
+  // Save to multi-site ranking
+  const siteName = window._lastCaptageLocation?.siteName || customSites.find(s => Math.abs(s.lat-lat)<0.001 && Math.abs(s.lng-lng)<0.001)?.name || `Site ${lat.toFixed(3)},${lng.toFixed(3)}`;
+  window._lastCaptageLocation.siteName = siteName;
+  saveSiteAnalysis(siteName, lat, lng, r, exec);
+
   const recoColor = r.totalTheorique >= 4000 ? 'var(--green)' : r.totalTheorique >= 2800 ? 'var(--yellow)' : 'var(--red)';
   const recoText = r.totalTheorique >= 4000 ? 'EXCELLENT' : r.totalTheorique >= 2800 ? 'VIABLE' : r.totalTheorique >= 2000 ? 'RISQUE' : 'INSUFFISANT';
 
   c.innerHTML = `
+    <div style="background:linear-gradient(135deg,${exec.verdictColor}12,${exec.verdictColor}04);border:2px solid ${exec.verdictColor}50;border-radius:10px;padding:14px;margin-bottom:12px;position:relative">
+      <div style="position:absolute;top:8px;right:10px">
+        <button onclick="exportPDF()" style="font-size:8px;padding:3px 10px;background:var(--accent);border:none;border-radius:4px;color:#000;cursor:pointer;font-weight:700;font-family:var(--font)">&#128196; Export PDF</button>
+      </div>
+      <div style="font-size:8px;font-weight:700;color:var(--gray2);letter-spacing:1px;margin-bottom:8px">EXECUTIVE SUMMARY</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px">
+        <div style="text-align:center">
+          <div style="font-size:44px;font-weight:900;color:${exec.verdictColor};line-height:1">${exec.total}</div>
+          <div style="font-size:8px;color:var(--gray2)">/100</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:900;color:${exec.verdictColor};margin-bottom:2px">${exec.verdict}</div>
+          <div style="font-size:9px;color:var(--gray)">${exec.verdictDesc}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:8px">
+        ${Object.values(exec.scores).map(s => {
+          const pct = Math.round(s.score / s.max * 100);
+          const col = pct >= 70 ? '#10b981' : pct >= 50 ? '#fbbf24' : '#ef4444';
+          return `<div style="flex:1;text-align:center">
+            <div style="font-size:7px;color:var(--gray2);margin-bottom:2px">${s.label}</div>
+            <div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div></div>
+            <div style="font-size:9px;font-weight:800;color:${col};margin-top:1px">${s.score}/${s.max}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${exec.risks.length > 0 || exec.opportunities.length > 0 ? `<div style="display:flex;gap:8px;font-size:8px;line-height:1.4">
+        ${exec.risks.length > 0 ? `<div style="flex:1"><div style="color:var(--red);font-weight:700;margin-bottom:2px">⚠ Risques</div>${exec.risks.map(r=>'<div style="color:var(--gray2)">• '+r+'</div>').join('')}</div>` : ''}
+        ${exec.opportunities.length > 0 ? `<div style="flex:1"><div style="color:var(--green);font-weight:700;margin-bottom:2px">★ Opportunités</div>${exec.opportunities.map(o=>'<div style="color:var(--gray2)">• '+o+'</div>').join('')}</div>` : ''}
+      </div>` : ''}
+    </div>
+
+    ${renderSiteRanking()}
+
     <div style="text-align:center;padding:12px 0;margin-bottom:12px;background:var(--bg);border-radius:8px">
       <div style="font-size:9px;font-weight:700;color:var(--gray2);margin-bottom:4px">MEMBRES THEORIQUES A TERME</div>
       <div style="font-size:42px;font-weight:900;color:${recoColor};line-height:1">${fmt(r.realiste)}</div>
@@ -4488,6 +4790,12 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <div style="font-size:18px;font-weight:900;color:var(--cyan)">${fmt(r.walkIn.walkInMembers)}</div>
         <div style="font-size:7px;color:var(--gray2)">trafic mall/centre</div>
       </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:6px">WATERFALL — Décomposition captage</div>
+      <div style="position:relative;height:140px;width:100%;margin-bottom:4px"><canvas id="waterfallChart"></canvas></div>
+      <div style="font-size:7px;color:var(--gray2)">Captifs ${Math.round(r.totalCaptifs/r.totalTheorique*100)}% | Natifs ${Math.round(r.native.captured/r.totalTheorique*100)}% | Walk-in ${Math.round(r.walkIn.walkInMembers/r.totalTheorique*100)}% du total</div>
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
@@ -4609,6 +4917,11 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
         CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${fmt(r.pnl.base.fixedOpex)}/mois | OPEX Ops 26% CA | Redev 6%+2% | Loyer ${fmt(r.pnl.base.rent)}/mois | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
       </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:6px">BRIDGE CA ANNUEL — 3 Scénarios (k€)</div>
+      <div style="position:relative;height:140px;width:100%;margin-bottom:4px"><canvas id="revenueBridgeChart"></canvas></div>
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
@@ -4775,6 +5088,64 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           scales: {
             x: { ticks: { color:'#94a3b8', font:{size:8}, maxRotation:0 }, grid: { color:'#1e293b' } },
             y: { ticks: { color:'#94a3b8', font:{size:8}, callback: v => Math.abs(v) >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color:'#1e293b' } }
+          }
+        }
+      });
+    }
+
+    // Waterfall chart — member source decomposition
+    const wfCanvas = document.getElementById('waterfallChart');
+    if(wfCanvas && typeof Chart !== 'undefined') {
+      const captifs = r.totalCaptifs;
+      const natifs = r.native.captured;
+      const walkIn = r.walkIn.walkInMembers;
+      const total = r.totalTheorique;
+      new Chart(wfCanvas, {
+        type: 'bar',
+        data: {
+          labels: ['Captifs', 'Natifs', 'Walk-in', 'TOTAL'],
+          datasets: [
+            { label: 'Invisible base', data: [0, captifs, captifs+natifs, 0], backgroundColor: 'transparent', borderWidth: 0, barPercentage: 0.6 },
+            { label: 'Value', data: [captifs, natifs, walkIn, total],
+              backgroundColor: ['#f97316', '#10b981', '#06b6d4', 'rgba(212,160,23,.7)'],
+              borderColor: ['#f97316', '#10b981', '#06b6d4', '#d4a017'],
+              borderWidth: 1, barPercentage: 0.6 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Value' ? fmt(ctx.raw) + ' membres' : '' } } },
+          scales: {
+            x: { stacked: true, ticks: { color:'#94a3b8', font:{size:9} }, grid: { display:false } },
+            y: { stacked: true, ticks: { color:'#94a3b8', font:{size:8}, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color:'#1e293b' } }
+          }
+        }
+      });
+    }
+
+    // Revenue bridge chart (Annual CA A1→A5)
+    const bridgeCanvas = document.getElementById('revenueBridgeChart');
+    if(bridgeCanvas && typeof Chart !== 'undefined') {
+      const years = ['A1','A2','A3','A4','A5'];
+      const baseCA = r.pnl.base.annualCA.map(v => Math.round(v/1000));
+      const conservCA = r.pnl.conservateur.annualCA.map(v => Math.round(v/1000));
+      const optimCA = r.pnl.optimiste.annualCA.map(v => Math.round(v/1000));
+      new Chart(bridgeCanvas, {
+        type: 'bar',
+        data: {
+          labels: years,
+          datasets: [
+            { label: 'Conservateur', data: conservCA, backgroundColor: '#ef444440', borderColor: '#ef4444', borderWidth: 1 },
+            { label: 'Base', data: baseCA, backgroundColor: '#fbbf2440', borderColor: '#fbbf24', borderWidth: 1 },
+            { label: 'Optimiste', data: optimCA, backgroundColor: '#10b98140', borderColor: '#10b981', borderWidth: 1 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, labels: { color:'#94a3b8', font:{size:8}, boxWidth:12 } } },
+          scales: {
+            x: { ticks: { color:'#94a3b8', font:{size:9} }, grid: { display:false } },
+            y: { ticks: { color:'#94a3b8', font:{size:8}, callback: v => v+'k€' }, grid: { color:'#1e293b' } }
           }
         }
       });
