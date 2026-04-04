@@ -3738,12 +3738,21 @@ function calcWalkIn(lat, lng) {
 
 // --- PERSONA SEGMENTATION ---
 // 4 personas with differentiated behavior based on quartier price proxy
+// Churn rates calibrated on FP France BP model (3800 mbr target, 300 clubs)
+// France Y1 avg churn ~0.7%/mois, Y2+ avg ~3.5%/mois → persona spread around these anchors
+// Annual renewal spike handled separately in cohortModel (see RENEWAL_CHURN_SPIKE)
 const PERSONAS = {
-  etudiants:   { label:'Etudiants',     age:'18-25', pctBase:0.25, propension:0.15, arpuMult:0.70, churn:0.035, color:'#a78bfa' },
-  jeunesActifs:{ label:'Jeunes Actifs', age:'25-35', pctBase:0.35, propension:0.18, arpuMult:1.00, churn:0.025, color:'#38bdf8' },
-  familles:    { label:'Familles',       age:'35-45', pctBase:0.25, propension:0.10, arpuMult:1.10, churn:0.020, color:'#34d399' },
-  cspPlus:     { label:'CSP+',           age:'25-45', pctBase:0.15, propension:0.14, arpuMult:1.30, churn:0.018, color:'#fbbf24' }
+  etudiants:   { label:'Etudiants',     age:'18-25', pctBase:0.25, propension:0.15, arpuMult:0.70, churnY1:0.012, churn:0.045, color:'#a78bfa' },
+  jeunesActifs:{ label:'Jeunes Actifs', age:'25-35', pctBase:0.35, propension:0.18, arpuMult:1.00, churnY1:0.006, churn:0.030, color:'#38bdf8' },
+  familles:    { label:'Familles',       age:'35-45', pctBase:0.25, propension:0.10, arpuMult:1.10, churnY1:0.005, churn:0.025, color:'#34d399' },
+  cspPlus:     { label:'CSP+',           age:'25-45', pctBase:0.15, propension:0.14, arpuMult:1.30, churnY1:0.004, churn:0.020, color:'#fbbf24' }
 };
+
+// Annual renewal spike — France BP: 45% résiliation rate at 12-month renewal
+// Translates to ~10-15% extra gross churn at months 13, 25, 37, 49
+// This reflects contract anniversary churn (members who complete 1 year and don't renew)
+const RENEWAL_CHURN_SPIKE = 0.12; // 12% of existing members churn at each anniversary
+const RENEWAL_MONTHS = [13, 25, 37, 49]; // Annual contract renewal points
 
 // Distribution based on REAL INS age data per sector + price proxy for CSP+ split
 function getPersonaMix(cartiereList) {
@@ -3813,10 +3822,13 @@ function blendedARPU(personaMix) {
 }
 
 // Blended churn rate based on persona mix
-function blendedChurn(personaMix) {
+// month parameter: if ≤12, uses Y1 (low) churn; if >12, uses steady-state churn
+// Source: FP France BP — Y1 avg 0.7%/mois, Y2+ avg 3.5%/mois
+function blendedChurn(personaMix, month) {
   let churn = 0;
+  const useY1 = month && month <= 12;
   for(const [key, pct] of Object.entries(personaMix)) {
-    churn += pct * PERSONAS[key].churn;
+    churn += pct * (useY1 ? PERSONAS[key].churnY1 : PERSONAS[key].churn);
   }
   return churn;
 }
@@ -3962,14 +3974,13 @@ const SEASONALITY = [
 
 // --- COHORT MODEL ---
 // Spain data = NET members (real observed, already reflects churn implicitly)
+// Churn model calibrated on FP France BP: low Y1 churn + annual renewal spike
 // We apply seasonality modulation on top for monthly CA variation
 function cohortModel(totalTheorique, months, personaMix, scenarioKey) {
   months = months || 60;
   scenarioKey = scenarioKey || 'base';
   const arpu = blendedARPU(personaMix);
-  const baseChurn = blendedChurn(personaMix);
   const sc = SCENARIOS[scenarioKey];
-  const churnRate = baseChurn * sc.churnAdj;
 
   const data = [];
   let cumulCA = 0;
@@ -3978,7 +3989,13 @@ function cohortModel(totalTheorique, months, personaMix, scenarioKey) {
   for(let m = 1; m <= months; m++) {
     const netMembers = scenarioMembers(m, totalTheorique, scenarioKey);
     const newMembers = Math.max(0, netMembers - prevMembers);
-    const impliedChurned = prevMembers > 0 ? Math.max(0, Math.round(prevMembers * churnRate)) : 0;
+
+    // Month-dependent churn: Y1 low engagement churn, Y2+ steady-state (France BP)
+    const monthChurn = blendedChurn(personaMix, m) * sc.churnAdj;
+    // Annual renewal spike at contract anniversary months (France BP: 45% résiliation)
+    const isRenewal = RENEWAL_MONTHS.includes(m);
+    const effectiveChurn = isRenewal ? monthChurn + RENEWAL_CHURN_SPIKE : monthChurn;
+    const impliedChurned = prevMembers > 0 ? Math.max(0, Math.round(prevMembers * effectiveChurn)) : 0;
     prevMembers = netMembers;
 
     // Apply seasonality: affects ARPU (attendance-linked revenue) and acquisition
@@ -3998,7 +4015,8 @@ function cohortModel(totalTheorique, months, personaMix, scenarioKey) {
       newMembers,
       churned: impliedChurned,
       netMembers: effectiveMembers,
-      churnRate,
+      churnRate: effectiveChurn,
+      isRenewalSpike: isRenewal,
       seasonFactor,
       monthlyCA: Math.round(monthCA),
       cumulCA: Math.round(cumulCA),
@@ -4076,19 +4094,20 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     case 'opex': adjOpexMult = multiplier; break;
   }
 
-  // Build adjusted cohort
+  // Build adjusted cohort (month-dependent churn — France BP calibration)
   const arpu = blendedARPU(personaMix) * adjArpuMult;
-  const baseChurnRate = blendedChurn(personaMix) * SCENARIOS.base.churnAdj;
-  const adjChurnRate = baseChurnRate * adjChurnMult;
-  const extraChurnDelta = adjChurnRate - baseChurnRate;
   const data = [];
   let cumulCA = 0;
 
   for(let m = 1; m <= 60; m++) {
     const adjMonth = Math.round(m * (adjRampMult > 0 ? adjRampMult : 1));
     let netMembers = scenarioMembers(Math.min(adjMonth, 60), totalTheorique, 'base');
+    // Month-dependent churn + renewal spike + sensitivity multiplier
+    const baseMonthChurn = blendedChurn(personaMix, m) * SCENARIOS.base.churnAdj;
+    const adjMonthChurn = baseMonthChurn * adjChurnMult;
+    const extraChurnDelta = adjMonthChurn - baseMonthChurn;
     if(extraChurnDelta !== 0) {
-      netMembers = Math.round(netMembers * Math.pow(1 - extraChurnDelta, m));
+      netMembers = Math.round(netMembers * (1 - extraChurnDelta));
     }
     const monthIdx = (m - 1) % 12;
     const seasonFactor = SEASONALITY[monthIdx];
@@ -4326,7 +4345,6 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
   };
 
   const baseARPU = blendedARPU(personaMix);
-  const baseChurn = blendedChurn(personaMix);
 
   for(let i = 0; i < iterations; i++) {
     // Random perturbations
@@ -4340,7 +4358,6 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
 
     const simTheo = Math.round(totalTheorique * pCapt);
     const simARPU = baseARPU * pArpu;
-    const simChurn = baseChurn * pChurn;
 
     // Build cohort with perturbed ramp speed
     const simCohort = [];
@@ -4881,7 +4898,8 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   const nearbyCARTIERE = getNearbyCARTIERE(lat, lng, captageRadius);
   const personaMix = getPersonaMix(nearbyCARTIERE);
   const arpu = blendedARPU(personaMix);
-  const churnRate = blendedChurn(personaMix);
+  const churnY1 = blendedChurn(personaMix, 6);   // Y1 rate (low, engagement period)
+  const churnRate = blendedChurn(personaMix, 24); // Steady-state Y2+ rate
 
   // 3 market scenarios (Conservateur / Base / Optimiste)
   const scenarios = {};
@@ -4922,7 +4940,7 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
     breakeven2800: totalTheorique >= 2800 ? 'OUI' : totalTheorique >= 2000 ? 'POSSIBLE' : 'NON',
     breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
     // Bain-level data
-    personaMix, arpu, churnRate,
+    personaMix, arpu, churnY1, churnRate,
     scenarios, pnl, sensitivity, monteCarlo,
     ltv, ltvCacRatio, cac: DEFAULT_CAC,
     avgQuartierPrice: Math.round(avgPrice),
@@ -5032,12 +5050,12 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           return `<div style="flex:1;background:${p.color}15;border:1px solid ${p.color}30;border-radius:6px;padding:5px;text-align:center">
             <div style="font-size:8px;font-weight:700;color:${p.color}">${p.label}</div>
             <div style="font-size:16px;font-weight:900;color:${p.color}">${Math.round(pct*100)}%</div>
-            <div style="font-size:7px;color:var(--gray2)">ARPU ×${p.arpuMult} | Churn ${(p.churn*100).toFixed(1)}%</div>
+            <div style="font-size:7px;color:var(--gray2)">ARPU ×${p.arpuMult} | Churn Y1:${(p.churnY1*100).toFixed(1)}% → Y2+:${(p.churn*100).toFixed(1)}%</div>
           </div>`;
         }).join('')}
       </div>
       <div class="metric-row"><span class="metric-label">ARPU blended (HT)</span><span class="metric-value" style="font-weight:700;color:var(--cyan)">${r.arpu.toFixed(2)} EUR/mois</span></div>
-      <div class="metric-row"><span class="metric-label">Churn blended</span><span class="metric-value">${(r.churnRate*100).toFixed(1)}%/mois (${Math.round((1-Math.pow(1-r.churnRate,12))*100)}%/an)</span></div>
+      <div class="metric-row"><span class="metric-label">Churn blended</span><span class="metric-value">Y1: ${(r.churnY1*100).toFixed(1)}%/mois → Y2+: ${(r.churnRate*100).toFixed(1)}%/mois (${Math.round((1-Math.pow(1-r.churnRate,12))*100)}%/an) + spike renouvellement annuel ${(RENEWAL_CHURN_SPIKE*100).toFixed(0)}%</span></div>
       <div class="metric-row"><span class="metric-label">LTV</span><span class="metric-value" style="color:var(--green);font-weight:700">${fmt(r.ltv)} EUR</span></div>
       <div class="metric-row"><span class="metric-label">LTV/CAC ratio</span><span class="metric-value" style="color:${r.ltvCacRatio>=10?'var(--green)':r.ltvCacRatio>=5?'var(--yellow)':'var(--red)'};font-weight:700">${r.ltvCacRatio}x</span></div>
       <div style="font-size:7px;color:var(--gray2);margin-top:4px">Source: INS Recensământ 2021 (pop. par âge × secteur) | Prix quartier: ${r.avgQuartierPrice} EUR/m2 | CAC: ${r.cac} EUR</div>
@@ -5302,7 +5320,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <b>Bass Diffusion</b> : F(t) = (1-e<sup>-(p+q)t</sup>) / (1+(q/p)e<sup>-(p+q)t</sup>)<br>
         Standard: p=0.02, q=0.35 (60-70% ouvertures) | Fort: p=0.05, q=0.42 (30-40%)<br>
         Calibre sur donnees reelles FP Espagne (2 clubs)<br><br>
-        <b>Churn/LTV</b> : Modele cohortes mensuel. LTV = ARPU/churn. CAC ≈ 50 EUR<br>
+        <b>Churn/LTV</b> : Modele cohortes calibre sur BP FP France (3800 mbr, 300 clubs). Y1 churn bas (~0.7%/mois) + spike renouvellement annuel (12% a M13/M25/M37/M49) + Y2+ steady-state (~3%/mois). LTV = ARPU/churn. CAC ≈ 50 EUR<br>
         Membres_net(t) = Membres(t-1) + Nouveaux(t) - Churned(t)<br><br>
         <b>P&L</b> : Calibre BP V17 — CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an<br>
         Staff ${fmt(Math.round(PNL_DEFAULTS.staffAnnualA1/1000))}k/an (+6%/an) | OPEX Ops 26% CA | Redev 6%+2% | CIT 16%<br>
