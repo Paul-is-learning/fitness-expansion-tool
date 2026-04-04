@@ -619,8 +619,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div id="customSitesList"></div>
       </div>
       <div class="card" id="siteAnalysisCard" style="display:none">
-        <div class="card-header">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
           <div class="card-title"><span class="icon">&#128202;</span> Analyse detaillee du site</div>
+          <button onclick="exitAnalysis()" style="background:none;border:1px solid var(--gray2);color:var(--gray2);border-radius:6px;padding:3px 10px;font-size:9px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--gray2)';this.style.color='var(--gray2)'">&times; Fermer</button>
         </div>
         <div id="siteAnalysisContent"></div>
       </div>
@@ -5204,6 +5205,22 @@ function clearAnalysis() {
   el('sazBox').style.display = 'none';
 }
 
+// Exit analysis mode — clears everything and hides all analysis panels
+function exitAnalysis() {
+  clearAnalysis();
+  // Hide analysis cards
+  const cards = ['siteAnalysisCard','captageCard','captageCardSite'];
+  cards.forEach(id => { const c = el(id); if(c) c.style.display = 'none'; });
+  // Reset iso mode
+  isoMode = 'circle';
+  document.querySelectorAll('.iso-btn').forEach(b => {
+    b.style.cssText = 'font-size:9px;' + (b.id.includes('Circle') ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : '');
+  });
+  // Switch back to main tab if on fiche site tab
+  const tabs = document.querySelectorAll('.tab-btn');
+  if(tabs.length > 0) tabs[0].click();
+}
+
 // ================================================================
 // RADIUS
 // ================================================================
@@ -5426,15 +5443,18 @@ async function fetchIsochroneORS(lat, lng, profile, rangeSeconds) {
   } catch(e) { return null; }
 }
 
-// Geometric fallback isochrone — speed-based polygon with randomized organic shape
-function geometricIsochrone(lat, lng, speedMperMin, timeLimitMin) {
-  const distM = speedMperMin * timeLimitMin;
-  const N = 36;
+// ---- WALK isochrone — smooth circle at walking speed (no API needed) ----
+// Walking is nearly isotropic (no road constraints), so a circle is accurate
+// Seeded variation for organic but deterministic shape
+function walkIsochrone(lat, lng, timeLimitMin) {
+  const walkSpeed = 80; // m/min average urban walking
+  const distM = walkSpeed * timeLimitMin; // ~800m for 10 min
+  const N = 48; // smooth circle
   const coords = [];
   for(let i = 0; i < N; i++) {
     const angle = (i * 360 / N) * Math.PI / 180;
-    // Add organic variation ±15% for realistic shape
-    const jitter = 0.85 + Math.random() * 0.30;
+    // Deterministic organic variation based on angle (simulates blocks/roads)
+    const jitter = 1.0 + 0.12 * Math.sin(angle * 3.7) + 0.08 * Math.cos(angle * 5.3);
     const dLat = (distM * jitter / 111320) * Math.cos(angle);
     const dLng = (distM * jitter / (111320 * Math.cos(lat * Math.PI/180))) * Math.sin(angle);
     coords.push([lng + dLng, lat + dLat]);
@@ -5442,129 +5462,171 @@ function geometricIsochrone(lat, lng, speedMperMin, timeLimitMin) {
   coords.push(coords[0]);
   return {
     type: 'Feature',
-    properties: { duration: timeLimitMin * 60, mode: 'GEOMETRIC', points: N },
+    properties: { duration: timeLimitMin * 60, mode: 'WALK', points: N },
     geometry: { type: 'Polygon', coordinates: [coords] }
   };
 }
 
-// Transit isochrone — uses metro/tram stations as anchors
+// ---- TRANSIT isochrone — metro stations + walking bubbles merged ----
+// Bucharest metro network: 4 lines, 63 stations
+const METRO_STATIONS = [
+  // M1 (Dristor→Pantelimon + Republica)
+  {name:'Dristor 1',lat:44.4175,lng:26.1395},{name:'Piata Muncii',lat:44.4220,lng:26.1450},
+  {name:'Iancului',lat:44.4300,lng:26.1290},{name:'Obor',lat:44.4480,lng:26.1250},
+  {name:'Stefan cel Mare',lat:44.4505,lng:26.1130},{name:'Piata Victoriei 1',lat:44.4528,lng:26.0854},
+  {name:'Gara de Nord 1',lat:44.4465,lng:26.0700},{name:'Basarab 1',lat:44.4520,lng:26.0650},
+  {name:'Crangasi',lat:44.4500,lng:26.0470},{name:'Grozavesti',lat:44.4350,lng:26.0610},
+  {name:'Eroilor 1',lat:44.4355,lng:26.0720},{name:'Izvor',lat:44.4320,lng:26.0900},
+  {name:'Piata Unirii 1',lat:44.4275,lng:26.1040},{name:'Timpuri Noi',lat:44.4185,lng:26.1080},
+  {name:'Mihai Bravu',lat:44.4180,lng:26.1275},{name:'Dristor 2',lat:44.4175,lng:26.1395},
+  {name:'Nicolae Grigorescu',lat:44.4165,lng:26.1520},{name:'Titan',lat:44.4155,lng:26.1600},
+  {name:'1 Decembrie',lat:44.4150,lng:26.1680},{name:'Republica',lat:44.4130,lng:26.1770},
+  // M2 (Pipera→Berceni)
+  {name:'Pipera',lat:44.4793,lng:26.1217},{name:'Aurel Vlaicu',lat:44.4729,lng:26.1166},
+  {name:'Aviatorilor',lat:44.4615,lng:26.0899},{name:'Piata Victoriei 2',lat:44.4528,lng:26.0854},
+  {name:'Piata Romana',lat:44.4476,lng:26.0970},{name:'Universitate',lat:44.4358,lng:26.1020},
+  {name:'Piata Unirii 2',lat:44.4275,lng:26.1040},{name:'Tineretului',lat:44.4100,lng:26.1050},
+  {name:'Eroii Revolutiei',lat:44.4020,lng:26.0980},{name:'Constantin Brancoveanu',lat:44.3960,lng:26.0960},
+  {name:'Piata Sudului',lat:44.3890,lng:26.0990},{name:'Aparatorii Patriei',lat:44.3810,lng:26.1070},
+  {name:'Dimitrie Leonida',lat:44.3740,lng:26.1100},
+  // M3 (Preciziei→Anghel Saligny)
+  {name:'Preciziei',lat:44.4280,lng:26.0050},{name:'Pacii',lat:44.4310,lng:26.0190},
+  {name:'Gorjului',lat:44.4290,lng:26.0090},{name:'Lujerului',lat:44.4315,lng:26.0280},
+  {name:'Politehnica',lat:44.4380,lng:26.0500},{name:'Eroilor 2',lat:44.4355,lng:26.0720},
+  {name:'Semnatoarea',lat:44.4330,lng:26.0780},{name:'1 Mai',lat:44.4670,lng:26.0700},
+  {name:'Pajura',lat:44.4750,lng:26.0690},{name:'Jiului',lat:44.4730,lng:26.0620},
+  // M4 (Gara de Nord→Străulești)
+  {name:'Gara de Nord 2',lat:44.4465,lng:26.0700},{name:'Basarab 2',lat:44.4520,lng:26.0650},
+  {name:'Laminorului',lat:44.4640,lng:26.0620},{name:'Straulesti',lat:44.4810,lng:26.0580},
+  // M5 (Drumul Taberei→Eroilor)
+  {name:'Raul Doamnei',lat:44.4225,lng:26.0160},{name:'Constantin Brancusi',lat:44.4240,lng:26.0040},
+  {name:'Romancierilor',lat:44.4130,lng:26.0180},{name:'Drumul Taberei 34',lat:44.4170,lng:26.0280},
+  {name:'Favorit',lat:44.4130,lng:26.0360},{name:'Orizont',lat:44.4130,lng:26.0490},
+  {name:'Academia Militara',lat:44.4200,lng:26.0640},{name:'Eroilor 3',lat:44.4355,lng:26.0720}
+];
+
 function transitIsochrone(lat, lng, timeLimitMin) {
-  // Bucharest metro stations with approximate coordinates
-  const METRO_STATIONS = [
-    {name:'Pipera',lat:44.4793,lng:26.1217},{name:'Aurel Vlaicu',lat:44.4729,lng:26.1166},
-    {name:'Aviatorilor',lat:44.4615,lng:26.0899},{name:'Piata Victoriei',lat:44.4528,lng:26.0854},
-    {name:'Piata Romana',lat:44.4476,lng:26.0970},{name:'Universitate',lat:44.4358,lng:26.1020},
-    {name:'Unirii',lat:44.4275,lng:26.1040},{name:'Timpuri Noi',lat:44.4185,lng:26.1080},
-    {name:'Mihai Bravu',lat:44.4180,lng:26.1275},{name:'Dristor',lat:44.4175,lng:26.1395},
-    {name:'Titan/N.Grigorescu',lat:44.4165,lng:26.1520},{name:'1 Decembrie',lat:44.4150,lng:26.1680},
-    {name:'Obor',lat:44.4505,lng:26.1260},{name:'Stefan cel Mare',lat:44.4505,lng:26.1130},
-    {name:'Piata Iancului',lat:44.4300,lng:26.1290},{name:'Izvor',lat:44.4320,lng:26.0900},
-    {name:'Eroilor',lat:44.4355,lng:26.0720},{name:'Politehnica',lat:44.4380,lng:26.0500},
-    {name:'Grozavesti',lat:44.4350,lng:26.0610},{name:'Pacii',lat:44.4310,lng:26.0190},
-    {name:'Gorjului',lat:44.4290,lng:26.0090},{name:'Lujerului',lat:44.4315,lng:26.0280},
-    {name:'Crangasi',lat:44.4500,lng:26.0470},{name:'Basarab',lat:44.4520,lng:26.0650},
-    {name:'1 Mai',lat:44.4670,lng:26.0700},{name:'Pajura',lat:44.4750,lng:26.0690},
-    {name:'Jiului',lat:44.4730,lng:26.0620},{name:'Drumul Taberei 34',lat:44.4170,lng:26.0280},
-    {name:'Favorit',lat:44.4130,lng:26.0360},{name:'Orizont',lat:44.4130,lng:26.0490},
-    {name:'Academia Militara',lat:44.4200,lng:26.0640},{name:'Raul Doamnei',lat:44.4225,lng:26.0160},
-    {name:'Constantin Brancusi',lat:44.4240,lng:26.0040},{name:'Romancierilor',lat:44.4130,lng:26.0180}
-  ];
-
   const walkSpeed = 80; // m/min
-  const metroSpeed = 600; // m/min (approx 35 km/h including stops)
+  const metroSpeed = 600; // m/min (~36 km/h with stops, Bucharest metro)
+  const walkToMetroBuffer = 0.5; // 30s buffer for entering station
 
-  // Find nearest station to origin
+  // Find all stations within walking distance
   const stationsWithDist = METRO_STATIONS.map(s => ({
-    ...s, dist: haversine(lat, lng, s.lat, s.lng)
-  })).sort((a,b) => a.dist - b.dist);
+    ...s, dist: haversine(lat, lng, s.lat, s.lng),
+    walkMin: haversine(lat, lng, s.lat, s.lng) / walkSpeed
+  })).filter(s => s.walkMin <= timeLimitMin); // reachable by walk alone
 
-  const nearestStation = stationsWithDist[0];
-  const walkToStationMin = nearestStation.dist / walkSpeed;
+  // Sort by walking time
+  stationsWithDist.sort((a,b) => a.walkMin - b.walkMin);
 
-  if(walkToStationMin > timeLimitMin) {
-    // Can't reach any metro station in time — fallback to walk isochrone
-    return geometricIsochrone(lat, lng, walkSpeed, timeLimitMin);
+  // If no station reachable → walking-only isochrone
+  if(stationsWithDist.length === 0 || stationsWithDist[0].walkMin + walkToMetroBuffer >= timeLimitMin) {
+    return walkIsochrone(lat, lng, timeLimitMin);
   }
 
-  // Time remaining after reaching nearest station
-  const metroTimeMin = timeLimitMin - walkToStationMin;
-  const metroRange = metroSpeed * metroTimeMin;
+  // Build reachable station set: for each walkable station, find metro-reachable stations
+  const reachableSet = new Map(); // stationName → {station, arrivalMin}
 
-  // Find all reachable stations (within metro range from nearest station)
-  const reachableStations = METRO_STATIONS.filter(s =>
-    haversine(nearestStation.lat, nearestStation.lng, s.lat, s.lng) <= metroRange
-  );
+  stationsWithDist.forEach(entry => {
+    const arriveAtStation = entry.walkMin + walkToMetroBuffer;
+    if(arriveAtStation >= timeLimitMin) return;
+    const metroTimeRemain = timeLimitMin - arriveAtStation;
+    const metroRangeM = metroSpeed * metroTimeRemain;
 
-  // Build convex hull: walking radius from origin + walking radius from each reachable station
-  const allPoints = [];
-  const walkRemain = walkSpeed * Math.max(2, timeLimitMin - walkToStationMin - 2); // remaining walk time at destination
+    // This station itself is reachable
+    if(!reachableSet.has(entry.name) || reachableSet.get(entry.name).arrivalMin > arriveAtStation) {
+      reachableSet.set(entry.name, { ...entry, arrivalMin: arriveAtStation });
+    }
 
-  // Walking circle from origin
-  const walkRadius = walkSpeed * timeLimitMin;
-  for(let i = 0; i < 24; i++) {
-    const angle = (i * 360 / 24) * Math.PI / 180;
-    const jitter = 0.88 + Math.random() * 0.24;
-    allPoints.push({
-      lat: lat + (walkRadius * jitter / 111320) * Math.cos(angle),
-      lng: lng + (walkRadius * jitter / (111320 * Math.cos(lat * Math.PI/180))) * Math.sin(angle)
+    // Find stations reachable by metro from this entry station
+    METRO_STATIONS.forEach(s2 => {
+      const metroDist = haversine(entry.lat, entry.lng, s2.lat, s2.lng);
+      if(metroDist <= metroRangeM) {
+        const totalArrival = arriveAtStation + metroDist / metroSpeed;
+        if(totalArrival < timeLimitMin) {
+          if(!reachableSet.has(s2.name) || reachableSet.get(s2.name).arrivalMin > totalArrival) {
+            reachableSet.set(s2.name, { ...s2, arrivalMin: totalArrival });
+          }
+        }
+      }
     });
-  }
+  });
 
-  // Walking circles from each reachable station
-  reachableStations.forEach(s => {
-    const stationDist = haversine(nearestStation.lat, nearestStation.lng, s.lat, s.lng);
-    const timeToStation = walkToStationMin + stationDist / metroSpeed;
-    const remainWalk = Math.max(0, (timeLimitMin - timeToStation)) * walkSpeed;
-    if(remainWalk < 100) return;
-    for(let i = 0; i < 12; i++) {
-      const angle = (i * 360 / 12) * Math.PI / 180;
-      const jitter = 0.85 + Math.random() * 0.30;
-      allPoints.push({
-        lat: s.lat + (remainWalk * jitter / 111320) * Math.cos(angle),
-        lng: s.lng + (remainWalk * jitter / (111320 * Math.cos(s.lat * Math.PI/180))) * Math.sin(angle)
-      });
+  // Build merged polygon: union of walking circles from origin + each reachable station
+  // Using multi-circle approach rendered as a single MultiPolygon
+  const circles = [];
+
+  // Walking circle from origin (full 10 min)
+  const originCircle = makeCircleCoords(lat, lng, walkSpeed * timeLimitMin, 36);
+  circles.push(originCircle);
+
+  // Walking circle from each reachable station (remaining time)
+  reachableSet.forEach(({lat: sLat, lng: sLng, arrivalMin, name}) => {
+    const remainMin = timeLimitMin - arrivalMin;
+    const walkRangeM = walkSpeed * remainMin;
+    if(walkRangeM >= 100) { // at least 100m radius
+      circles.push(makeCircleCoords(sLat, sLng, walkRangeM, 24));
     }
   });
 
-  // Compute convex hull
-  const hull = convexHull(allPoints);
+  // Merge into single polygon using point union + convex hull
+  const allPts = [];
+  circles.forEach(c => c.forEach(p => allPts.push({lat: p[1], lng: p[0]})));
+  const hull = convexHull(allPts);
   const coords = hull.map(p => [p.lng, p.lat]);
   coords.push(coords[0]);
 
   return {
     type: 'Feature',
-    properties: { duration: timeLimitMin * 60, mode: 'TRANSIT', points: hull.length, stations: reachableStations.length },
+    properties: { duration: timeLimitMin * 60, mode: 'TRANSIT', points: hull.length, stations: reachableSet.size },
     geometry: { type: 'Polygon', coordinates: [coords] }
   };
 }
 
-// Simple convex hull (Graham scan)
+// Helper: generate circle coordinates [lng, lat] for a given center and radius
+function makeCircleCoords(lat, lng, radiusM, numPoints) {
+  const coords = [];
+  for(let i = 0; i < numPoints; i++) {
+    const angle = (i * 360 / numPoints) * Math.PI / 180;
+    // Deterministic slight variation for natural shape
+    const jitter = 1.0 + 0.08 * Math.sin(angle * 4.1) + 0.05 * Math.cos(angle * 6.7);
+    const dLat = (radiusM * jitter / 111320) * Math.cos(angle);
+    const dLng = (radiusM * jitter / (111320 * Math.cos(lat * Math.PI/180))) * Math.sin(angle);
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  return coords;
+}
+
+// Convex hull — Andrew's monotone chain (more robust than Graham scan)
 function convexHull(points) {
   if(points.length < 3) return points;
-  // Find lowest point
-  let lowest = 0;
-  for(let i = 1; i < points.length; i++) {
-    if(points[i].lat < points[lowest].lat || (points[i].lat === points[lowest].lat && points[i].lng < points[lowest].lng))
-      lowest = i;
-  }
-  [points[0], points[lowest]] = [points[lowest], points[0]];
-  const pivot = points[0];
-  const sorted = points.slice(1).sort((a,b) => {
-    const angA = Math.atan2(a.lat - pivot.lat, a.lng - pivot.lng);
-    const angB = Math.atan2(b.lat - pivot.lat, b.lng - pivot.lng);
-    return angA - angB || (a.lng - pivot.lng)**2 + (a.lat - pivot.lat)**2 - ((b.lng - pivot.lng)**2 + (b.lat - pivot.lat)**2);
-  });
-  const hull = [pivot, sorted[0]];
-  for(let i = 1; i < sorted.length; i++) {
-    while(hull.length > 1) {
-      const a = hull[hull.length-2], b = hull[hull.length-1], c = sorted[i];
-      const cross = (b.lng-a.lng)*(c.lat-a.lat) - (b.lat-a.lat)*(c.lng-a.lng);
-      if(cross > 0) break;
-      hull.pop();
+  const pts = points.slice().sort((a,b) => a.lng - b.lng || a.lat - b.lat);
+
+  // Build lower hull
+  const lower = [];
+  for(const p of pts) {
+    while(lower.length >= 2) {
+      const a = lower[lower.length-2], b = lower[lower.length-1];
+      if((b.lng-a.lng)*(p.lat-a.lat) - (b.lat-a.lat)*(p.lng-a.lng) <= 0) lower.pop();
+      else break;
     }
-    hull.push(sorted[i]);
+    lower.push(p);
   }
-  return hull;
+  // Build upper hull
+  const upper = [];
+  for(let i = pts.length-1; i >= 0; i--) {
+    const p = pts[i];
+    while(upper.length >= 2) {
+      const a = upper[upper.length-2], b = upper[upper.length-1];
+      if((b.lng-a.lng)*(p.lat-a.lat) - (b.lat-a.lat)*(p.lng-a.lng) <= 0) upper.pop();
+      else break;
+    }
+    upper.push(p);
+  }
+  // Remove last point of each half (it's repeated)
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
 }
 
 async function drawIsochrone(lat, lng) {
@@ -5584,31 +5646,32 @@ async function drawIsochrone(lat, lng) {
   let geojson = null;
   let source = '';
 
-  // Try Google Routes API first (works best for DRIVE)
-  if (_googleHasKey() && isoMode !== 'transit') {
-    geojson = await googleIsochrone(lat, lng, cfg.api, 600, cfg.maxDist);
-    if (geojson) { source = 'Google Routes API'; console.log(`[Google Routes] Isochrone ${cfg.api}: ${geojson.properties.points} points`); }
+  // WALK: always use local model (walking is isotropic, no API needed)
+  if(isoMode === 'walk') {
+    geojson = walkIsochrone(lat, lng, 10);
+    source = '~800m (vitesse marche 80m/min)';
   }
-
-  // Fallback to OpenRouteService
-  if (!geojson && cfg.ors) {
-    geojson = await fetchIsochroneORS(lat, lng, cfg.ors, 600);
-    if (geojson) { source = 'OpenRouteService'; console.log('[ORS fallback] Isochrone loaded'); }
+  // TRANSIT: local model with Bucharest metro network
+  else if(isoMode === 'transit') {
+    geojson = transitIsochrone(lat, lng, 10);
+    source = `Réseau métro (${geojson?.properties?.stations || 0} stations accessibles)`;
   }
-
-  // Final fallback: geometric approximation
-  if (!geojson) {
-    if(isoMode === 'transit') {
-      geojson = transitIsochrone(lat, lng, 10);
-      source = `Modèle transit (${geojson.properties.stations || 0} stations)`;
-    } else if(isoMode === 'walk') {
-      geojson = geometricIsochrone(lat, lng, 80, 10); // 80m/min walking
-      source = 'Estimation géométrique (~800m)';
-    } else {
-      geojson = geometricIsochrone(lat, lng, 500, 10); // 500m/min driving avg urban
-      source = 'Estimation géométrique (~5km)';
+  // DRIVE: Google Routes API (road network matters)
+  else {
+    if (_googleHasKey()) {
+      geojson = await googleIsochrone(lat, lng, cfg.api, 600, cfg.maxDist);
+      if (geojson) { source = 'Google Routes API'; console.log(`[Google Routes] Isochrone DRIVE: ${geojson.properties.points} points`); }
     }
-    console.log(`[Fallback] Using geometric isochrone for ${isoMode}`);
+    // Fallback ORS
+    if (!geojson && cfg.ors) {
+      geojson = await fetchIsochroneORS(lat, lng, cfg.ors, 600);
+      if (geojson) { source = 'OpenRouteService'; }
+    }
+    // Fallback geometric
+    if (!geojson) {
+      geojson = walkIsochrone(lat, lng, 62); // ~5km at 500m/min equivalent
+      source = 'Estimation ~5km';
+    }
   }
 
   if (geojson) {
