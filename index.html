@@ -3567,7 +3567,7 @@ function showOverlapAnalysis() {
 // USER-EDITABLE PARAMS — persisted in localStorage, impact BP en direct
 // 3 subscription tiers + loyer — calibre BP V17 (MF FP - BP RO)
 // ================================================================
-const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400 };
+const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400, clubSurface: 1449 };
 const TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46)
 const TVA_RO = 0.21;   // TVA Roumanie (BP V17 C24)
 
@@ -3611,7 +3611,7 @@ function resetUserParams() {
 }
 function updateParamSummary() {
   const s = el('paramSummary');
-  if(s) s.innerHTML = `Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b>`;
+  if(s) s.innerHTML = `Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))} EUR/mois</b>`;
 }
 window._lastCaptageLocation = null;
 
@@ -4122,8 +4122,7 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     });
   }
 
-  // Build adjusted P&L (mirrors buildPnL structure from BP V17)
-  const baseRentMonthly = getEffectiveRentAnnual() / 12;
+  // Build adjusted P&L (mirrors buildPnL structure — stepped rent)
   const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
   const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
   let cumulCashFlow = -adjCapex;
@@ -4138,7 +4137,7 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     const costOfSales = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
     const margeBrute = totalCA - costOfSales;
     const staffM = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx) * adjOpexMult);
-    const rentM = Math.round(baseRentMonthly * Math.pow(1 + PNL_DEFAULTS.rentGrowth, yearIdx) * adjRentMult);
+    const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * adjRentMult);
     const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx) * adjOpexMult);
     const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
     const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
@@ -4169,8 +4168,26 @@ const PNL_DEFAULTS = {
   leasingYears: 5,           // Duree leasing
   staffAnnualA1: 85890,      // EUR/an — 4 ETP + charges 2.25% (BP V17 C60)
   staffGrowth: 0.06,         // +6%/an (BP V17 C61)
-  rentAnnualBase: 236400,    // EUR/an — loyer+charges base (BP V17 C53) — overridden by user input
-  rentGrowth: 0.02,          // +2%/an (BP V17 C54)
+  // STEPPED RENT — Real data from Hala Laminor offer (01.04.2026)
+  // Surface: 1449 m² | Service charges: 5€/m² | Marketing fee: 0.5€/m²
+  // Two scenarios: initial offer vs negotiation target
+  rentSteps: {
+    surface: 1449,           // m² (Hala Laminor G-28 First Floor)
+    serviceCharge: 5.0,      // EUR/m²/mois
+    marketingFee: 0.5,       // EUR/m²/mois
+    offerInitiale: [         // Offre bailleur avant négo
+      { fromYear: 1, rent: 12.0 },  // Y1-Y2: 12€/m²/mois
+      { fromYear: 3, rent: 14.0 },  // Y3-Y4: 14€/m²/mois
+      { fromYear: 5, rent: 15.0 },  // Y5+:   15€/m²/mois
+    ],
+    objectifNego: [          // Objectif négociation Isseo
+      { fromYear: 1, rent: 10.5 },  // Y1-Y2: 10.5€/m²/mois
+      { fromYear: 3, rent: 11.5 },  // Y3-Y4: 11.5€/m²/mois
+      { fromYear: 5, rent: 13.0 },  // Y5+:   13€/m²/mois
+    ],
+    indexation: 0.03,        // HICP ~3%/an (Eurostat HICP 27 avg)
+  },
+  rentGrowth: 0.03,          // HICP indexation (replaces fixed 2%)
   fpCloudMonthly: 600,       // EUR/mois (BP V17 C64)
   fpCloudGrowth: 0.01,       // ~1%/an
   opexOpsRate: 0.26,         // % du CA Total — maint/secu/menage/energie (BP V17 C65)
@@ -4179,7 +4196,7 @@ const PNL_DEFAULTS = {
   fondsPubRate: 0.02,        // % du CA Adherents — fonds publicitaire (BP V17 C17)
   ptMonthlyRevenue: 2000,    // EUR/mois — 4 PT × 500€ (BP V17 C48)
   ptGrowth: 0.05,            // +5%/an
-  clubSurface: 1400,         // m2 (BP V17 C50)
+  clubSurface: 1449,         // m2 — Hala Laminor (was 1400 in BP V17)
   dapAnnual: 117600,         // EUR/an — CAPEX / 10 ans (BP V17 C80)
   citRate: 0.16,             // CIT Roumanie 16% (BP V17 C23)
   discountRate: 0.12,        // WACC 12% (BP V17 C112)
@@ -4188,10 +4205,25 @@ const PNL_DEFAULTS = {
   targetMembers: 4000        // Cible maturite A3 (BP V17 C34)
 };
 
+// Get monthly rent (all-in: base rent + service charges + marketing) for a given year
+// scenario: 'offerInitiale' or 'objectifNego'
+function getSteppedRentMonthly(yearNum, scenario) {
+  const steps = PNL_DEFAULTS.rentSteps[scenario || 'objectifNego'];
+  const surface = PNL_DEFAULTS.rentSteps.surface;
+  const sc = PNL_DEFAULTS.rentSteps.serviceCharge;
+  const mf = PNL_DEFAULTS.rentSteps.marketingFee;
+  // Find applicable rent step
+  let rentPerSqm = steps[0].rent;
+  for(const step of steps) {
+    if(yearNum >= step.fromYear) rentPerSqm = step.rent;
+  }
+  // HICP indexation from Y2 onwards
+  const hicpMult = yearNum > 1 ? Math.pow(1 + PNL_DEFAULTS.rentSteps.indexation, yearNum - 1) : 1.0;
+  return Math.round(surface * (rentPerSqm + sc + mf) * hicpMult);
+}
+
 function buildPnL(cohortData, avgQuartierPrice) {
   const capex = PNL_DEFAULTS.capex;
-  const baseRentAnnual = getEffectiveRentAnnual();
-  const baseRentMonthly = baseRentAnnual / 12;
   const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
   const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
   const arpu = getFP_MONTHLY_HT();
@@ -4221,8 +4253,8 @@ function buildPnL(cohortData, avgQuartierPrice) {
     // --- OPEX ---
     // Staff (grows 6%/yr)
     const staffMonthly = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx));
-    // Rent (grows 2%/yr) — uses user-defined base
-    const rentMonthly = Math.round(baseRentMonthly * Math.pow(1 + PNL_DEFAULTS.rentGrowth, yearIdx));
+    // Stepped rent — Hala Laminor paliers (objectif négo) + HICP indexation
+    const rentMonthly = getSteppedRentMonthly(yearNum, 'objectifNego');
     // FP Cloud
     const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx));
     // OPEX Ops (26% of Total CA)
@@ -4261,17 +4293,45 @@ function buildPnL(cohortData, avgQuartierPrice) {
 
   const irr = calcIRR(cashflows);
   const npv = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
-  const rentDisplay = Math.round(baseRentMonthly);
+  const rentY1 = getSteppedRentMonthly(1, 'objectifNego');
   const fixedOpexDisplay = Math.round(staffMonthlyA1 + PNL_DEFAULTS.fpCloudMonthly);
+
+  // Also compute IRR with offre initiale for comparison
+  let irrOffreInitiale = null;
+  {
+    const cfInit = [-capex];
+    let cumCF = -capex;
+    for(let i = 0; i < cohortData.length && i < 60; i++) {
+      const d = cohortData[i];
+      const yIdx = Math.floor(i / 12);
+      const yNum = yIdx + 1;
+      const caAdh = d.monthlyCA;
+      const ptRev = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yIdx));
+      const tCA = caAdh + ptRev;
+      const cos = Math.round(tCA * PNL_DEFAULTS.costOfSalesRate);
+      const mb = tCA - cos;
+      const stf = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yIdx));
+      const rnt = getSteppedRentMonthly(yNum, 'offerInitiale');
+      const fpc = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yIdx));
+      const opx = Math.round(tCA * PNL_DEFAULTS.opexOpsRate);
+      const rdv = Math.round(caAdh * PNL_DEFAULTS.redevanceRate);
+      const fpb = Math.round(caAdh * PNL_DEFAULTS.fondsPubRate);
+      const lsg = yNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
+      const totOpex = stf + rnt + fpc + opx + rdv + fpb;
+      const ebt = mb - totOpex;
+      cfInit.push(ebt - lsg);
+    }
+    irrOffreInitiale = calcIRR(cfInit);
+  }
 
   return {
     monthly, annualCA: annualCA.map(Math.round), annualEBITDA: annualEBITDA.map(Math.round),
-    capex, rent: rentDisplay, fixedOpex: fixedOpexDisplay,
+    capex, rent: rentY1, fixedOpex: fixedOpexDisplay,
     breakevenMonth, paybackMonth,
-    irr, npv,
+    irr, npv, irrOffreInitiale,
     totalCA5y: Math.round(annualCA.reduce((a,b)=>a+b,0)),
     avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0,
-    rentAnnual: baseRentAnnual, leasingMonthly
+    rentSteps: PNL_DEFAULTS.rentSteps, leasingMonthly
   };
 }
 
@@ -4377,10 +4437,8 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       prevM = netMembers;
     }
 
-    // Build P&L with perturbed costs
+    // Build P&L with perturbed costs (stepped rent)
     const capex = Math.round(PNL_DEFAULTS.capex * pCapex);
-    const baseRentAnnual = getEffectiveRentAnnual() * pRent;
-    const baseRentMonthly = Math.round(baseRentAnnual / 12);
     const staffMonthlyA1 = Math.round(PNL_DEFAULTS.staffAnnualA1 / 12);
     const leasingMonthly = Math.round(PNL_DEFAULTS.leasingAnnual / 12);
     const cashflows = [-capex];
@@ -4397,7 +4455,7 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       const cos = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
       const margeBrute = totalCA - cos;
       const staffM = Math.round(staffMonthlyA1 * Math.pow(1.06, yearIdx) * pOpex);
-      const rentM = Math.round(baseRentMonthly * Math.pow(1.02, yearIdx));
+      const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * pRent);
       const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1.01, yearIdx) * pOpex);
       const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
       const redev = Math.round(caAdherents * (PNL_DEFAULTS.redevanceRate + PNL_DEFAULTS.fondsPubRate));
@@ -5108,7 +5166,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid rgba(212,160,23,.15)">
-        <div id="paramSummary" style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b></div>
+        <div id="paramSummary" style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))} EUR/mois</b></div>
         <button onclick="resetUserParams()" style="font-size:8px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--gray2);cursor:pointer;font-family:var(--font)">Reset</button>
       </div>
     </div>
@@ -5150,7 +5208,31 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
-        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${fmt(r.pnl.base.fixedOpex)}/mois | OPEX Ops 26% CA | Redev 6%+2% | Loyer ${fmt(r.pnl.base.rent)}/mois | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
+        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${fmt(r.pnl.base.fixedOpex)}/mois | OPEX Ops 26% CA | Redev 6%+2% | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
+      </div>
+      <div style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
+        <div style="font-size:8px;font-weight:700;color:var(--accent);margin-bottom:4px">LOYER — Paliers réels Hala Laminor (${PNL_DEFAULTS.rentSteps.surface} m²)</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
+            <div style="font-size:7px;color:var(--gray2)">Y1-Y2</div>
+            <div style="font-size:10px;font-weight:700;color:var(--green)">${PNL_DEFAULTS.rentSteps.objectifNego[0].rent}€/m²</div>
+            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(1,'objectifNego'))}/mois</div>
+          </div>
+          <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
+            <div style="font-size:7px;color:var(--gray2)">Y3-Y4</div>
+            <div style="font-size:10px;font-weight:700;color:var(--yellow)">${PNL_DEFAULTS.rentSteps.objectifNego[1].rent}€/m²</div>
+            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(3,'objectifNego'))}/mois</div>
+          </div>
+          <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
+            <div style="font-size:7px;color:var(--gray2)">Y5+</div>
+            <div style="font-size:10px;font-weight:700;color:var(--orange)">${PNL_DEFAULTS.rentSteps.objectifNego[2].rent}€/m²</div>
+            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(5,'objectifNego'))}/mois</div>
+          </div>
+        </div>
+        <div style="font-size:7px;color:var(--gray2)">
+          Charges: ${PNL_DEFAULTS.rentSteps.serviceCharge}€/m² + Marketing: ${PNL_DEFAULTS.rentSteps.marketingFee}€/m² | Indexation HICP ~${(PNL_DEFAULTS.rentSteps.indexation*100).toFixed(0)}%/an
+          ${r.pnl.base.irrOffreInitiale !== null ? `<br><span style="color:var(--orange)">⚠ Si offre initiale bailleur (${PNL_DEFAULTS.rentSteps.offerInitiale[0].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[1].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[2].rent}€/m²) : IRR = ${r.pnl.base.irrOffreInitiale.toFixed(1)}% vs ${r.pnl.base.irr.toFixed(1)}% objectif négo → delta ${(r.pnl.base.irr - r.pnl.base.irrOffreInitiale).toFixed(1)} pts</span>` : ''}
+        </div>
       </div>
     </div>
 
