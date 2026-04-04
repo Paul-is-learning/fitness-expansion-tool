@@ -3624,12 +3624,21 @@ window._lastCaptageLocation = null;
 
 // BP V17 convention: HT = TTC × (1 - TVA) [not TTC/(1+TVA)]
 function toHT(ttc) { return ttc * (1 - TVA_RO); }
+// PANIER MOYEN = Abonnement blended + Revenus accessoires (frais adhesion amorti + boissons/accessoires)
+// France BP: panier moyen HT = 37.5€ soit ~70% au-dessus de l'abo base (19€ HT base France)
+// Source: FP France BP model, panier stabilise M12+ à 37.5€ HT (col R)
+// Revenus accessoires mensuels HT par membre actif
+// France BP: panier moyen 37.5€ HT vs base abo 15.8€ HT → extras = ~22€ HT
+// Romania ajusté pouvoir d'achat (~55% France) + marché naissant: 22 × 0.45 ≈ 5€ HT
+// Compose: frais adhesion amorti (~1.1€), boissons/barres (~2€), PRM/accessoires (~1.5€), freeze fees (~0.4€)
+const EXTRAS_HT_MONTHLY = 5.0;
 function getPanierMoyenHT() {
   const baseHT = toHT(USER_PARAMS.priceBaseTTC);
   const premHT = toHT(USER_PARAMS.pricePremiumTTC);
   const ultiHT = toHT(USER_PARAMS.priceUltimateTTC);
   const avgVAD = (premHT + ultiHT) / 2;
-  return (1 - TAUX_VAD) * baseHT + TAUX_VAD * avgVAD;
+  const aboBlended = (1 - TAUX_VAD) * baseHT + TAUX_VAD * avgVAD;
+  return aboBlended + EXTRAS_HT_MONTHLY;
 }
 function getEffectiveRentAnnual() {
   return USER_PARAMS.loyerAnnuel || FP_DEFAULTS.loyerAnnuel;
@@ -3880,7 +3889,7 @@ const SCENARIOS = {
     sublabel: 'Marche roumain prudent',
     desc: 'Marche immature, pas de franchise low-cost internationale. Clients habitues aux prix bas locaux. Cap ~3500 mbr. Churn eleve (marche non-eduque).',
     capMultiplier: 0.65,    // Cap at ~65% of theoretical (max ~3500-4000)
-    rampSpeed: 0.80,        // 20% more slow than Spain standard
+    rampSpeed: 0.90,        // 10% slower than Spain (was 0.80, too aggressive slowdown)
     churnAdj: 1.25,         // 25% more churn (market education needed)
     color: '#ef4444',
     refCurve: SPAIN_STANDARD,
@@ -3889,10 +3898,10 @@ const SCENARIOS = {
   base: {
     label: 'Base',
     sublabel: 'Hybride RO/ES',
-    desc: 'FP brand premium + prix competitif (28EUR vs WC 80EUR). Nouveaute attire mais marche en apprentissage. Cap ~4500 mbr.',
+    desc: 'FP brand premium + prix competitif (28EUR vs WC 80EUR). 1er low-cost intl = forte attractivite. Cap ~4500 mbr.',
     capMultiplier: 0.85,    // Cap at ~85% of theoretical
-    rampSpeed: 0.90,        // Slightly slower than Spain
-    churnAdj: 1.10,         // 10% more churn than Spain
+    rampSpeed: 1.0,         // Spain-comparable (1st intl low-cost = novelty effect compensates market immaturity)
+    churnAdj: 1.10,         // 10% more churn than Spain (market education needed)
     color: '#fbbf24',
     refCurve: SPAIN_STANDARD,
     refM: SPAIN_STANDARD_M
