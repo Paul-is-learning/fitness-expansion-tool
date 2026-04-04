@@ -3549,18 +3549,34 @@ function updateUserParam(key, value) {
   if(isNaN(v) || v <= 0) return;
   USER_PARAMS[key] = v;
   saveUserParams(USER_PARAMS);
+  // Update summary line live
+  updateParamSummary();
+  // Re-render BOTH captage containers + P&L
   if(window._lastCaptageLocation) {
-    const {lat, lng, radius, containerId} = window._lastCaptageLocation;
-    renderCaptageAnalysis(containerId, lat, lng, radius);
+    const {lat, lng, radius} = window._lastCaptageLocation;
+    // Re-render whichever containers are visible
+    if(el('captageContent') && el('captageContent').innerHTML) renderCaptageAnalysis('captageContent', lat, lng, radius);
+    if(el('captageContentSite') && el('captageContentSite').innerHTML) renderCaptageAnalysis('captageContentSite', lat, lng, radius);
   }
 }
 function resetUserParams() {
   USER_PARAMS = {...FP_DEFAULTS};
   saveUserParams(USER_PARAMS);
+  // Update input fields
+  const ib = el('inputPriceBase'); if(ib) ib.value = USER_PARAMS.priceBaseTTC;
+  const ip = el('inputPricePremium'); if(ip) ip.value = USER_PARAMS.pricePremiumTTC;
+  const iu = el('inputPriceUltimate'); if(iu) iu.value = USER_PARAMS.priceUltimateTTC;
+  const il = el('inputLoyer'); if(il) il.value = USER_PARAMS.loyerAnnuel;
+  updateParamSummary();
   if(window._lastCaptageLocation) {
-    const {lat, lng, radius, containerId} = window._lastCaptageLocation;
-    renderCaptageAnalysis(containerId, lat, lng, radius);
+    const {lat, lng, radius} = window._lastCaptageLocation;
+    if(el('captageContent') && el('captageContent').innerHTML) renderCaptageAnalysis('captageContent', lat, lng, radius);
+    if(el('captageContentSite') && el('captageContentSite').innerHTML) renderCaptageAnalysis('captageContentSite', lat, lng, radius);
   }
+}
+function updateParamSummary() {
+  const s = el('paramSummary');
+  if(s) s.innerHTML = `Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b>`;
 }
 window._lastCaptageLocation = null;
 
@@ -3581,9 +3597,8 @@ function getEffectiveRentAnnual() {
 // CAPTAGE ENGINE v2 — 3 sources: Captifs + Natifs + Walk-in
 // ================================================================
 // FP positioning: prix TTC/month dynamique, premium low-cost international franchise
-const FP_MONTHLY_TTC = USER_PARAMS.priceBaseTTC;
+function getFP_MONTHLY_TTC() { return USER_PARAMS.priceBaseTTC; }
 function getFP_MONTHLY_HT() { return getPanierMoyenHT(); }
-const FP_MONTHLY_HT = getPanierMoyenHT();
 
 // Competitor average prices TTC — VERIFIED March 2026
 // Sources: worldclass.ro, stayfit.ro, downtownfitness.ro, 18gym.ro, nr1fitness
@@ -3654,7 +3669,7 @@ function competitorStrength(reviewCount) {
 // NEW: Price elasticity — bigger price gap = more capture
 function priceElasticity(compSegment) {
   const compPrice = COMP_PRICES[compSegment] || 30;
-  const priceDiff = compPrice - FP_MONTHLY_TTC;
+  const priceDiff = compPrice - getFP_MONTHLY_TTC();
   if(priceDiff <= 0) return 0.7;  // FP is MORE expensive → less capture
   // Each 10€ of savings = +15% capture boost
   return 1 + (priceDiff / 10) * 0.15;  // e.g. WC 80€ → diff 52€ → x1.78
@@ -4550,7 +4565,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid rgba(212,160,23,.15)">
-        <div style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b></div>
+        <div id="paramSummary" style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer/mois: <b style="color:var(--yellow)">${fmt(Math.round(getEffectiveRentAnnual()/12))} EUR</b></div>
         <button onclick="resetUserParams()" style="font-size:8px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--gray2);cursor:pointer;font-family:var(--font)">Reset</button>
       </div>
     </div>
@@ -5330,17 +5345,37 @@ let isoMode = 'circle'; // 'circle' | 'walk' | 'drive' | 'transit'
 let isoLayer = null;
 
 function setIsoMode(mode) {
-  isoMode = mode;
+  // Toggle: clicking the active mode hides the isochrone
+  if(mode === isoMode && mode !== 'circle') {
+    // Hide isochrone layer
+    if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+    isoMode = 'circle';
+    // Restore circle full opacity
+    if(circle) circle.setStyle({fillOpacity: 0.06});
+  } else if(mode === isoMode && mode === 'circle') {
+    return; // already on circle, nothing to toggle
+  } else {
+    isoMode = mode;
+    // Draw new isochrone (only if a point is selected)
+    if(selectedPt) {
+      if(isoMode !== 'circle') {
+        drawIsochrone(selectedPt.lat, selectedPt.lng);
+        if(circle) circle.setStyle({fillOpacity: 0.02}); // dim circle behind isochrone
+      } else {
+        if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+        if(circle) circle.setStyle({fillOpacity: 0.06});
+      }
+    }
+  }
   // Update ALL iso buttons across both panels (main + fiche site)
   document.querySelectorAll('.iso-btn').forEach(b => {
     const isActive =
-      (mode==='walk' && b.id.includes('Walk')) ||
-      (mode==='drive' && b.id.includes('Drive')) ||
-      (mode==='transit' && b.id.includes('Transit')) ||
-      (mode==='circle' && b.id.includes('Circle'));
+      (isoMode==='walk' && b.id.includes('Walk')) ||
+      (isoMode==='drive' && b.id.includes('Drive')) ||
+      (isoMode==='transit' && b.id.includes('Transit')) ||
+      (isoMode==='circle' && b.id.includes('Circle'));
     b.style.cssText = 'font-size:9px;' + (isActive ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : '');
   });
-  if(selectedPt) onMapClick({latlng:selectedPt});
 }
 
 // Google Routes API — Isochrone generation
