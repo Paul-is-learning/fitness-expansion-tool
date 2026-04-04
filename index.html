@@ -1783,7 +1783,7 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   const optimistic = Math.round(realistic * 1.4);
 
   const capMembers = n => Math.min(n, 6000);
-  const monthlyARPU = toHT(USER_PARAMS.priceBaseTTC);
+  const monthlyARPU = getPanierMoyenHT(); // Uses blended ARPU (base + VAD premium/ultimate)
 
   return {
     pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
@@ -3568,7 +3568,7 @@ function showOverlapAnalysis() {
 // 3 subscription tiers + loyer — calibre BP V17 (MF FP - BP RO)
 // ================================================================
 const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400, clubSurface: 1449 };
-const TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46)
+let TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46) — modifiable par utilisateur
 const TVA_RO = 0.21;   // TVA Roumanie (BP V17 C24)
 
 function loadUserParams() {
@@ -3601,7 +3601,9 @@ function resetUserParams() {
   const ib = el('inputPriceBase'); if(ib) ib.value = USER_PARAMS.priceBaseTTC;
   const ip = el('inputPricePremium'); if(ip) ip.value = USER_PARAMS.pricePremiumTTC;
   const iu = el('inputPriceUltimate'); if(iu) iu.value = USER_PARAMS.priceUltimateTTC;
-  const il = el('inputLoyer'); if(il) il.value = USER_PARAMS.loyerAnnuel;
+  TAUX_VAD = 0.20;
+  const iv = el('inputVAD'); if(iv) iv.value = 20;
+  const vl = el('vadLabel'); if(vl) vl.textContent = '20%';
   updateParamSummary();
   if(window._lastCaptageLocation) {
     const {lat, lng, radius} = window._lastCaptageLocation;
@@ -3611,7 +3613,12 @@ function resetUserParams() {
 }
 function updateParamSummary() {
   const s = el('paramSummary');
-  if(s) s.innerHTML = `Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))} EUR/mois</b>`;
+  const pmHT = getPanierMoyenHT();
+  const baseTTC = USER_PARAMS.priceBaseTTC;
+  const premTTC = USER_PARAMS.pricePremiumTTC;
+  const ultiTTC = USER_PARAMS.priceUltimateTTC;
+  const vadPct = Math.round(TAUX_VAD * 100);
+  if(s) s.innerHTML = `ARPU: <b style="color:var(--cyan)">${pmHT.toFixed(2)} EUR HT</b> (${(100-vadPct)}% × ${baseTTC}€ + ${vadPct}% × avg(${premTTC}+${ultiTTC})€ TTC) | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))}/mois</b>`;
 }
 window._lastCaptageLocation = null;
 
@@ -5153,8 +5160,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           <input id="inputPriceBase" type="number" step="0.5" min="15" max="60" value="${USER_PARAMS.priceBaseTTC}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:13px;font-weight:700;font-family:var(--font)" onchange="updateUserParam('priceBaseTTC',this.value)">
         </div>
         <div>
-          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Loyer annuel (EUR)</label>
-          <input id="inputLoyer" type="number" step="1000" min="50000" max="600000" value="${USER_PARAMS.loyerAnnuel}" style="width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:13px;font-weight:700;font-family:var(--font)" onchange="updateUserParam('loyerAnnuel',this.value)">
+          <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Taux VAD (%) — <span id="vadLabel">${Math.round(TAUX_VAD*100)}%</span></label>
+          <input id="inputVAD" type="range" min="5" max="50" step="1" value="${Math.round(TAUX_VAD*100)}" style="width:100%;accent-color:var(--accent);cursor:pointer" oninput="TAUX_VAD=this.value/100;document.getElementById('vadLabel').textContent=this.value+'%';updateParamSummary();if(window._lastCaptageLocation){const{lat,lng,radius}=window._lastCaptageLocation;if(el('captageContent')&&el('captageContent').innerHTML)renderCaptageAnalysis('captageContent',lat,lng,radius);}">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--gray2);margin-top:1px"><span>5%</span><span>Prem+Ulti</span><span>50%</span></div>
         </div>
         <div>
           <label style="font-size:8px;font-weight:700;color:var(--gray);display:block;margin-bottom:2px">Prix Premium TTC (EUR)</label>
@@ -5166,7 +5174,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid rgba(212,160,23,.15)">
-        <div id="paramSummary" style="font-size:8px;color:var(--gray2)">Taux VAD: ${(TAUX_VAD*100).toFixed(0)}% | Panier moyen HT: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR</b> | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))} EUR/mois</b></div>
+        <div id="paramSummary" style="font-size:8px;color:var(--gray2)">ARPU: <b style="color:var(--cyan)">${getPanierMoyenHT().toFixed(2)} EUR HT</b> (${100-Math.round(TAUX_VAD*100)}% × ${USER_PARAMS.priceBaseTTC}€ + ${Math.round(TAUX_VAD*100)}% × avg(${USER_PARAMS.pricePremiumTTC}+${USER_PARAMS.priceUltimateTTC})€ TTC) | Loyer Y1: <b style="color:var(--yellow)">${fmt(getSteppedRentMonthly(1,'objectifNego'))}/mois</b></div>
         <button onclick="resetUserParams()" style="font-size:8px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--gray2);cursor:pointer;font-family:var(--font)">Reset</button>
       </div>
     </div>
