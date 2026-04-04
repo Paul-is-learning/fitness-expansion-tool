@@ -4877,7 +4877,7 @@ async function runSiteAnalysis(site) {
   el('siteAnalysisContent').innerHTML = `
     <div style="text-align:center;padding:8px 0">
       <div style="font-size:11px;font-weight:600;margin-bottom:4px">${site.name}</div>
-      <div style="font-size:10px;color:var(--gray2)">${cartier?cartier.name+' | ':''} ${sector?sector.name:'Hors zone'} | R=${radius/1000}km</div>
+      <div style="font-size:10px;color:var(--gray2)" id="ficheSubtitle">${cartier?cartier.name+' | ':''} ${sector?sector.name:'Hors zone'} | R=${radius/1000}km</div>
     </div>
 
     <div style="display:flex;gap:16px;justify-content:center;margin:12px 0">
@@ -4887,11 +4887,11 @@ async function runSiteAnalysis(site) {
         <div class="${recoClass} reco-chip" style="font-size:9px;margin-top:4px">${recoText}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:36px;font-weight:900;color:var(--blue)">${fmt(popGranular.target)}</div>
+        <div style="font-size:36px;font-weight:900;color:var(--blue)" id="ficheCible1545">${fmt(popGranular.target)}</div>
         <div class="saz-sublabel">Cible 15-45</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:36px;font-weight:900;color:${comps.length>10?'var(--red)':comps.length>5?'var(--yellow)':'var(--green)'}">${comps.length}</div>
+        <div style="font-size:36px;font-weight:900;color:${comps.length>10?'var(--red)':comps.length>5?'var(--yellow)':'var(--green)'}" id="ficheNbComps">${comps.length}</div>
         <div class="saz-sublabel">Concurrents</div>
       </div>
     </div>
@@ -4929,9 +4929,9 @@ async function runSiteAnalysis(site) {
 
     <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px" id="popZoneTitle">POPULATION ZONE (R=${radius/1000}km) — Calcul par quartier</div>
-      <div class="metric-row"><span class="metric-label">Pop. totale</span><span class="metric-value">${fmt(popGranular.pop)}</span></div>
-      <div class="metric-row"><span class="metric-label">Cible 15-45 ans</span><span class="metric-value" style="color:var(--blue)">${fmt(popGranular.target)}</span></div>
-      <div class="metric-row"><span class="metric-label">Prix moyen zone</span><span class="metric-value">${fmt(popGranular.avgPrice)} EUR/m2</span></div>
+      <div class="metric-row"><span class="metric-label">Pop. totale</span><span class="metric-value" id="fichePopTotal">${fmt(popGranular.pop)}</span></div>
+      <div class="metric-row"><span class="metric-label">Cible 15-45 ans</span><span class="metric-value" style="color:var(--blue)" id="fichePopTarget">${fmt(popGranular.target)}</span></div>
+      <div class="metric-row"><span class="metric-label">Prix moyen zone</span><span class="metric-value" id="fichePrixMoyen">${fmt(popGranular.avgPrice)} EUR/m2</span></div>
       ${poi.unis.length?`<div class="metric-row"><span class="metric-label">Universites (${poi.unis.length})</span><span class="metric-value" style="color:#a855f7">${fmt(poi.totalStudents)} etudiants</span></div>`:''}
       ${poi.offices.length?`<div class="metric-row"><span class="metric-label">Bureaux (${poi.offices.length})</span><span class="metric-value">${fmt(poi.totalEmployees)} employes</span></div>`:''}
       ${poi.malls.length?`<div class="metric-row"><span class="metric-label">Malls</span><span class="metric-value">${poi.malls.length}</span></div>`:''}
@@ -5246,6 +5246,29 @@ function syncRadiusSlider() {
   if(fl) fl.textContent = (radius/1000).toFixed(1) + ' km';
 }
 
+// Live update population stats in fiche site header when radius changes
+function updateFichePopStats() {
+  if(!selectedPt) return;
+  const popG = estimatePopInRadiusGranular(selectedPt.lat, selectedPt.lng, radius);
+  const compsInR = getDemoInRadius(selectedPt.lat, selectedPt.lng, radius);
+  // Update header numbers
+  const cible = el('ficheCible1545');
+  if(cible) cible.textContent = fmt(popG.target);
+  const nbC = el('ficheNbComps');
+  if(nbC) { nbC.textContent = compsInR.length; nbC.style.color = compsInR.length>10?'var(--red)':compsInR.length>5?'var(--yellow)':'var(--green)'; }
+  // Update population zone section
+  const sub = el('ficheSubtitle');
+  if(sub) sub.textContent = sub.textContent.replace(/R=[\d.]+km/, `R=${radius/1000}km`);
+  const title = el('popZoneTitle');
+  if(title) title.textContent = `POPULATION ZONE (R=${radius/1000}km) — Calcul par quartier`;
+  const popT = el('fichePopTotal');
+  if(popT) popT.textContent = fmt(popG.pop);
+  const popTgt = el('fichePopTarget');
+  if(popTgt) popTgt.textContent = fmt(popG.target);
+  const prix = el('fichePrixMoyen');
+  if(prix) prix.textContent = fmt(popG.avgPrice) + ' EUR/m2';
+}
+
 // Radius controls from Fiche Site panel — syncs with main panel + updates map
 function setRadiusFromFiche(r) {
   radius = r;
@@ -5256,6 +5279,9 @@ function setRadiusFromFiche(r) {
     const handleLng = selectedPt.lng + (radius / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
     radiusHandle.setLatLng([selectedPt.lat, handleLng]);
   }
+  // Instant population update in fiche
+  updateFichePopStats();
+  // Full re-analysis (captage etc.)
   if(selectedPt) onMapClick({latlng:selectedPt});
 }
 
@@ -5271,6 +5297,8 @@ function setRadiusFromFicheSlider(val) {
     const handleLng = selectedPt.lng + (radius / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
     radiusHandle.setLatLng([selectedPt.lat, handleLng]);
   }
+  // INSTANT population update in header (no debounce)
+  updateFichePopStats();
   // Debounce full analysis
   if(_radiusDebounce) clearTimeout(_radiusDebounce);
   _radiusDebounce = setTimeout(() => {
@@ -5398,45 +5426,200 @@ async function fetchIsochroneORS(lat, lng, profile, rangeSeconds) {
   } catch(e) { return null; }
 }
 
+// Geometric fallback isochrone — speed-based polygon with randomized organic shape
+function geometricIsochrone(lat, lng, speedMperMin, timeLimitMin) {
+  const distM = speedMperMin * timeLimitMin;
+  const N = 36;
+  const coords = [];
+  for(let i = 0; i < N; i++) {
+    const angle = (i * 360 / N) * Math.PI / 180;
+    // Add organic variation ±15% for realistic shape
+    const jitter = 0.85 + Math.random() * 0.30;
+    const dLat = (distM * jitter / 111320) * Math.cos(angle);
+    const dLng = (distM * jitter / (111320 * Math.cos(lat * Math.PI/180))) * Math.sin(angle);
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  coords.push(coords[0]);
+  return {
+    type: 'Feature',
+    properties: { duration: timeLimitMin * 60, mode: 'GEOMETRIC', points: N },
+    geometry: { type: 'Polygon', coordinates: [coords] }
+  };
+}
+
+// Transit isochrone — uses metro/tram stations as anchors
+function transitIsochrone(lat, lng, timeLimitMin) {
+  // Bucharest metro stations with approximate coordinates
+  const METRO_STATIONS = [
+    {name:'Pipera',lat:44.4793,lng:26.1217},{name:'Aurel Vlaicu',lat:44.4729,lng:26.1166},
+    {name:'Aviatorilor',lat:44.4615,lng:26.0899},{name:'Piata Victoriei',lat:44.4528,lng:26.0854},
+    {name:'Piata Romana',lat:44.4476,lng:26.0970},{name:'Universitate',lat:44.4358,lng:26.1020},
+    {name:'Unirii',lat:44.4275,lng:26.1040},{name:'Timpuri Noi',lat:44.4185,lng:26.1080},
+    {name:'Mihai Bravu',lat:44.4180,lng:26.1275},{name:'Dristor',lat:44.4175,lng:26.1395},
+    {name:'Titan/N.Grigorescu',lat:44.4165,lng:26.1520},{name:'1 Decembrie',lat:44.4150,lng:26.1680},
+    {name:'Obor',lat:44.4505,lng:26.1260},{name:'Stefan cel Mare',lat:44.4505,lng:26.1130},
+    {name:'Piata Iancului',lat:44.4300,lng:26.1290},{name:'Izvor',lat:44.4320,lng:26.0900},
+    {name:'Eroilor',lat:44.4355,lng:26.0720},{name:'Politehnica',lat:44.4380,lng:26.0500},
+    {name:'Grozavesti',lat:44.4350,lng:26.0610},{name:'Pacii',lat:44.4310,lng:26.0190},
+    {name:'Gorjului',lat:44.4290,lng:26.0090},{name:'Lujerului',lat:44.4315,lng:26.0280},
+    {name:'Crangasi',lat:44.4500,lng:26.0470},{name:'Basarab',lat:44.4520,lng:26.0650},
+    {name:'1 Mai',lat:44.4670,lng:26.0700},{name:'Pajura',lat:44.4750,lng:26.0690},
+    {name:'Jiului',lat:44.4730,lng:26.0620},{name:'Drumul Taberei 34',lat:44.4170,lng:26.0280},
+    {name:'Favorit',lat:44.4130,lng:26.0360},{name:'Orizont',lat:44.4130,lng:26.0490},
+    {name:'Academia Militara',lat:44.4200,lng:26.0640},{name:'Raul Doamnei',lat:44.4225,lng:26.0160},
+    {name:'Constantin Brancusi',lat:44.4240,lng:26.0040},{name:'Romancierilor',lat:44.4130,lng:26.0180}
+  ];
+
+  const walkSpeed = 80; // m/min
+  const metroSpeed = 600; // m/min (approx 35 km/h including stops)
+
+  // Find nearest station to origin
+  const stationsWithDist = METRO_STATIONS.map(s => ({
+    ...s, dist: haversine(lat, lng, s.lat, s.lng)
+  })).sort((a,b) => a.dist - b.dist);
+
+  const nearestStation = stationsWithDist[0];
+  const walkToStationMin = nearestStation.dist / walkSpeed;
+
+  if(walkToStationMin > timeLimitMin) {
+    // Can't reach any metro station in time — fallback to walk isochrone
+    return geometricIsochrone(lat, lng, walkSpeed, timeLimitMin);
+  }
+
+  // Time remaining after reaching nearest station
+  const metroTimeMin = timeLimitMin - walkToStationMin;
+  const metroRange = metroSpeed * metroTimeMin;
+
+  // Find all reachable stations (within metro range from nearest station)
+  const reachableStations = METRO_STATIONS.filter(s =>
+    haversine(nearestStation.lat, nearestStation.lng, s.lat, s.lng) <= metroRange
+  );
+
+  // Build convex hull: walking radius from origin + walking radius from each reachable station
+  const allPoints = [];
+  const walkRemain = walkSpeed * Math.max(2, timeLimitMin - walkToStationMin - 2); // remaining walk time at destination
+
+  // Walking circle from origin
+  const walkRadius = walkSpeed * timeLimitMin;
+  for(let i = 0; i < 24; i++) {
+    const angle = (i * 360 / 24) * Math.PI / 180;
+    const jitter = 0.88 + Math.random() * 0.24;
+    allPoints.push({
+      lat: lat + (walkRadius * jitter / 111320) * Math.cos(angle),
+      lng: lng + (walkRadius * jitter / (111320 * Math.cos(lat * Math.PI/180))) * Math.sin(angle)
+    });
+  }
+
+  // Walking circles from each reachable station
+  reachableStations.forEach(s => {
+    const stationDist = haversine(nearestStation.lat, nearestStation.lng, s.lat, s.lng);
+    const timeToStation = walkToStationMin + stationDist / metroSpeed;
+    const remainWalk = Math.max(0, (timeLimitMin - timeToStation)) * walkSpeed;
+    if(remainWalk < 100) return;
+    for(let i = 0; i < 12; i++) {
+      const angle = (i * 360 / 12) * Math.PI / 180;
+      const jitter = 0.85 + Math.random() * 0.30;
+      allPoints.push({
+        lat: s.lat + (remainWalk * jitter / 111320) * Math.cos(angle),
+        lng: s.lng + (remainWalk * jitter / (111320 * Math.cos(s.lat * Math.PI/180))) * Math.sin(angle)
+      });
+    }
+  });
+
+  // Compute convex hull
+  const hull = convexHull(allPoints);
+  const coords = hull.map(p => [p.lng, p.lat]);
+  coords.push(coords[0]);
+
+  return {
+    type: 'Feature',
+    properties: { duration: timeLimitMin * 60, mode: 'TRANSIT', points: hull.length, stations: reachableStations.length },
+    geometry: { type: 'Polygon', coordinates: [coords] }
+  };
+}
+
+// Simple convex hull (Graham scan)
+function convexHull(points) {
+  if(points.length < 3) return points;
+  // Find lowest point
+  let lowest = 0;
+  for(let i = 1; i < points.length; i++) {
+    if(points[i].lat < points[lowest].lat || (points[i].lat === points[lowest].lat && points[i].lng < points[lowest].lng))
+      lowest = i;
+  }
+  [points[0], points[lowest]] = [points[lowest], points[0]];
+  const pivot = points[0];
+  const sorted = points.slice(1).sort((a,b) => {
+    const angA = Math.atan2(a.lat - pivot.lat, a.lng - pivot.lng);
+    const angB = Math.atan2(b.lat - pivot.lat, b.lng - pivot.lng);
+    return angA - angB || (a.lng - pivot.lng)**2 + (a.lat - pivot.lat)**2 - ((b.lng - pivot.lng)**2 + (b.lat - pivot.lat)**2);
+  });
+  const hull = [pivot, sorted[0]];
+  for(let i = 1; i < sorted.length; i++) {
+    while(hull.length > 1) {
+      const a = hull[hull.length-2], b = hull[hull.length-1], c = sorted[i];
+      const cross = (b.lng-a.lng)*(c.lat-a.lat) - (b.lat-a.lat)*(c.lng-a.lng);
+      if(cross > 0) break;
+      hull.pop();
+    }
+    hull.push(sorted[i]);
+  }
+  return hull;
+}
+
 async function drawIsochrone(lat, lng) {
   if(isoMode === 'circle') return;
 
   if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
 
   const modeMap = {
-    walk:    { api:'WALK',    color:'#22c55e', label:'10 min à pied',    ors:'foot-walking', maxDist:0.015 },
-    drive:   { api:'DRIVE',   color:'#3b82f6', label:'10 min en voiture', ors:'driving-car',  maxDist:0.06  },
-    transit: { api:'TRANSIT', color:'#a855f7', label:'10 min en métro/bus', ors:null,          maxDist:0.04  }
+    walk:    { api:'WALK',    color:'#22c55e', label:'10 min à pied',     ors:'foot-walking', maxDist:0.015, speed:80  },
+    drive:   { api:'DRIVE',   color:'#3b82f6', label:'10 min en voiture', ors:'driving-car',  maxDist:0.06,  speed:null },
+    transit: { api:'TRANSIT', color:'#a855f7', label:'10 min en métro',   ors:null,           maxDist:0.04,  speed:null }
   };
   const cfg = modeMap[isoMode] || modeMap.drive;
 
-  showLoad('Calcul isochrone...', `${cfg.label} via Google Routes API`);
+  showLoad('Calcul isochrone...', `${cfg.label}`);
 
   let geojson = null;
+  let source = '';
 
-  // Try Google Routes API first
-  if (_googleHasKey()) {
+  // Try Google Routes API first (works best for DRIVE)
+  if (_googleHasKey() && isoMode !== 'transit') {
     geojson = await googleIsochrone(lat, lng, cfg.api, 600, cfg.maxDist);
-    if (geojson) console.log(`[Google Routes] Isochrone ${cfg.api}: ${geojson.properties.points} points`);
+    if (geojson) { source = 'Google Routes API'; console.log(`[Google Routes] Isochrone ${cfg.api}: ${geojson.properties.points} points`); }
   }
 
-  // Fallback to OpenRouteService (no transit support in ORS)
+  // Fallback to OpenRouteService
   if (!geojson && cfg.ors) {
     geojson = await fetchIsochroneORS(lat, lng, cfg.ors, 600);
-    if (geojson) console.log('[ORS fallback] Isochrone loaded');
+    if (geojson) { source = 'OpenRouteService'; console.log('[ORS fallback] Isochrone loaded'); }
+  }
+
+  // Final fallback: geometric approximation
+  if (!geojson) {
+    if(isoMode === 'transit') {
+      geojson = transitIsochrone(lat, lng, 10);
+      source = `Modèle transit (${geojson.properties.stations || 0} stations)`;
+    } else if(isoMode === 'walk') {
+      geojson = geometricIsochrone(lat, lng, 80, 10); // 80m/min walking
+      source = 'Estimation géométrique (~800m)';
+    } else {
+      geojson = geometricIsochrone(lat, lng, 500, 10); // 500m/min driving avg urban
+      source = 'Estimation géométrique (~5km)';
+    }
+    console.log(`[Fallback] Using geometric isochrone for ${isoMode}`);
   }
 
   if (geojson) {
     isoLayer = L.geoJSON(geojson, {
-      style: { color: cfg.color, weight: 2, fillColor: cfg.color, fillOpacity: 0.1, dashArray: '6,4' }
+      style: { color: cfg.color, weight: 2.5, fillColor: cfg.color, fillOpacity: 0.12, dashArray: isoMode==='transit' ? '4,8' : '6,4' }
     }).addTo(map);
 
     isoLayer.bindTooltip(
-      `<b>${cfg.label}</b><br>Google Routes API`,
+      `<b>${cfg.label}</b><br><span style="font-size:10px">${source}</span>`,
       {className:'custom-tooltip', permanent:false, direction:'center'}
     );
-  } else {
-    console.warn('Isochrone unavailable (Google + ORS both failed)');
   }
 
   hideLoad();
