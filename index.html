@@ -4239,6 +4239,145 @@ function calcNPV(cashflows, annualRate) {
   return Math.round(npv);
 }
 
+// --- MONTE CARLO SIMULATION ---
+// N iterations with random perturbations of key variables → distribution of IRR/NPV outcomes
+function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations) {
+  iterations = iterations || 1000;
+  const results = { irr: [], npv: [], payback: [], breakeven: [], caA3: [] };
+
+  // Box-Muller normal distribution
+  function randn() {
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  // Perturbation ranges (mean=1.0, stddev)
+  const vars = {
+    captage:    { std: 0.15 }, // ±15% members théo
+    arpu:       { std: 0.10 }, // ±10% ARPU
+    churn:      { std: 0.20 }, // ±20% churn rate
+    capex:      { std: 0.12 }, // ±12% CAPEX
+    rent:       { std: 0.15 }, // ±15% loyer
+    opex:       { std: 0.10 }, // ±10% OPEX
+    rampSpeed:  { std: 0.15 }, // ±15% vitesse ramp-up
+  };
+
+  const baseARPU = blendedARPU(personaMix);
+  const baseChurn = blendedChurn(personaMix);
+
+  for(let i = 0; i < iterations; i++) {
+    // Random perturbations
+    const pCapt = Math.max(0.5, 1 + randn() * vars.captage.std);
+    const pArpu = Math.max(0.7, 1 + randn() * vars.arpu.std);
+    const pChurn = Math.max(0.5, 1 + randn() * vars.churn.std);
+    const pCapex = Math.max(0.7, 1 + randn() * vars.capex.std);
+    const pRent = Math.max(0.6, 1 + randn() * vars.rent.std);
+    const pOpex = Math.max(0.7, 1 + randn() * vars.opex.std);
+    const pRamp = Math.max(0.5, 1 + randn() * vars.rampSpeed.std);
+
+    const simTheo = Math.round(totalTheorique * pCapt);
+    const simARPU = baseARPU * pArpu;
+    const simChurn = baseChurn * pChurn;
+
+    // Build cohort with perturbed ramp speed
+    const simCohort = [];
+    let prevM = 0, cumulCA = 0;
+    for(let m = 1; m <= 60; m++) {
+      const adjMonth = Math.round(m * SCENARIOS.base.rampSpeed * pRamp);
+      const refMembers = interpolateCurve(adjMonth, SPAIN_STANDARD);
+      const refFrac = refMembers / SPAIN_STANDARD_M;
+      const effectiveM = simTheo * SCENARIOS.base.capMultiplier;
+      const netMembers = Math.round(effectiveM * refFrac);
+      const monthIdx = (m - 1) % 12;
+      const seasonFactor = SEASONALITY[monthIdx];
+      const effMembers = Math.round(netMembers * (0.90 + 0.10 * seasonFactor));
+      const monthCA = effMembers * simARPU * (0.85 + 0.15 * seasonFactor);
+      cumulCA += monthCA;
+      simCohort.push({ month: m, netMembers: effMembers, monthlyCA: Math.round(monthCA), arpu: simARPU });
+      prevM = netMembers;
+    }
+
+    // Build P&L with perturbed costs
+    const capex = Math.round(PNL_DEFAULTS.capex * pCapex);
+    const baseRentAnnual = getEffectiveRentAnnual() * pRent;
+    const baseRentMonthly = Math.round(baseRentAnnual / 12);
+    const staffMonthlyA1 = Math.round(PNL_DEFAULTS.staffAnnualA1 / 12);
+    const leasingMonthly = Math.round(PNL_DEFAULTS.leasingAnnual / 12);
+    const cashflows = [-capex];
+    let cumulCF = -capex, beMonth = null, pbMonth = null;
+    const annualCA = [0,0,0,0,0];
+
+    for(let m = 0; m < 60; m++) {
+      const d = simCohort[m];
+      const yearIdx = Math.floor(m / 12);
+      const yearNum = yearIdx + 1;
+      const caAdherents = d.monthlyCA;
+      const ptRev = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1.05, yearIdx));
+      const totalCA = caAdherents + ptRev;
+      const cos = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
+      const margeBrute = totalCA - cos;
+      const staffM = Math.round(staffMonthlyA1 * Math.pow(1.06, yearIdx) * pOpex);
+      const rentM = Math.round(baseRentMonthly * Math.pow(1.02, yearIdx));
+      const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1.01, yearIdx) * pOpex);
+      const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+      const redev = Math.round(caAdherents * (PNL_DEFAULTS.redevanceRate + PNL_DEFAULTS.fondsPubRate));
+      const leasing = yearNum <= 5 ? leasingMonthly : 0;
+      const totalOpex = staffM + rentM + fpCloud + opexOps + redev;
+      const ebitda = margeBrute - totalOpex;
+      const cf = ebitda - leasing;
+      cumulCF += cf;
+      cashflows.push(cf);
+      if(yearIdx < 5) annualCA[yearIdx] += totalCA;
+      if(beMonth === null && ebitda > 0) beMonth = m + 1;
+      if(pbMonth === null && cumulCF > 0) pbMonth = m + 1;
+    }
+
+    const irr = calcIRR(cashflows);
+    const npv = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
+    results.irr.push(irr);
+    results.npv.push(npv);
+    results.payback.push(pbMonth || 61);
+    results.breakeven.push(beMonth || 61);
+    results.caA3.push(annualCA[2]);
+  }
+
+  // Sort and compute percentiles
+  function percentile(arr, p) {
+    const sorted = [...arr].sort((a,b) => a - b);
+    const idx = Math.floor(p / 100 * sorted.length);
+    return sorted[Math.min(idx, sorted.length - 1)];
+  }
+  function mean(arr) { return arr.reduce((a,b) => a + b, 0) / arr.length; }
+  function stddev(arr) { const m = mean(arr); return Math.sqrt(arr.reduce((a,b) => a + (b-m)**2, 0) / arr.length); }
+
+  // Probability of positive IRR
+  const probPositiveIRR = Math.round(results.irr.filter(v => v > 0).length / iterations * 100);
+  const probIRR15 = Math.round(results.irr.filter(v => v > 15).length / iterations * 100);
+  const probPayback36 = Math.round(results.payback.filter(v => v <= 36).length / iterations * 100);
+
+  // IRR histogram bins (for chart)
+  const irrSorted = [...results.irr].sort((a,b) => a - b);
+  const irrMin = Math.floor(irrSorted[0] / 5) * 5;
+  const irrMax = Math.ceil(irrSorted[irrSorted.length-1] / 5) * 5;
+  const bins = [];
+  for(let b = irrMin; b < irrMax; b += 5) {
+    const count = results.irr.filter(v => v >= b && v < b + 5).length;
+    bins.push({ label: `${b}-${b+5}%`, count, pct: Math.round(count / iterations * 100), midpoint: b + 2.5 });
+  }
+
+  return {
+    iterations,
+    irr: { mean: Math.round(mean(results.irr)*10)/10, std: Math.round(stddev(results.irr)*10)/10, p5: percentile(results.irr, 5), p25: percentile(results.irr, 25), p50: percentile(results.irr, 50), p75: percentile(results.irr, 75), p95: percentile(results.irr, 95), min: irrSorted[0], max: irrSorted[irrSorted.length-1] },
+    npv: { mean: Math.round(mean(results.npv)), std: Math.round(stddev(results.npv)), p5: percentile(results.npv, 5), p50: percentile(results.npv, 50), p95: percentile(results.npv, 95) },
+    payback: { mean: Math.round(mean(results.payback)*10)/10, p50: percentile(results.payback, 50), p95: percentile(results.payback, 95) },
+    caA3: { mean: Math.round(mean(results.caA3)), p5: percentile(results.caA3, 5), p95: percentile(results.caA3, 95) },
+    probPositiveIRR, probIRR15, probPayback36,
+    bins
+  };
+}
+
 // --- EXECUTIVE SUMMARY / GO-NO-GO SCORING ---
 // Weighted scoring algorithm — 100 points, Bain-level decision framework
 function computeExecSummary(r) {
@@ -4486,6 +4625,20 @@ function exportPDF() {
       <ul style="padding-left:16px">${exec.opportunities.map(o => `<li style="color:#10b981;margin-bottom:3px"><span style="color:#333">${o}</span></li>`).join('')}</ul>
     </div>` : ''}
 
+    ${r.monteCarlo ? `<div class="section">
+      <div class="section-title" style="border-left-color:#8b5cf6">Monte Carlo — Stress Test (${r.monteCarlo.iterations} simulations)</div>
+      <div class="metric-grid">
+        <div class="metric-box"><div class="label">P(IRR > 0%)</div><div class="value" style="color:${r.monteCarlo.probPositiveIRR>=90?'#10b981':'#ef4444'}">${r.monteCarlo.probPositiveIRR}%</div></div>
+        <div class="metric-box"><div class="label">P(IRR > 15%)</div><div class="value" style="color:${r.monteCarlo.probIRR15>=70?'#10b981':'#ef4444'}">${r.monteCarlo.probIRR15}%</div></div>
+        <div class="metric-box"><div class="label">P(Payback ≤ 36M)</div><div class="value" style="color:${r.monteCarlo.probPayback36>=70?'#10b981':'#ef4444'}">${r.monteCarlo.probPayback36}%</div></div>
+      </div>
+      <table style="margin-top:8px">
+        <tr><th>Métrique</th><th>P5 (pire)</th><th>P25</th><th>Médian</th><th>P75</th><th>P95 (meilleur)</th></tr>
+        <tr><td>IRR</td><td style="color:#ef4444">${r.monteCarlo.irr.p5}%</td><td>${r.monteCarlo.irr.p25}%</td><td style="font-weight:700">${r.monteCarlo.irr.p50}%</td><td>${r.monteCarlo.irr.p75}%</td><td style="color:#10b981">${r.monteCarlo.irr.p95}%</td></tr>
+        <tr><td>NPV</td><td style="color:#ef4444">${fmt(Math.round(r.monteCarlo.npv.p5/1000))}k€</td><td></td><td style="font-weight:700">${fmt(Math.round(r.monteCarlo.npv.p50/1000))}k€</td><td></td><td style="color:#10b981">${fmt(Math.round(r.monteCarlo.npv.p95/1000))}k€</td></tr>
+      </table>
+    </div>` : ''}
+
     ${window._siteAnalyses.length >= 2 ? `<div class="section">
       <div class="section-title" style="border-left-color:#8b5cf6">Matrice Comparative</div>
       <table>
@@ -4693,6 +4846,9 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   // Sensitivity / Tornado analysis
   const sensitivity = runSensitivity(totalTheorique, personaMix, avgPrice);
 
+  // Monte Carlo simulation (1000 iterations)
+  const monteCarlo = runMonteCarlo(totalTheorique, personaMix, avgPrice, 1000);
+
   return {
     captageRadius, comps: captageDetails,
     totalCaptifs, totalMembersZone,
@@ -4706,7 +4862,7 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
     breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
     // Bain-level data
     personaMix, arpu, churnRate,
-    scenarios, pnl, sensitivity,
+    scenarios, pnl, sensitivity, monteCarlo,
     ltv, ltvCacRatio, cac: DEFAULT_CAC,
     avgQuartierPrice: Math.round(avgPrice),
     nearbyCARTIERE
@@ -4971,6 +5127,64 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       </div>
     </div>
 
+    <div style="background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(139,92,246,.02));border:1px solid rgba(139,92,246,.25);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#8b5cf6;margin-bottom:8px">MONTE CARLO — Stress Test Probabiliste (${r.monteCarlo.iterations} simulations)</div>
+      <div style="font-size:7px;color:var(--gray2);margin-bottom:8px">Perturbation aleatoire de 7 variables cles (captage, ARPU, churn, CAPEX, loyer, OPEX, ramp-up) — distribution gaussienne</div>
+
+      <div style="position:relative;height:130px;width:100%;margin-bottom:8px"><canvas id="mcHistogram"></canvas></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">
+        <div style="background:var(--bg);border-radius:4px;padding:6px;text-align:center">
+          <div style="font-size:7px;color:var(--gray2)">P(IRR > 0%)</div>
+          <div style="font-size:18px;font-weight:900;color:${r.monteCarlo.probPositiveIRR>=90?'#10b981':r.monteCarlo.probPositiveIRR>=70?'#fbbf24':'#ef4444'}">${r.monteCarlo.probPositiveIRR}%</div>
+          <div style="font-size:7px;color:var(--gray2)">projet rentable</div>
+        </div>
+        <div style="background:var(--bg);border-radius:4px;padding:6px;text-align:center">
+          <div style="font-size:7px;color:var(--gray2)">P(IRR > 15%)</div>
+          <div style="font-size:18px;font-weight:900;color:${r.monteCarlo.probIRR15>=70?'#10b981':r.monteCarlo.probIRR15>=40?'#fbbf24':'#ef4444'}">${r.monteCarlo.probIRR15}%</div>
+          <div style="font-size:7px;color:var(--gray2)">objectif investisseur</div>
+        </div>
+        <div style="background:var(--bg);border-radius:4px;padding:6px;text-align:center">
+          <div style="font-size:7px;color:var(--gray2)">P(Payback ≤ 36M)</div>
+          <div style="font-size:18px;font-weight:900;color:${r.monteCarlo.probPayback36>=70?'#10b981':r.monteCarlo.probPayback36>=40?'#fbbf24':'#ef4444'}">${r.monteCarlo.probPayback36}%</div>
+          <div style="font-size:7px;color:var(--gray2)">retour en 3 ans</div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:6px;padding:8px;margin-bottom:6px">
+        <div style="font-size:8px;font-weight:700;color:var(--gray);margin-bottom:4px">DISTRIBUTION IRR (percentiles)</div>
+        <div style="display:flex;align-items:center;gap:2px;height:20px;margin-bottom:4px">
+          <div style="font-size:7px;color:var(--red);width:35px;text-align:right">${r.monteCarlo.irr.p5}%</div>
+          <div style="flex:1;position:relative;height:14px;background:var(--bg2);border-radius:3px;overflow:hidden">
+            <div style="position:absolute;left:${Math.max(0,Math.min(100,(r.monteCarlo.irr.p5-r.monteCarlo.irr.min)/(r.monteCarlo.irr.max-r.monteCarlo.irr.min)*100))}%;right:${Math.max(0,100-(r.monteCarlo.irr.p95-r.monteCarlo.irr.min)/(r.monteCarlo.irr.max-r.monteCarlo.irr.min)*100)}%;top:0;bottom:0;background:rgba(139,92,246,.25);border-radius:3px"></div>
+            <div style="position:absolute;left:${Math.max(0,Math.min(100,(r.monteCarlo.irr.p25-r.monteCarlo.irr.min)/(r.monteCarlo.irr.max-r.monteCarlo.irr.min)*100))}%;right:${Math.max(0,100-(r.monteCarlo.irr.p75-r.monteCarlo.irr.min)/(r.monteCarlo.irr.max-r.monteCarlo.irr.min)*100)}%;top:2px;bottom:2px;background:rgba(139,92,246,.5);border-radius:2px"></div>
+            <div style="position:absolute;left:${Math.max(0,Math.min(98,(r.monteCarlo.irr.p50-r.monteCarlo.irr.min)/(r.monteCarlo.irr.max-r.monteCarlo.irr.min)*100))}%;top:0;bottom:0;width:2px;background:#8b5cf6"></div>
+          </div>
+          <div style="font-size:7px;color:var(--green);width:35px">${r.monteCarlo.irr.p95}%</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--gray2);padding:0 37px">
+          <span>P5</span><span>P25: ${r.monteCarlo.irr.p25}%</span><span style="color:#8b5cf6;font-weight:700">Median: ${r.monteCarlo.irr.p50}%</span><span>P75: ${r.monteCarlo.irr.p75}%</span><span>P95</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+        <div style="background:var(--bg);border-radius:4px;padding:5px 6px">
+          <div class="metric-row"><span class="metric-label" style="font-size:8px">IRR moyen</span><span class="metric-value" style="color:#8b5cf6;font-weight:700">${r.monteCarlo.irr.mean}% ± ${r.monteCarlo.irr.std}%</span></div>
+          <div class="metric-row"><span class="metric-label" style="font-size:8px">NPV médian</span><span class="metric-value" style="color:${r.monteCarlo.npv.p50>0?'var(--green)':'var(--red)'}">${fmt(Math.round(r.monteCarlo.npv.p50/1000))}k€</span></div>
+        </div>
+        <div style="background:var(--bg);border-radius:4px;padding:5px 6px">
+          <div class="metric-row"><span class="metric-label" style="font-size:8px">Payback médian</span><span class="metric-value">M${r.monteCarlo.payback.p50}</span></div>
+          <div class="metric-row"><span class="metric-label" style="font-size:8px">CA A3 médian</span><span class="metric-value">${fmt(Math.round(r.monteCarlo.caA3.mean/1000))}k€</span></div>
+        </div>
+      </div>
+
+      <div style="font-size:7px;color:var(--gray2);line-height:1.4">
+        <b style="color:#8b5cf6">Interprétation</b> : ${r.monteCarlo.probPositiveIRR >= 90 ? 'Projet très robuste — rentable dans '+r.monteCarlo.probPositiveIRR+'% des scénarios simulés.' : r.monteCarlo.probPositiveIRR >= 70 ? 'Projet globalement viable mais sensible aux hypothèses — '+r.monteCarlo.probPositiveIRR+'% de probabilité de rentabilité.' : 'Projet risqué — seulement '+r.monteCarlo.probPositiveIRR+'% de probabilité de rentabilité. Revoir les hypothèses.'}
+        Intervalle de confiance 90% IRR : [${r.monteCarlo.irr.p5}% — ${r.monteCarlo.irr.p95}%].
+        ${r.monteCarlo.probIRR15 < 50 ? ' Attention : moins de 50% de chance d\'atteindre l\'objectif investisseur (IRR>15%).' : ''}
+      </div>
+    </div>
+
     ${r.walkIn.walkInMembers > 0 ? `
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:6px">WALK-IN — Conversion trafic mall/centre</div>
@@ -5118,6 +5332,32 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           scales: {
             x: { stacked: true, ticks: { color:'#94a3b8', font:{size:9} }, grid: { display:false } },
             y: { stacked: true, ticks: { color:'#94a3b8', font:{size:8}, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color:'#1e293b' } }
+          }
+        }
+      });
+    }
+
+    // Monte Carlo histogram
+    const mcCanvas = document.getElementById('mcHistogram');
+    if(mcCanvas && typeof Chart !== 'undefined' && r.monteCarlo) {
+      const mc = r.monteCarlo;
+      new Chart(mcCanvas, {
+        type: 'bar',
+        data: {
+          labels: mc.bins.map(b => b.label),
+          datasets: [{
+            data: mc.bins.map(b => b.count),
+            backgroundColor: mc.bins.map(b => b.midpoint < 0 ? '#ef444480' : b.midpoint < 15 ? '#fbbf2480' : '#10b98180'),
+            borderColor: mc.bins.map(b => b.midpoint < 0 ? '#ef4444' : b.midpoint < 15 ? '#fbbf24' : '#10b981'),
+            borderWidth: 1, barPercentage: 0.95, categoryPercentage: 0.95
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ctx.raw + ' simulations (' + mc.bins[ctx.dataIndex].pct + '%)' } } },
+          scales: {
+            x: { ticks: { color:'#94a3b8', font:{size:7}, maxRotation: 45 }, grid: { display:false } },
+            y: { ticks: { color:'#94a3b8', font:{size:7} }, grid: { color:'#1e293b' } }
           }
         }
       });
