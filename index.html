@@ -478,9 +478,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         </div>
         <div style="margin-top:8px">
           <div style="display:flex;gap:4px;margin-bottom:4px">
-            <button class="btn btn-sm" id="isoWalkBtn" onclick="setIsoMode('walk')" style="font-size:9px">&#128694; 10min marche</button>
-            <button class="btn btn-sm" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px">&#128663; 10min voiture</button>
-            <button class="btn btn-sm" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)">&#9898; Cercle</button>
+            <button class="btn btn-sm iso-btn" id="isoWalkBtn" onclick="setIsoMode('walk')" style="font-size:9px">&#128694; 10min marche</button>
+            <button class="btn btn-sm iso-btn" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px">&#128663; 10min voiture</button>
+            <button class="btn btn-sm iso-btn" id="isoTransitBtn" onclick="setIsoMode('transit')" style="font-size:9px">&#128647; 10min métro</button>
+            <button class="btn btn-sm iso-btn" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)">&#9898; Cercle</button>
           </div>
           <div style="margin-top:2px;font-size:8px;color:var(--gray2)">Powered by Google Routes API</div>
         </div>
@@ -1161,8 +1162,8 @@ const SECTORS = [
 // ================================================================
 const COMP_DB = [
   {name:'World Class',segment:'premium',avgSize:1500,avgMembers:2000,threat:'high',color:'#ef4444',price:'46-145',clubs:34,brand:'international'},
-  {name:'Stay Fit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~30',clubs:28,brand:'local'},
-  {name:'StayFit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~30',clubs:28,brand:'local'},
+  {name:'Stay Fit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~32',clubs:28,brand:'local'},
+  {name:'StayFit',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~32',clubs:28,brand:'local'},
   {name:'18GYM',segment:'mid',avgSize:500,avgMembers:600,threat:'medium',color:'#f97316',price:'~36',clubs:6,brand:'local'},
   {name:'Downtown Fitness',segment:'mid-premium',avgSize:700,avgMembers:800,threat:'medium',color:'#f97316',price:'~35',clubs:5,brand:'local'},
   {name:'Nr1 Fitness',segment:'mid',avgSize:600,avgMembers:700,threat:'medium',color:'#f97316',price:'~25',clubs:5,brand:'international'},
@@ -2791,7 +2792,7 @@ function showCompsOnMap(comps) {
       ${gLine}
       ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km${c.driveMins!==undefined?' <span style="color:var(--blue);font-size:9px">🚗 '+c.driveMins+' min</span>':''}</span></div>`:''}
       ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100${c.driveMins!==undefined?' <span style="font-size:8px;color:var(--gray2)">(temps reel)</span>':''}</span></div>`:''}
-      <div class="ps"><span>Prix</span><span class="pv">${c.price||'?'} EUR/mois</span></div>
+      <div class="ps"><span>Prix</span><span class="pv">${c.price || (COMP_PRICES[c.segment] ? '~'+COMP_PRICES[c.segment] : '?')} EUR/mois</span></div>
     `);
     compCluster.addLayer(mk);
   });
@@ -3595,18 +3596,20 @@ const COMP_PRICES = {
   boutique:40       // estimated
 };
 
-// Capture rates RECALIBRATED — conservative & realistic
-// Reality check: annual churn in fitness = 25-30%. Not all churners switch to FP.
-// Of those who leave a competitor, maybe 30-50% consider alternatives, and of those
-// FP captures a fraction. Net capture = churn × consideration × conversion.
+// Capture rates V3 — FP = disrupteur low-cost qui casse le marché
+// Benchmark Western Europe: quand Basic-Fit/PureGym entrent sur un marché,
+// ils captent 15-25% des membres concurrents mid-range en 2 ans.
+// FP en Roumanie = PREMIERE franchise low-cost internationale → effet encore plus fort.
+// Churn annuel fitness = 25-30%. FP capte une part significative des churners
+// car meilleur rapport qualité/prix + marque internationale + équipements neufs.
 const CAPTURE_RATES = {
-  premium: {rate:0.08, reason:'WC 46-145EUR → FP 28EUR. Fort ecart prix mais clientele attachee aux services premium (piscine, spa). Churn WC ~20%, dont ~40% considere alternatives = 8%'},
-  'mid-premium': {rate:0.12, reason:'Downtown 42EUR → FP 28EUR = -14EUR/mois. Positionnement proche, FP gagne sur marque + prix. Churn ~25%, consideration ~50% = 12%'},
-  mid: {rate:0.15, reason:'Stay Fit 32EUR / 18GYM 36EUR → FP 28EUR = -4 a -8EUR/mois. Ecart modere mais equipements neufs + marque internationale. Churn ~30%, consideration ~50% = 15%'},
-  lowcost: {rate:0.04, reason:'Deja moins cher que FP. Seuls les insatisfaits qualite migrent vers le haut'},
-  independent: {rate:0.10, reason:'Equipement vieillissant mais clients fideles par habitude. Churn ~35%, consideration ~30% = 10%'},
-  crossfit: {rate:0.03, reason:'Niche communautaire, quasi zero transferabilite'},
-  boutique: {rate:0.02, reason:'Experience unique non substituable'},
+  premium: {rate:0.12, reason:'WC 46-145EUR → FP 28EUR. Ecart prix majeur (-50 à -117EUR). Churn WC ~20%, 60% considèrent alternatives low-cost = 12%. Benchmark: Basic-Fit capte ~10-15% du premium en WE'},
+  'mid-premium': {rate:0.18, reason:'Downtown 42EUR → FP 28EUR = -33% prix. Positionnement quasi-identique, FP gagne sur prix + marque + équipements neufs. Churn ~25%, haute consideration = 18%'},
+  mid: {rate:0.22, reason:'Stay Fit 32EUR / 18GYM 36EUR → FP 28EUR. Cible identique, FP moins cher avec marque internationale. Churn ~30%, très haute consideration = 22%. Benchmark WE: 20-25% de captage mid→lowcost'},
+  lowcost: {rate:0.06, reason:'Déjà low-cost mais FP = marque internationale + équipements premium. Les insatisfaits qualité migrent vers le haut = 6%'},
+  independent: {rate:0.15, reason:'Équipement vieillissant, pas de marque. FP offre modernité + prix compétitif. Churn ~35%, haute consideration = 15%'},
+  crossfit: {rate:0.03, reason:'Niche communautaire, quasi zero transférabilité'},
+  boutique: {rate:0.02, reason:'Expérience unique non substituable'},
 };
 
 function distanceDecay(dist, driveMins) {
@@ -4274,14 +4277,50 @@ function getNearbyCARTIERE(lat, lng, radiusM) {
   return CARTIERE.filter(c => haversine(lat, lng, c.lat, c.lng) <= radiusM);
 }
 
+// NATIVE DEMAND V3 — Western Europe penetration gap model
+// Core insight: Romania fitness penetration ~4-5% vs Western Europe 15-20%.
+// Low-cost disruptors (Basic-Fit, PureGym, FP) are THE driver of penetration growth.
+// When low-cost enters a market, penetration jumps 3-6 pp in the catchment zone.
+// Source: EuropeActive 2024, Deloitte European Health & Fitness Market Report
+//
+// Model: FP doesn't just steal from competitors — it CREATES the market.
+// The "natifs" pool = people in the target demo who DON'T go to gym today
+// but WOULD if a credible low-cost option existed (= the WE penetration gap).
+const RO_PENETRATION = 0.045;  // Romania current fitness penetration (~4.5%)
+const WE_PENETRATION_TARGET = 0.13; // Target with low-cost = ~13% (conservative WE avg)
+// FP's share of the incremental market — calibrated for single-club reality
+// One FP club (1,400m²) can realistically convert ~1,500-2,500 new gym-goers
+// The rest of capacity comes from competitor capture (captifs)
+const FP_MARKET_CREATION_SHARE = 0.18;
+// Physical ceiling: one club can't create more than ~2,500 brand-new gym members
+// (the rest of its capacity is filled by competitive capture)
+const MAX_NATIVE_SINGLE_CLUB = 2500;
+
 function calcNativeDemand(popTarget, currentPenetration, fpAttractivite) {
-  const upliftPct = fpAttractivite * 0.03;
-  const nativePool = popTarget * (1 - currentPenetration/100);
-  const nativeCapture = nativePool * upliftPct;
+  // Current local penetration (may differ from national average)
+  const localPen = Math.max(currentPenetration / 100, RO_PENETRATION);
+
+  // Penetration gap = opportunity for market creation
+  const penGap = Math.max(0, WE_PENETRATION_TARGET - localPen);
+
+  // Pool of potential NEW gym-goers in the target demographic
+  const nativePool = Math.round(popTarget * penGap);
+
+  // FP's capture of this new pool, modulated by local attractiveness
+  // Higher attractiveness (good location score) → more of the gap FP can unlock
+  const attractMult = 0.8 + fpAttractivite * 0.4; // range 0.8 - 1.2
+  const captureRate = FP_MARKET_CREATION_SHARE * Math.min(attractMult, 1.3);
+  const rawNative = Math.round(nativePool * captureRate);
+  // Cap at single-club physical absorption limit
+  const nativeCapture = Math.min(rawNative, MAX_NATIVE_SINGLE_CLUB);
+
   return {
-    pool: Math.round(nativePool),
-    uplift: Math.round(upliftPct * 100 * 10) / 10,
-    captured: Math.round(nativeCapture)
+    pool: nativePool,
+    uplift: Math.round(captureRate * 100 * 10) / 10,
+    penGap: Math.round(penGap * 1000) / 10, // in % with 1 decimal
+    localPen: Math.round(localPen * 1000) / 10,
+    targetPen: Math.round(WE_PENETRATION_TARGET * 100 * 10) / 10,
+    captured: nativeCapture
   };
 }
 
@@ -4426,7 +4465,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--green)">
         <div style="font-size:7px;font-weight:700;color:var(--green)">NATIFS</div>
         <div style="font-size:18px;font-weight:900;color:var(--green)">${fmt(r.native.captured)}</div>
-        <div style="font-size:7px;color:var(--gray2)">nouvelle demande</div>
+        <div style="font-size:7px;color:var(--gray2)">création marché</div>
       </div>
       <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--cyan)">
         <div style="font-size:7px;font-weight:700;color:var(--cyan)">WALK-IN</div>
@@ -4638,19 +4677,22 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">DEMANDE NATIVE — Nouveaux pratiquants</div>
+      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">CRÉATION DE MARCHÉ — Modèle penetration gap WE</div>
       <div class="metric-row"><span class="metric-label">Pop. cible 15-45 dans rayon</span><span class="metric-value">${fmt(r.popTarget)}</span></div>
-      <div class="metric-row"><span class="metric-label">Non-inscrits (pool natif)</span><span class="metric-value">${fmt(r.native.pool)}</span></div>
-      <div class="metric-row"><span class="metric-label">Attractivite FP (flux+jeunesse)</span><span class="metric-value">${r.fpAttract}%</span></div>
-      <div class="metric-row"><span class="metric-label">Uplift penetration FP</span><span class="metric-value">+${r.native.uplift}%</span></div>
-      <div class="metric-row"><span class="metric-label">Natifs captes</span><span class="metric-value" style="color:var(--green);font-weight:700">${fmt(r.native.captured)}</span></div>
+      <div class="metric-row"><span class="metric-label">Pénétration locale actuelle</span><span class="metric-value">${r.native.localPen}%</span></div>
+      <div class="metric-row"><span class="metric-label">Pénétration cible (benchmark WE)</span><span class="metric-value" style="color:var(--cyan)">${r.native.targetPen}%</span></div>
+      <div class="metric-row"><span class="metric-label">Gap de pénétration</span><span class="metric-value" style="color:var(--yellow)">+${r.native.penGap} pp</span></div>
+      <div class="metric-row"><span class="metric-label">Pool nouveaux pratiquants</span><span class="metric-value">${fmt(r.native.pool)}</span></div>
+      <div class="metric-row"><span class="metric-label">Part FP (1er low-cost international)</span><span class="metric-value">${r.native.uplift}%</span></div>
+      <div class="metric-row"><span class="metric-label">Natifs captés (création marché)</span><span class="metric-value" style="color:var(--green);font-weight:700">${fmt(r.native.captured)}</span></div>
     </div>
 
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;color:var(--gray)">
       <div style="font-size:9px;font-weight:700;color:var(--cyan);margin-bottom:4px">METHODOLOGIE BAIN-LEVEL</div>
       <div style="line-height:1.6">
         <b>Captifs</b> = Σ (membres × taux_base × decay × note_Google × prix × force)<br>
-        <b>Natifs</b> = Pop_non_inscrite × uplift_FP | <b>Walk-in</b> = trafic_mall × 0.2%<br><br>
+        <b>Natifs</b> = Pop_cible × (Pen_WE − Pen_RO) × Part_FP — Modèle expansion marché low-cost (source: EuropeActive)<br>
+        <b>Walk-in</b> = trafic_mall × 0.2%<br><br>
         <b>Personas</b> : Etudiants (ARPU×0.7, churn 3.5%), Jeunes Actifs (×1.0, 2.5%), Familles (×1.1, 2.0%), CSP+ (×1.3, 1.8%)<br>
         Mix determine par prix moyen quartier (proxy socio-economique CARTIERE)<br><br>
         <b>Bass Diffusion</b> : F(t) = (1-e<sup>-(p+q)t</sup>) / (1+(q/p)e<sup>-(p+q)t</sup>)<br>
@@ -4859,13 +4901,34 @@ async function runSiteAnalysis(site) {
       ${cartier?`
         <div class="metric-row"><span class="metric-label">Nom</span><span class="metric-value">${cartier.name}</span></div>
         <div class="metric-row"><span class="metric-label">Population</span><span class="metric-value">${fmt(cartier.pop)}</span></div>
-        <div class="metric-row"><span class="metric-label">Prix immo. (proxy revenu)</span><span class="metric-value">${fmt(cartier.price)} EUR/m2</span></div>
+        <div class="metric-row"><span class="metric-label">Loyer cible (réf.)</span><span class="metric-value">12 EUR/m²/an HT/HC</span></div>
         <div class="metric-row"><span class="metric-label">Profil</span><span class="metric-value" style="font-size:10px">${cartier.desc}</span></div>
       `:'<div style="font-size:11px;color:var(--gray2)">Hors quartiers references</div>'}
     </div>
 
+    <div style="background:var(--bg2);border:1px solid var(--accent)40;border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:8px">&#127758; ZONE DE CHALANDISE</div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <div class="radius-pill" onclick="setRadiusFromFiche(1000)" style="padding:3px 8px;font-size:9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--gray2);${radius===1000?'background:var(--accent)30;border-color:var(--accent);color:white':''}">1 km</div>
+        <div class="radius-pill" onclick="setRadiusFromFiche(2000)" style="padding:3px 8px;font-size:9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--gray2);${radius===2000?'background:var(--accent)30;border-color:var(--accent);color:white':''}">2 km</div>
+        <div class="radius-pill" onclick="setRadiusFromFiche(3000)" style="padding:3px 8px;font-size:9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--gray2);${radius===3000?'background:var(--accent)30;border-color:var(--accent);color:white':''}">3 km</div>
+        <div class="radius-pill" onclick="setRadiusFromFiche(5000)" style="padding:3px 8px;font-size:9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--gray2);${radius===5000?'background:var(--accent)30;border-color:var(--accent);color:white':''}">5 km</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input type="range" id="ficheRadiusSlider" min="500" max="5000" step="100" value="${radius}" oninput="setRadiusFromFicheSlider(this.value)" style="flex:1;accent-color:var(--accent);height:4px;cursor:pointer">
+        <span id="ficheRadiusLabel" style="font-size:11px;font-weight:700;color:var(--accent);min-width:42px;text-align:right">${(radius/1000).toFixed(1)} km</span>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-sm iso-btn" id="isoWalkBtnF" onclick="setIsoMode('walk')" style="font-size:9px;${isoMode==='walk'?'background:rgba(212,160,23,.3);border-color:var(--accent);color:white':''}">&#128694; 10min marche</button>
+        <button class="btn btn-sm iso-btn" id="isoDriveBtnF" onclick="setIsoMode('drive')" style="font-size:9px;${isoMode==='drive'?'background:rgba(212,160,23,.3);border-color:var(--accent);color:white':''}">&#128663; 10min voiture</button>
+        <button class="btn btn-sm iso-btn" id="isoTransitBtnF" onclick="setIsoMode('transit')" style="font-size:9px;${isoMode==='transit'?'background:rgba(212,160,23,.3);border-color:var(--accent);color:white':''}">&#128647; 10min métro</button>
+        <button class="btn btn-sm iso-btn" id="isoCircleBtnF" onclick="setIsoMode('circle')" style="font-size:9px;${isoMode==='circle'?'background:rgba(212,160,23,.3);border-color:var(--accent);color:white':''}">&#9898; Cercle</button>
+      </div>
+      <div style="font-size:7px;color:var(--gray2);margin-top:4px">Powered by Google Routes API — le cercle et les isochrones se mettent à jour sur la carte</div>
+    </div>
+
     <div style="background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">POPULATION ZONE (R=${radius/1000}km) — Calcul par quartier</div>
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px" id="popZoneTitle">POPULATION ZONE (R=${radius/1000}km) — Calcul par quartier</div>
       <div class="metric-row"><span class="metric-label">Pop. totale</span><span class="metric-value">${fmt(popGranular.pop)}</span></div>
       <div class="metric-row"><span class="metric-label">Cible 15-45 ans</span><span class="metric-value" style="color:var(--blue)">${fmt(popGranular.target)}</span></div>
       <div class="metric-row"><span class="metric-label">Prix moyen zone</span><span class="metric-value">${fmt(popGranular.avgPrice)} EUR/m2</span></div>
@@ -5176,33 +5239,72 @@ function syncRadiusSlider() {
   if(s) { s.value = radius; }
   const l = el('radiusSliderLabel');
   if(l) l.textContent = (radius/1000).toFixed(1) + ' km';
+  // Also sync fiche site slider if present
+  const fs = el('ficheRadiusSlider');
+  if(fs) fs.value = radius;
+  const fl = el('ficheRadiusLabel');
+  if(fl) fl.textContent = (radius/1000).toFixed(1) + ' km';
+}
+
+// Radius controls from Fiche Site panel — syncs with main panel + updates map
+function setRadiusFromFiche(r) {
+  radius = r;
+  syncRadiusSlider();
+  // Update circle visually
+  if(circle) circle.setRadius(radius);
+  if(radiusHandle && selectedPt) {
+    const handleLng = selectedPt.lng + (radius / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
+    radiusHandle.setLatLng([selectedPt.lat, handleLng]);
+  }
+  if(selectedPt) onMapClick({latlng:selectedPt});
+}
+
+function setRadiusFromFicheSlider(val) {
+  radius = parseInt(val);
+  const fl = el('ficheRadiusLabel');
+  if(fl) fl.textContent = (radius/1000).toFixed(1) + ' km';
+  // Sync main slider too
+  syncRadiusSlider();
+  // Update circle live
+  if(circle) circle.setRadius(radius);
+  if(radiusHandle && selectedPt) {
+    const handleLng = selectedPt.lng + (radius / 111320 / Math.cos(selectedPt.lat * Math.PI/180));
+    radiusHandle.setLatLng([selectedPt.lat, handleLng]);
+  }
+  // Debounce full analysis
+  if(_radiusDebounce) clearTimeout(_radiusDebounce);
+  _radiusDebounce = setTimeout(() => {
+    if(selectedPt) onMapClick({latlng:selectedPt});
+  }, 400);
 }
 
 // ================================================================
 // ISOCHRONES — Real travel-time catchment areas
 // ================================================================
-let isoMode = 'circle'; // 'circle' | 'walk' | 'drive'
+let isoMode = 'circle'; // 'circle' | 'walk' | 'drive' | 'transit'
 let isoLayer = null;
 
 function setIsoMode(mode) {
   isoMode = mode;
-  ['isoWalkBtn','isoDriveBtn','isoCircleBtn'].forEach(id => {
-    const b = el(id);
-    if(b) b.style.cssText = 'font-size:9px;' + (
-      (mode==='walk'&&id==='isoWalkBtn') || (mode==='drive'&&id==='isoDriveBtn') || (mode==='circle'&&id==='isoCircleBtn')
-      ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : ''
-    );
+  // Update ALL iso buttons across both panels (main + fiche site)
+  document.querySelectorAll('.iso-btn').forEach(b => {
+    const isActive =
+      (mode==='walk' && b.id.includes('Walk')) ||
+      (mode==='drive' && b.id.includes('Drive')) ||
+      (mode==='transit' && b.id.includes('Transit')) ||
+      (mode==='circle' && b.id.includes('Circle'));
+    b.style.cssText = 'font-size:9px;' + (isActive ? 'background:rgba(212,160,23,.3);border-color:var(--accent);color:white' : '');
   });
   if(selectedPt) onMapClick({latlng:selectedPt});
 }
 
 // Google Routes API — Isochrone generation
 // Sends routes in N directions from center, collects reachable points to build polygon
-async function googleIsochrone(lat, lng, travelMode, timeLimitSec) {
+async function googleIsochrone(lat, lng, travelMode, timeLimitSec, maxDistOverride) {
   if (!_googleHasKey()) return null;
   const DIRECTIONS = 24; // 24 rays every 15°
   const destinations = [];
-  const maxDist = travelMode === 'WALK' ? 0.015 : 0.06; // ~1.5km walk, ~6km drive
+  const maxDist = maxDistOverride || (travelMode === 'WALK' ? 0.015 : 0.06);
 
   for (let i = 0; i < DIRECTIONS; i++) {
     const angle = (i * 360 / DIRECTIONS) * Math.PI / 180;
@@ -5230,7 +5332,8 @@ async function googleIsochrone(lat, lng, travelMode, timeLimitSec) {
             origin: { location: { latLng: { latitude: lat, longitude: lng } } },
             destination: { location: { latLng: { latitude: dest.lat, longitude: dest.lng } } },
             travelMode: travelMode,
-            routingPreference: travelMode === 'DRIVE' ? 'TRAFFIC_AWARE' : undefined
+            routingPreference: travelMode === 'DRIVE' ? 'TRAFFIC_AWARE' : undefined,
+            ...(travelMode === 'TRANSIT' ? { transitPreferences: { routingPreference: 'LESS_WALKING' } } : {})
           })
         });
         const data = await resp.json();
@@ -5300,34 +5403,36 @@ async function drawIsochrone(lat, lng) {
 
   if(isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
 
-  const travelMode = isoMode === 'walk' ? 'WALK' : 'DRIVE';
-  const color = isoMode === 'walk' ? '#22c55e' : '#3b82f6';
-  const label = isoMode === 'walk' ? '10 min a pied' : '10 min en voiture';
+  const modeMap = {
+    walk:    { api:'WALK',    color:'#22c55e', label:'10 min à pied',    ors:'foot-walking', maxDist:0.015 },
+    drive:   { api:'DRIVE',   color:'#3b82f6', label:'10 min en voiture', ors:'driving-car',  maxDist:0.06  },
+    transit: { api:'TRANSIT', color:'#a855f7', label:'10 min en métro/bus', ors:null,          maxDist:0.04  }
+  };
+  const cfg = modeMap[isoMode] || modeMap.drive;
 
-  showLoad('Calcul isochrone...', `${label} via Google Routes API`);
+  showLoad('Calcul isochrone...', `${cfg.label} via Google Routes API`);
 
   let geojson = null;
 
   // Try Google Routes API first
   if (_googleHasKey()) {
-    geojson = await googleIsochrone(lat, lng, travelMode, 600);
-    if (geojson) console.log(`[Google Routes] Isochrone ${travelMode}: ${geojson.properties.points} points`);
+    geojson = await googleIsochrone(lat, lng, cfg.api, 600, cfg.maxDist);
+    if (geojson) console.log(`[Google Routes] Isochrone ${cfg.api}: ${geojson.properties.points} points`);
   }
 
-  // Fallback to OpenRouteService
-  if (!geojson) {
-    const orsProfile = isoMode === 'walk' ? 'foot-walking' : 'driving-car';
-    geojson = await fetchIsochroneORS(lat, lng, orsProfile, 600);
+  // Fallback to OpenRouteService (no transit support in ORS)
+  if (!geojson && cfg.ors) {
+    geojson = await fetchIsochroneORS(lat, lng, cfg.ors, 600);
     if (geojson) console.log('[ORS fallback] Isochrone loaded');
   }
 
   if (geojson) {
     isoLayer = L.geoJSON(geojson, {
-      style: { color, weight: 2, fillColor: color, fillOpacity: 0.1, dashArray: '6,4' }
+      style: { color: cfg.color, weight: 2, fillColor: cfg.color, fillOpacity: 0.1, dashArray: '6,4' }
     }).addTo(map);
 
     isoLayer.bindTooltip(
-      `<b>${label}</b><br>Google Routes API`,
+      `<b>${cfg.label}</b><br>Google Routes API`,
       {className:'custom-tooltip', permanent:false, direction:'center'}
     );
   } else {
