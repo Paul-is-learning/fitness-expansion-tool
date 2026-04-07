@@ -1330,7 +1330,7 @@ const TARGETS = [
   {name:'Unirea Shopping Center',lat:44.4275,lng:26.1019,phase:1,sector:3,area:'~1,400 m2',rent:'A negocier (Colliers)',status:'En discussion',opening:'2027-2028',note:'Centre commercial historique | Metro Unirii (M1+M2+M3) | Restructuration prevue 3 ans | Cible RDC + visibilite rue',capex:1176000},
   {name:'Militari Shopping',lat:44.4367,lng:25.9827,phase:1,sector:6,area:'~1,400 m2',rent:'11 EUR/m2 (base Brico)',status:'A confirmer',opening:'Q1-2027',note:'Plus grand bassin population peri-urbaine ouest | Militari Residence ~40k hab. | Livraison Q1 2027',capex:1176000},
   {name:'Grand Arena',lat:44.3742,lng:26.1204,phase:2,sector:4,area:'~1,400 m2',rent:'TBD',status:'Interet proprietaire',opening:'2028',note:'Zone residentielle sud en forte croissance | Position existante Stayfit ou nouvelle cellule RDC+R1',capex:1176000},
-  {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,phase:2,sector:1,area:'~1,400 m2',rent:'>20 EUR/m2',status:'2 options en discussion',opening:'2028',note:'Quartier residentiel premium nord | Option A: cote hypermarche | Option B: attendre extension',capex:1176000}
+  {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,phase:2,sector:1,area:'~1,400 m2',rent:'>20 EUR/m2',status:'2 options en discussion',opening:'2028',note:'20M visites/an | 380M€ CA centre | 55k+35k GLA extension | 221ha Baneasa Project mixed-use | Business parks | 4,500 parkings | 350+ marques premium',capex:1176000}
 ];
 
 // ================================================================
@@ -1532,7 +1532,7 @@ const CARTIERE = [
   {name:'Primaverii',lat:44.4580,lng:26.0820,sector:1,pop:12000,price:3200,young:.38,desc:'Villas ambassades, CSP++'},
   {name:'Aviatorilor',lat:44.4620,lng:26.0880,sector:1,pop:10000,price:3000,young:.40,desc:'Proche Herastrau, premium'},
   {name:'Floreasca',lat:44.4680,lng:26.0950,sector:1,pop:15000,price:2600,young:.45,desc:'Business + residentiel premium'},
-  {name:'Baneasa',lat:44.4950,lng:26.0800,sector:1,pop:22000,price:2200,young:.44,desc:'Baneasa Shopping, expansion nord'},
+  {name:'Baneasa',lat:44.4950,lng:26.0800,sector:1,pop:28000,price:2500,young:.42,desc:'Baneasa Project 221ha | Shopping 20M vis/an | Business parks | Premium residential'},
   {name:'Pipera Nord',lat:44.4850,lng:26.1100,sector:1,pop:18000,price:2100,young:.46,desc:'Tech hub, bureaux + residentiel'},
   {name:'Domenii',lat:44.4680,lng:26.0550,sector:1,pop:16000,price:2000,young:.42,desc:'Residentiel calme classe moyenne+'},
   {name:'Bucurestii Noi',lat:44.4780,lng:26.0430,sector:1,pop:20000,price:1600,young:.43,desc:'Mixte, en gentrification'},
@@ -1877,7 +1877,7 @@ const POIS = [
   {name:'Nicolae Titulescu University',lat:44.404416,lng:26.121035,type:'university',students:5000,icon:'🎓'},
   // MALLS (13) — Source: romania-insider.com, official mall websites
   {name:'AFI Cotroceni',lat:44.431500,lng:26.052000,type:'mall',gla:90000,icon:'🛒'},
-  {name:'Baneasa Shopping City',lat:44.507259,lng:26.089485,type:'mall',gla:85000,icon:'🛒'},
+  {name:'Baneasa Shopping City',lat:44.507259,lng:26.089485,type:'mall',gla:90000,icon:'🛒'},// 55k GLA + 35k extension = 90k total | 20M visits/an
   {name:'Mega Mall',lat:44.441776,lng:26.152213,type:'mall',gla:75000,icon:'🛒'},
   {name:'ParkLake Mall',lat:44.420665,lng:26.149631,type:'mall',gla:70000,icon:'🛒'},
   {name:'Sun Plaza',lat:44.395444,lng:26.123051,type:'mall',gla:81000,icon:'🛒'},
@@ -1895,6 +1895,7 @@ const POIS = [
   {name:'Center-West (Cotroceni)',lat:44.433000,lng:26.055000,type:'office',employees:15000,icon:'🏢'},
   {name:'Timpuri Noi Square',lat:44.411499,lng:26.115091,type:'office',employees:15000,icon:'🏢'},
   {name:'Sema Parc',lat:44.442909,lng:26.048414,type:'office',employees:10000,icon:'🏢'},
+  {name:'Baneasa Business & Technology Park',lat:44.5050,lng:26.0870,type:'office',employees:12000,icon:'🏢'},// Part of 221ha Baneasa Project mixed-use (PPTX officiel)
   // MAJOR RESIDENTIAL (4) — Source: romania-insider.com
   {name:'Militari Residence',lat:44.430000,lng:25.960000,type:'residential',inhabitants:25000,icon:'🏠'},
   {name:'Cosmopolis',lat:44.530000,lng:26.115000,type:'residential',inhabitants:7500,icon:'🏠'},
@@ -2442,7 +2443,7 @@ const TRAFFIC_GENERATORS = {
     {name:'AFI Cotroceni',lat:44.4315,lng:26.0520,dailyVisitors:60000},       // 90k m2 GLA, largest in Romania
     {name:'Mega Mall',lat:44.4418,lng:26.1522,dailyVisitors:35000},           // S2, 70k m2 GLA
     {name:'ParkLake',lat:44.4207,lng:26.1496,dailyVisitors:30000},            // S3, 70k m2 GLA, near Titan park
-    {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,dailyVisitors:30000},// S1 nord, 85k m2 GLA
+    {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,dailyVisitors:55000},// S1 nord, 55k m2 GLA + 35k extension | 20M visits/yr (PPTX officiel) | 380M€ CA/an | 350+ marques premium
     // Tier 2: 20-30k visitors/day — major district malls
     {name:'Sun Plaza',lat:44.3954,lng:26.1231,dailyVisitors:28000},           // S4, metro Piata Sudului
     {name:'Promenada Mall',lat:44.4782,lng:26.1034,dailyVisitors:25000},      // S1, Floreasca, 45k m2 GLA
@@ -2484,7 +2485,7 @@ const TRAFFIC_GENERATORS = {
     {name:'Sun Plaza',lat:44.3954,lng:26.1231,spaces:1900},
     {name:'Grand Arena',lat:44.3742,lng:26.1204,spaces:2000},
     {name:'Plaza Romania',lat:44.4285,lng:26.0352,spaces:1800},
-    {name:'Baneasa Shopping',lat:44.5073,lng:26.0895,spaces:3000},
+    {name:'Baneasa Shopping',lat:44.5073,lng:26.0895,spaces:4500},// 2500 existants + 2000 extension
     {name:'Promenada',lat:44.4782,lng:26.1034,spaces:1600},
   ]
 };
@@ -4774,7 +4775,7 @@ function updatePnLDisplay(pnl, exec) {
 // Store all analyzed sites for comparison
 // Cache-buster: AGGRESSIVE clear on model version change
 // Clears: site analyses, custom site cached data, syncs custom site coords with TARGETS
-const MODEL_VERSION = 'v2.7-fullclear';
+const MODEL_VERSION = 'v2.8-baneasa';
 if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   // 1. Clear ranked analyses cache
   localStorage.removeItem('fpSiteAnalyses');
