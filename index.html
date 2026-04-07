@@ -4641,6 +4641,13 @@ function computeExecSummary(r) {
 
 // --- MULTI-SITE RANKING ---
 // Store all analyzed sites for comparison
+// Cache-buster: clear stale analyses when model version changes
+const MODEL_VERSION = 'v2.3-nocap';
+if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
+  localStorage.removeItem('fpSiteAnalyses');
+  localStorage.setItem('fpModelVersion', MODEL_VERSION);
+  console.log('Model updated to ' + MODEL_VERSION + ' — cache cleared');
+}
 window._siteAnalyses = JSON.parse(localStorage.getItem('fpSiteAnalyses') || '[]');
 
 function saveSiteAnalysis(name, lat, lng, r, exec) {
