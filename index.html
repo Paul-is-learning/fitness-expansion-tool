@@ -2434,7 +2434,8 @@ const TRAFFIC_GENERATORS = {
     {name:'Grand Arena',lat:44.3742,lng:26.1204,dailyVisitors:15000},         // S4 sud, Berceni
     {name:'Liberty Center',lat:44.4102,lng:26.0937,dailyVisitors:10000},      // S5, Calea Rahovei/Progresului
     {name:'City Mall',lat:44.4130,lng:26.0920,dailyVisitors:8000},            // S5, Eroii Revolutiei (partly closed, low traffic)
-    // Planned/Under construction
+    // Planned/Under construction — major projects
+    {name:'Hala Laminor',lat:44.4258,lng:26.1492,dailyVisitors:35000},        // S3, 86.3k m2 GLA mixed-use, metro Republica, mairie S3, bureaux, université — ouverture 2027
     {name:'Dambovita Center',lat:44.4360,lng:26.0880,dailyVisitors:5000},     // S6, under development
   ],
   pedestrian: [{name:'Calea Victoriei',lat:44.4440,lng:26.0930,dailyPed:50000},
@@ -3738,14 +3739,15 @@ function calcWalkIn(lat, lng) {
     else if(d < 800) { dailyFootfall += m.dailyVisitors * 0.3; sources.push({name:m.name,visitors:Math.round(m.dailyVisitors*0.3),type:'adjacent'}); }
   });
 
-  // Walk-in conversion: 0.7% of annual unique visitors become members
-  // (industry benchmark: 0.5-1% for fitness in shopping centres)
-  const annualUnique = dailyFootfall * 300; // ~300 operating days, adjusted for repeat visitors
-  // Walk-in conversion lowered: 0.2% (was 0.7% — too aggressive)
-  // Reality: most mall visitors never enter the gym. 0.2% = 2 per 1000 visitors/year
-  const walkInMembers = Math.round(annualUnique * 0.002);
+  // Walk-in conversion: unique visitors × conversion rate
+  // Daily footfall = total visits/day. Average mall visitor comes ~2.5x/month = 30x/year
+  const AVG_VISIT_FREQ = 30; // repeat visit frequency (Cushman & Wakefield EU benchmark)
+  const annualUnique = Math.round(dailyFootfall * 300 / AVG_VISIT_FREQ); // ~300 operating days / repeat factor
+  // Conversion: 0.7% of annual unique visitors become members (IHRSA benchmark for in-mall fitness)
+  // "in-mall" = club inside the centre → full conversion. "adjacent" = nearby → lower base already in footfall calc
+  const walkInMembers = Math.round(annualUnique * 0.007);
 
-  return { dailyFootfall, annualUnique, walkInMembers, sources, conversionRate: 0.7 };
+  return { dailyFootfall, annualUnique, walkInMembers, sources, conversionRate: 0.7, avgVisitFreq: AVG_VISIT_FREQ };
 }
 
 // ================================================================
