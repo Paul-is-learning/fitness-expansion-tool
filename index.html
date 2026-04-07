@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<!-- BUILD: v2.5-coordfix-20260407 -->
+<!-- BUILD: v2.6-rentslider-20260407 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="build-version" content="v2.5-coordfix-20260407">
+<meta name="build-version" content="v2.6-rentslider-20260407">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FP Romania — Expansion Intelligence Platform</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -4258,8 +4258,21 @@ const PNL_DEFAULTS = {
 
 // Get monthly rent (all-in: base rent + service charges + marketing) for a given year
 // scenario: 'offerInitiale' or 'objectifNego'
-function getSteppedRentMonthly(yearNum, scenario) {
+// Rent override system — allows slider to adjust rent in real-time
+window._rentOverride = null; // {y1: number} — if set, overrides objectifNego Y1 and scales Y3/Y5 proportionally
+window._rentOverrides = {}; // per-site storage: siteKey → y1 rent
+
+function getRentSteps(scenario) {
   const steps = PNL_DEFAULTS.rentSteps[scenario || 'objectifNego'];
+  if(!window._rentOverride || scenario === 'offerInitiale') return steps;
+  // Scale Y3/Y5 proportionally to Y1 override
+  const origY1 = PNL_DEFAULTS.rentSteps.objectifNego[0].rent;
+  const ratio = window._rentOverride.y1 / origY1;
+  return steps.map(s => ({...s, rent: Math.round(s.rent * ratio * 10) / 10}));
+}
+
+function getSteppedRentMonthly(yearNum, scenario) {
+  const steps = getRentSteps(scenario);
   const surface = PNL_DEFAULTS.rentSteps.surface;
   const sc = PNL_DEFAULTS.rentSteps.serviceCharge;
   const mf = PNL_DEFAULTS.rentSteps.marketingFee;
@@ -4658,10 +4671,107 @@ function computeExecSummary(r) {
   return { total, scores, verdict, verdictColor, verdictDesc, risks, opportunities };
 }
 
+// --- RENT SLIDER: REAL-TIME P&L RECALC ---
+function onRentSliderChange(val) {
+  const y1 = parseFloat(val);
+  window._rentOverride = {y1};
+  // Store per-site for persistence
+  if(window._lastCaptageLocation) {
+    const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
+    window._rentOverrides[key] = y1;
+  }
+  // Update slider label
+  const lbl = document.getElementById('rent-slider-label');
+  if(lbl) lbl.textContent = y1.toFixed(1) + '€/m²';
+  // Update rent tier labels
+  const steps = getRentSteps('objectifNego');
+  const e = id => document.getElementById(id);
+  if(e('rent-y1-sqm')) e('rent-y1-sqm').textContent = steps[0].rent + '€/m²';
+  if(e('rent-y3-sqm')) e('rent-y3-sqm').textContent = steps[1].rent + '€/m²';
+  if(e('rent-y5-sqm')) e('rent-y5-sqm').textContent = steps[2].rent + '€/m²';
+  if(e('rent-y1-monthly')) e('rent-y1-monthly').textContent = fmt(getSteppedRentMonthly(1,'objectifNego')) + '/mois';
+  if(e('rent-y3-monthly')) e('rent-y3-monthly').textContent = fmt(getSteppedRentMonthly(3,'objectifNego')) + '/mois';
+  if(e('rent-y5-monthly')) e('rent-y5-monthly').textContent = fmt(getSteppedRentMonthly(5,'objectifNego')) + '/mois';
+  // Debounce P&L recalc (heavier computation)
+  clearTimeout(window._rentRecalcTimer);
+  window._rentRecalcTimer = setTimeout(recalcPnLWithRent, 150);
+}
+
+function recalcPnLWithRent() {
+  if(!window._lastCaptageData) return;
+  const {r, avgPrice} = window._lastCaptageData;
+  // Recalc PnL for all 3 scenarios with new rent
+  const pnl = {};
+  for(const key of ['conservateur','base','optimiste']) {
+    pnl[key] = buildPnL(r.scenarios[key].cohort, avgPrice);
+  }
+  r.pnl = pnl;
+  // Recompute scoring
+  const exec = computeExecSummary(r);
+  window._lastExecData = {r, exec};
+  // Update DOM
+  updatePnLDisplay(pnl, exec);
+}
+
+function updatePnLDisplay(pnl, exec) {
+  const e = id => document.getElementById(id);
+  // Update P&L grid for each scenario
+  for(const key of ['conservateur','base','optimiste']) {
+    const p = pnl[key];
+    for(let i=0;i<5;i++) {
+      const caEl = e('pnl-ca'+(i+1)+'-'+key);
+      if(caEl) caEl.textContent = fmt(Math.round(p.annualCA[i]/1000)) + 'k';
+    }
+    const beEl = e('pnl-be-'+key);
+    if(beEl) { beEl.textContent = p.breakevenMonth ? 'M'+p.breakevenMonth : 'N/A'; beEl.style.color = p.breakevenMonth ? 'var(--green)' : 'var(--red)'; }
+    const pbEl = e('pnl-pb-'+key);
+    if(pbEl) { pbEl.textContent = p.paybackMonth ? 'M'+p.paybackMonth : '>60M'; pbEl.style.color = p.paybackMonth ? 'var(--green)' : 'var(--red)'; }
+    const irrEl = e('pnl-irr-'+key);
+    if(irrEl) { irrEl.innerHTML = '<b>'+p.irr+'%</b>'; irrEl.style.color = p.irr>15?'var(--green)':p.irr>8?'var(--yellow)':'var(--red)'; }
+    const npvEl = e('pnl-npv-'+key);
+    if(npvEl) { npvEl.textContent = fmt(Math.round(p.npv/1000))+'k'; npvEl.style.color = p.npv>0?'var(--green)':'var(--red)'; }
+  }
+  // Update loyer/mois box
+  if(e('pnl-loyer-box')) e('pnl-loyer-box').textContent = fmt(pnl.base.rent);
+  // Update exec summary
+  if(e('exec-score')) { e('exec-score').textContent = exec.total; e('exec-score').style.color = exec.verdictColor; }
+  if(e('exec-verdict')) { e('exec-verdict').textContent = exec.verdict; e('exec-verdict').style.color = exec.verdictColor; }
+  if(e('exec-verdict-desc')) e('exec-verdict-desc').textContent = exec.verdictDesc;
+  // Update score bars
+  if(e('exec-scores-bars')) {
+    e('exec-scores-bars').innerHTML = Object.values(exec.scores).map(s => {
+      const pct = Math.round(s.score / s.max * 100);
+      const col = pct >= 70 ? '#10b981' : pct >= 50 ? '#fbbf24' : '#ef4444';
+      return `<div style="flex:1;text-align:center">
+        <div style="font-size:7px;color:var(--gray2);margin-bottom:2px">${s.label}</div>
+        <div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div></div>
+        <div style="font-size:9px;font-weight:800;color:${col};margin-top:1px">${s.score}/${s.max}</div>
+      </div>`;
+    }).join('');
+  }
+  // Update offre initiale delta
+  if(e('rent-offre-delta') && pnl.base.irrOffreInitiale !== null) {
+    e('rent-offre-delta').innerHTML = `⚠ Si offre initiale bailleur (${PNL_DEFAULTS.rentSteps.offerInitiale[0].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[1].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[2].rent}€/m²) : IRR = ${pnl.base.irrOffreInitiale.toFixed(1)}% vs ${pnl.base.irr.toFixed(1)}% objectif négo → delta ${(pnl.base.irr - pnl.base.irrOffreInitiale).toFixed(1)} pts`;
+  }
+  // Update P&L chart if exists
+  if(window._pnlChart) {
+    try {
+      const months = Array.from({length:60},(_,i)=>i+1);
+      const scenarioKeys = ['conservateur','base','optimiste'];
+      scenarioKeys.forEach((key,idx) => {
+        if(window._pnlChart.data.datasets[idx]) {
+          window._pnlChart.data.datasets[idx].data = pnl[key].monthly.map(m => Math.round(m.ebitda));
+        }
+      });
+      window._pnlChart.update('none');
+    } catch(err) { console.warn('Chart update failed:', err); }
+  }
+}
+
 // --- MULTI-SITE RANKING ---
 // Store all analyzed sites for comparison
 // Cache-buster: clear stale analyses when model version changes
-const MODEL_VERSION = 'v2.5-coordfix';
+const MODEL_VERSION = 'v2.6-rentslider';
 if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   localStorage.removeItem('fpSiteAnalyses');
   localStorage.setItem('fpModelVersion', MODEL_VERSION);
@@ -5096,6 +5206,13 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
 // Render captage analysis in a container
 function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   window._lastCaptageLocation = {lat, lng, radius: captageRadius, containerId};
+  // Restore per-site rent override if previously adjusted
+  const siteKey = lat.toFixed(3) + ',' + lng.toFixed(3);
+  if(window._rentOverrides[siteKey]) {
+    window._rentOverride = {y1: window._rentOverrides[siteKey]};
+  } else {
+    window._rentOverride = null;
+  }
   const r = runCaptageAnalysis(lat, lng, captageRadius);
   const c = el(containerId);
   if(!c) return;
@@ -5103,6 +5220,8 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   // Executive Summary scoring
   const exec = computeExecSummary(r);
   window._lastExecData = {r, exec};
+  // Store for real-time recalc (rent slider)
+  window._lastCaptageData = {r, avgPrice: r.avgQuartierPrice, containerId};
 
   // Save to multi-site ranking
   const siteName = window._lastCaptageLocation?.siteName || customSites.find(s => Math.abs(s.lat-lat)<0.001 && Math.abs(s.lng-lng)<0.001)?.name || `Site ${lat.toFixed(3)},${lng.toFixed(3)}`;
@@ -5118,17 +5237,17 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <button onclick="exportPDF()" style="font-size:8px;padding:3px 10px;background:var(--accent);border:none;border-radius:4px;color:#000;cursor:pointer;font-weight:700;font-family:var(--font)">&#128196; Export PDF</button>
       </div>
       <div style="font-size:8px;font-weight:700;color:var(--gray2);letter-spacing:1px;margin-bottom:8px">EXECUTIVE SUMMARY</div>
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px">
+      <div id="exec-summary-header" style="display:flex;align-items:center;gap:16px;margin-bottom:10px">
         <div style="text-align:center">
-          <div style="font-size:44px;font-weight:900;color:${exec.verdictColor};line-height:1">${exec.total}</div>
+          <div id="exec-score" style="font-size:44px;font-weight:900;color:${exec.verdictColor};line-height:1">${exec.total}</div>
           <div style="font-size:8px;color:var(--gray2)">/100</div>
         </div>
         <div style="flex:1">
-          <div style="font-size:18px;font-weight:900;color:${exec.verdictColor};margin-bottom:2px">${exec.verdict}</div>
-          <div style="font-size:9px;color:var(--gray)">${exec.verdictDesc}</div>
+          <div id="exec-verdict" style="font-size:18px;font-weight:900;color:${exec.verdictColor};margin-bottom:2px">${exec.verdict}</div>
+          <div id="exec-verdict-desc" style="font-size:9px;color:var(--gray)">${exec.verdictDesc}</div>
         </div>
       </div>
-      <div style="display:flex;gap:3px;margin-bottom:8px">
+      <div id="exec-scores-bars" style="display:flex;gap:3px;margin-bottom:8px">
         ${Object.values(exec.scores).map(s => {
           const pct = Math.round(s.score / s.max * 100);
           const col = pct >= 70 ? '#10b981' : pct >= 50 ? '#fbbf24' : '#ef4444';
@@ -5266,17 +5385,17 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         ${Object.entries(SCENARIOS).map(([k,sc]) => `<div style="font-size:8px;color:${sc.color}">● ${sc.label}</div>`).join('')}
         <div style="font-size:8px;color:var(--gray2)">- - Breakeven</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">
+      <div id="pnl-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">
         ${Object.entries(SCENARIOS).map(([key, sc]) => {
           const p = r.pnl[key];
           return `<div style="background:var(--bg2);border-radius:4px;padding:4px 6px;font-size:9px;border-top:2px solid ${sc.color}">
             <div style="color:${sc.color};font-size:7px;font-weight:700;margin-bottom:3px">${sc.label.toUpperCase()}</div>
-            ${p.annualCA.map((ca,i) => `<div class="metric-row"><span class="metric-label">A${i+1} CA</span><span class="metric-value">${fmt(Math.round(ca/1000))}k</span></div>`).join('')}
+            ${p.annualCA.map((ca,i) => `<div class="metric-row"><span class="metric-label">A${i+1} CA</span><span class="metric-value" id="pnl-ca${i+1}-${key}">${fmt(Math.round(ca/1000))}k</span></div>`).join('')}
             <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.15)">
-              <div class="metric-row"><span class="metric-label">Breakeven</span><span class="metric-value" style="color:${p.breakevenMonth?'var(--green)':'var(--red)'}">${p.breakevenMonth?'M'+p.breakevenMonth:'N/A'}</span></div>
-              <div class="metric-row"><span class="metric-label">Payback</span><span class="metric-value" style="color:${p.paybackMonth?'var(--green)':'var(--red)'}">${p.paybackMonth?'M'+p.paybackMonth:'>60M'}</span></div>
-              <div class="metric-row"><span class="metric-label">IRR</span><span class="metric-value" style="color:${p.irr>15?'var(--green)':p.irr>8?'var(--yellow)':'var(--red)'}"><b>${p.irr}%</b></span></div>
-              <div class="metric-row"><span class="metric-label">NPV</span><span class="metric-value" style="color:${p.npv>0?'var(--green)':'var(--red)'}">${fmt(Math.round(p.npv/1000))}k</span></div>
+              <div class="metric-row"><span class="metric-label">Breakeven</span><span class="metric-value" id="pnl-be-${key}" style="color:${p.breakevenMonth?'var(--green)':'var(--red)'}">${p.breakevenMonth?'M'+p.breakevenMonth:'N/A'}</span></div>
+              <div class="metric-row"><span class="metric-label">Payback</span><span class="metric-value" id="pnl-pb-${key}" style="color:${p.paybackMonth?'var(--green)':'var(--red)'}">${p.paybackMonth?'M'+p.paybackMonth:'>60M'}</span></div>
+              <div class="metric-row"><span class="metric-label">IRR</span><span class="metric-value" id="pnl-irr-${key}" style="color:${p.irr>15?'var(--green)':p.irr>8?'var(--yellow)':'var(--red)'}"><b>${p.irr}%</b></span></div>
+              <div class="metric-row"><span class="metric-label">NPV</span><span class="metric-value" id="pnl-npv-${key}" style="color:${p.npv>0?'var(--green)':'var(--red)'}">${fmt(Math.round(p.npv/1000))}k</span></div>
             </div>
           </div>`;
         }).join('')}
@@ -5288,7 +5407,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
         <div style="background:var(--bg2);border-radius:4px;padding:6px;text-align:center">
           <div style="font-size:7px;color:var(--gray2)">LOYER/MOIS</div>
-          <div style="font-size:14px;font-weight:800;color:var(--yellow)">${fmt(r.pnl.base.rent)}</div>
+          <div id="pnl-loyer-box" style="font-size:14px;font-weight:800;color:var(--yellow)">${fmt(r.pnl.base.rent)}</div>
         </div>
         <div style="background:var(--bg2);border-radius:4px;padding:6px;text-align:center">
           <div style="font-size:7px;color:var(--gray2)">OPEX FIXE/MOIS</div>
@@ -5298,28 +5417,36 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
         CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${Math.round(PNL_DEFAULTS.staffRate*100)}% CA (plancher ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRate*100)}% CA | Redev 6%+2% | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
       </div>
-      <div style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
-        <div style="font-size:8px;font-weight:700;color:var(--accent);margin-bottom:4px">LOYER — Paliers réels Hala Laminor (${PNL_DEFAULTS.rentSteps.surface} m²)</div>
+      <div id="rent-block" style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:8px;font-weight:700;color:var(--accent)">LOYER — Ajustable en direct (${PNL_DEFAULTS.rentSteps.surface} m²)</div>
+          <div style="font-size:9px;font-weight:800;color:var(--accent)" id="rent-slider-label">${(window._rentOverride?.y1 || PNL_DEFAULTS.rentSteps.objectifNego[0].rent).toFixed(1)}€/m²</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:7px;color:var(--gray2)">5€</span>
+          <input id="rentSlider" type="range" min="5" max="25" step="0.5" value="${window._rentOverride?.y1 || PNL_DEFAULTS.rentSteps.objectifNego[0].rent}" style="flex:1;accent-color:var(--accent);height:5px;cursor:pointer" oninput="onRentSliderChange(this.value)">
+          <span style="font-size:7px;color:var(--gray2)">25€</span>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:6px">
           <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
             <div style="font-size:7px;color:var(--gray2)">Y1-Y2</div>
-            <div style="font-size:10px;font-weight:700;color:var(--green)">${PNL_DEFAULTS.rentSteps.objectifNego[0].rent}€/m²</div>
-            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(1,'objectifNego'))}/mois</div>
+            <div id="rent-y1-sqm" style="font-size:10px;font-weight:700;color:var(--green)">${getRentSteps('objectifNego')[0].rent}€/m²</div>
+            <div id="rent-y1-monthly" style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(1,'objectifNego'))}/mois</div>
           </div>
           <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
             <div style="font-size:7px;color:var(--gray2)">Y3-Y4</div>
-            <div style="font-size:10px;font-weight:700;color:var(--yellow)">${PNL_DEFAULTS.rentSteps.objectifNego[1].rent}€/m²</div>
-            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(3,'objectifNego'))}/mois</div>
+            <div id="rent-y3-sqm" style="font-size:10px;font-weight:700;color:var(--yellow)">${getRentSteps('objectifNego')[1].rent}€/m²</div>
+            <div id="rent-y3-monthly" style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(3,'objectifNego'))}/mois</div>
           </div>
           <div style="flex:1;background:var(--bg);border-radius:4px;padding:4px;text-align:center">
             <div style="font-size:7px;color:var(--gray2)">Y5+</div>
-            <div style="font-size:10px;font-weight:700;color:var(--orange)">${PNL_DEFAULTS.rentSteps.objectifNego[2].rent}€/m²</div>
-            <div style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(5,'objectifNego'))}/mois</div>
+            <div id="rent-y5-sqm" style="font-size:10px;font-weight:700;color:var(--orange)">${getRentSteps('objectifNego')[2].rent}€/m²</div>
+            <div id="rent-y5-monthly" style="font-size:7px;color:var(--gray2)">${fmt(getSteppedRentMonthly(5,'objectifNego'))}/mois</div>
           </div>
         </div>
-        <div style="font-size:7px;color:var(--gray2)">
+        <div id="rent-footer" style="font-size:7px;color:var(--gray2)">
           Charges: ${PNL_DEFAULTS.rentSteps.serviceCharge}€/m² + Marketing: ${PNL_DEFAULTS.rentSteps.marketingFee}€/m² | Indexation HICP ~${(PNL_DEFAULTS.rentSteps.indexation*100).toFixed(0)}%/an
-          ${r.pnl.base.irrOffreInitiale !== null ? `<br><span style="color:var(--orange)">⚠ Si offre initiale bailleur (${PNL_DEFAULTS.rentSteps.offerInitiale[0].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[1].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[2].rent}€/m²) : IRR = ${r.pnl.base.irrOffreInitiale.toFixed(1)}% vs ${r.pnl.base.irr.toFixed(1)}% objectif négo → delta ${(r.pnl.base.irr - r.pnl.base.irrOffreInitiale).toFixed(1)} pts</span>` : ''}
+          ${r.pnl.base.irrOffreInitiale !== null ? `<br><span id="rent-offre-delta" style="color:var(--orange)">⚠ Si offre initiale bailleur (${PNL_DEFAULTS.rentSteps.offerInitiale[0].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[1].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[2].rent}€/m²) : IRR = ${r.pnl.base.irrOffreInitiale.toFixed(1)}% vs ${r.pnl.base.irr.toFixed(1)}% objectif négo → delta ${(r.pnl.base.irr - r.pnl.base.irrOffreInitiale).toFixed(1)} pts</span>` : ''}
         </div>
       </div>
     </div>
@@ -5543,7 +5670,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       }
       // Breakeven line
       datasets.push({ label:'Breakeven', data: r.pnl.base.monthly.map(()=>0), borderColor:'#94a3b8', borderDash:[3,3], borderWidth:1, pointRadius:0, fill:false });
-      new Chart(pnlCanvas, {
+      window._pnlChart = new Chart(pnlCanvas, {
         type: 'line',
         data: { labels, datasets },
         options: {
