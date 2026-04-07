@@ -4139,10 +4139,10 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
   }
 
   // Build adjusted P&L (mirrors buildPnL structure — stepped rent)
-  const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
   const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
   let cumulCashFlow = -adjCapex;
   const cashflows = [-adjCapex];
+  let ebitdaY5 = 0;
 
   for(let i = 0; i < data.length; i++) {
     const yearIdx = Math.floor(i / 12);
@@ -4152,7 +4152,7 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     const totalCA = caAdherents + ptRevenue;
     const costOfSales = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
     const margeBrute = totalCA - costOfSales;
-    const staffM = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx) * adjOpexMult);
+    const staffM = Math.round(getStaffMonthly(totalCA, yearNum) * adjOpexMult);
     const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * adjRentMult);
     const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx) * adjOpexMult);
     const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
@@ -4164,7 +4164,12 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     const cashFlow = ebitda - leasing;
     cumulCashFlow += cashFlow;
     cashflows.push(cashFlow);
+    if(yearNum === 5) ebitdaY5 += ebitda;
   }
+
+  // Terminal value (EBITDA Y5 × exit multiple)
+  const sensTV = Math.round(Math.max(0, ebitdaY5) * PNL_DEFAULTS.exitMultiple);
+  cashflows[cashflows.length - 1] += sensTV;
 
   return calcIRR(cashflows);
 }
@@ -4182,8 +4187,12 @@ const PNL_DEFAULTS = {
   capex: 1176000,            // EUR — Travaux 840k + Equip CAPEX 40%=336k (BP V17 C79)
   leasingAnnual: 100800,     // EUR/an — 504k equip leasing 60% / 5 ans (BP V17 C86)
   leasingYears: 5,           // Duree leasing
-  staffAnnualA1: 85890,      // EUR/an — 4 ETP + charges 2.25% (BP V17 C60)
-  staffGrowth: 0.06,         // +6%/an (BP V17 C61)
+  // Staff = 9% du CA (BP officiel FP — moyenne 10 ans avec Laminor)
+  // Plancher = 65,000€/an (4 ETP Romania minimum: 1 manager + 3 coaches)
+  // En ramp-up le plancher s'applique, à maturité le 9% prend le relais
+  staffRate: 0.09,           // % du CA — BP officiel FP
+  staffFloorAnnual: 65000,   // EUR/an — plancher 4 ETP Romania (salaires RO)
+  staffGrowth: 0.03,         // +3%/an sur le plancher uniquement (inflation RO)
   // STEPPED RENT — Real data from Hala Laminor offer (01.04.2026)
   // Surface: 1449 m² | Service charges: 5€/m² | Marketing fee: 0.5€/m²
   // Two scenarios: initial offer vs negotiation target
@@ -4206,7 +4215,10 @@ const PNL_DEFAULTS = {
   rentGrowth: 0.03,          // HICP indexation (replaces fixed 2%)
   fpCloudMonthly: 600,       // EUR/mois (BP V17 C64)
   fpCloudGrowth: 0.01,       // ~1%/an
-  opexOpsRate: 0.26,         // % du CA Total — maint/secu/menage/energie (BP V17 C65)
+  // OPEX operations = 27% du CA (BP officiel FP — Maint/Secu/Menage/Energie)
+  // Moyenne 10 ans avec Laminor pluggé. Inclut: maintenance 8%, énergie 4%,
+  // sécu/ménage ~8%, assurance/IT/admin/marketing local ~7%
+  opexOpsRate: 0.20,         // % du CA Total — compressé Romania (vs 27% France)
   costOfSalesRate: 0.05,     // % du CA Total — accessoires VAD (BP V17 C63)
   redevanceRate: 0.06,       // % du CA Adherents — marque → FP France (BP V17 C21)
   fondsPubRate: 0.02,        // % du CA Adherents — fonds publicitaire (BP V17 C17)
@@ -4218,7 +4230,9 @@ const PNL_DEFAULTS = {
   discountRate: 0.12,        // WACC 12% (BP V17 C112)
   caGrowthA4A6: 0.05,        // +5%/an post-maturite A4-A6 (BP V17 C38)
   caGrowthA7Plus: 0.02,      // +2%/an long terme A7+ (BP V17 C39)
-  targetMembers: 4000        // Cible maturite A3 (BP V17 C34)
+  targetMembers: 4000,       // Cible maturite A3 (BP V17 C34)
+  exitMultiple: 6,           // EV/EBITDA multiple sortie Y5 (standard franchise fitness EU)
+  terminalGrowth: 0.02       // Croissance perpetuelle pour Gordon (= inflation long terme)
 };
 
 // Get monthly rent (all-in: base rent + service charges + marketing) for a given year
@@ -4238,9 +4252,15 @@ function getSteppedRentMonthly(yearNum, scenario) {
   return Math.round(surface * (rentPerSqm + sc + mf) * hicpMult);
 }
 
+// Staff = max(9% du CA mensuel, plancher 4 ETP avec inflation)
+function getStaffMonthly(monthlyCA, yearNum) {
+  const rateStaff = Math.round(monthlyCA * PNL_DEFAULTS.staffRate);
+  const floorStaff = Math.round(PNL_DEFAULTS.staffFloorAnnual / 12 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearNum - 1));
+  return Math.max(rateStaff, floorStaff);
+}
+
 function buildPnL(cohortData, avgQuartierPrice) {
   const capex = PNL_DEFAULTS.capex;
-  const staffMonthlyA1 = PNL_DEFAULTS.staffAnnualA1 / 12;
   const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
   const arpu = getFP_MONTHLY_HT();
 
@@ -4267,8 +4287,8 @@ function buildPnL(cohortData, avgQuartierPrice) {
     const margeBrute = totalCA - costOfSales;
 
     // --- OPEX ---
-    // Staff (grows 6%/yr)
-    const staffMonthly = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yearIdx));
+    // Staff = max(9% CA, plancher 4 ETP) — BP officiel FP
+    const staffMonthly = getStaffMonthly(totalCA, yearNum);
     // Stepped rent — Hala Laminor paliers (objectif négo) + HICP indexation
     const rentMonthly = getSteppedRentMonthly(yearNum, 'objectifNego');
     // FP Cloud
@@ -4307,16 +4327,28 @@ function buildPnL(cohortData, avgQuartierPrice) {
     });
   }
 
-  const irr = calcIRR(cashflows);
-  const npv = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
+  // --- Terminal Value (standard DCF — valeur de sortie Y5) ---
+  // TV = EBITDA_Y5 × exit multiple, ajouté au dernier cashflow
+  const ebitdaY5Annual = annualEBITDA[4] || 0;
+  const terminalValue = Math.round(ebitdaY5Annual * PNL_DEFAULTS.exitMultiple);
+
+  // IRR/NPV with terminal value (= investment horizon with exit)
+  const cfWithTV = [...cashflows];
+  cfWithTV[cfWithTV.length - 1] += terminalValue;
+  const irr = calcIRR(cfWithTV);
+  const npv = calcNPV(cfWithTV, PNL_DEFAULTS.discountRate);
+
+  // IRR/NPV without terminal value (= pure operating cashflows 5 ans)
+  const irrOps = calcIRR(cashflows);
+  const npvOps = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
+
   const rentY1 = getSteppedRentMonthly(1, 'objectifNego');
-  const fixedOpexDisplay = Math.round(staffMonthlyA1 + PNL_DEFAULTS.fpCloudMonthly);
+  const fixedOpexDisplay = Math.round(PNL_DEFAULTS.staffFloorAnnual / 12 + PNL_DEFAULTS.fpCloudMonthly);
 
   // Also compute IRR with offre initiale for comparison
   let irrOffreInitiale = null;
   {
     const cfInit = [-capex];
-    let cumCF = -capex;
     for(let i = 0; i < cohortData.length && i < 60; i++) {
       const d = cohortData[i];
       const yIdx = Math.floor(i / 12);
@@ -4326,7 +4358,7 @@ function buildPnL(cohortData, avgQuartierPrice) {
       const tCA = caAdh + ptRev;
       const cos = Math.round(tCA * PNL_DEFAULTS.costOfSalesRate);
       const mb = tCA - cos;
-      const stf = Math.round(staffMonthlyA1 * Math.pow(1 + PNL_DEFAULTS.staffGrowth, yIdx));
+      const stf = getStaffMonthly(tCA, yNum);
       const rnt = getSteppedRentMonthly(yNum, 'offerInitiale');
       const fpc = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yIdx));
       const opx = Math.round(tCA * PNL_DEFAULTS.opexOpsRate);
@@ -4337,7 +4369,10 @@ function buildPnL(cohortData, avgQuartierPrice) {
       const ebt = mb - totOpex;
       cfInit.push(ebt - lsg);
     }
-    irrOffreInitiale = calcIRR(cfInit);
+    // Add terminal value to offre initiale too
+    const cfInitTV = [...cfInit];
+    cfInitTV[cfInitTV.length - 1] += terminalValue;
+    irrOffreInitiale = calcIRR(cfInitTV);
   }
 
   return {
@@ -4345,6 +4380,7 @@ function buildPnL(cohortData, avgQuartierPrice) {
     capex, rent: rentY1, fixedOpex: fixedOpexDisplay,
     breakevenMonth, paybackMonth,
     irr, npv, irrOffreInitiale,
+    irrOps, npvOps, terminalValue,
     totalCA5y: Math.round(annualCA.reduce((a,b)=>a+b,0)),
     avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0,
     rentSteps: PNL_DEFAULTS.rentSteps, leasingMonthly
@@ -4455,10 +4491,9 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
 
     // Build P&L with perturbed costs (stepped rent)
     const capex = Math.round(PNL_DEFAULTS.capex * pCapex);
-    const staffMonthlyA1 = Math.round(PNL_DEFAULTS.staffAnnualA1 / 12);
     const leasingMonthly = Math.round(PNL_DEFAULTS.leasingAnnual / 12);
     const cashflows = [-capex];
-    let cumulCF = -capex, beMonth = null, pbMonth = null;
+    let cumulCF = -capex, beMonth = null, pbMonth = null, mcEbitdaY5 = 0;
     const annualCA = [0,0,0,0,0];
 
     for(let m = 0; m < 60; m++) {
@@ -4470,7 +4505,7 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       const totalCA = caAdherents + ptRev;
       const cos = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
       const margeBrute = totalCA - cos;
-      const staffM = Math.round(staffMonthlyA1 * Math.pow(1.06, yearIdx) * pOpex);
+      const staffM = Math.round(getStaffMonthly(totalCA, yearNum) * pOpex);
       const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * pRent);
       const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1.01, yearIdx) * pOpex);
       const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
@@ -4482,9 +4517,14 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       cumulCF += cf;
       cashflows.push(cf);
       if(yearIdx < 5) annualCA[yearIdx] += totalCA;
+      if(yearIdx === 4) mcEbitdaY5 += ebitda;
       if(beMonth === null && ebitda > 0) beMonth = m + 1;
       if(pbMonth === null && cumulCF > 0) pbMonth = m + 1;
     }
+
+    // Terminal value
+    const mcTV = Math.round(Math.max(0, mcEbitdaY5) * PNL_DEFAULTS.exitMultiple);
+    cashflows[cashflows.length - 1] += mcTV;
 
     const irr = calcIRR(cashflows);
     const npv = calcNPV(cashflows, PNL_DEFAULTS.discountRate);
@@ -4740,9 +4780,9 @@ function exportPDF() {
       <div class="section-title">Métriques Clés</div>
       <div class="metric-grid">
         <div class="metric-box"><div class="label">Membres Théoriques</div><div class="value">${fmt(r.totalTheorique)}</div></div>
-        <div class="metric-box"><div class="label">IRR Base</div><div class="value" style="color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</div></div>
-        <div class="metric-box"><div class="label">NPV Base</div><div class="value" style="color:${r.pnl.base.npv>0?'#10b981':'#ef4444'}">${fmt(Math.round(r.pnl.base.npv/1000))}k€</div></div>
-        <div class="metric-box"><div class="label">Payback</div><div class="value">${r.pnl.base.paybackMonth?'M'+r.pnl.base.paybackMonth:'>60M'}</div></div>
+        <div class="metric-box"><div class="label">IRR (incl. TV ${PNL_DEFAULTS.exitMultiple}x)</div><div class="value" style="color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</div></div>
+        <div class="metric-box"><div class="label">NPV (incl. TV)</div><div class="value" style="color:${r.pnl.base.npv>0?'#10b981':'#ef4444'}">${fmt(Math.round(r.pnl.base.npv/1000))}k€</div></div>
+        <div class="metric-box"><div class="label">Payback Ops</div><div class="value">${r.pnl.base.paybackMonth?'M'+r.pnl.base.paybackMonth:'>60M'}</div></div>
         <div class="metric-box"><div class="label">LTV/CAC</div><div class="value">${r.ltvCacRatio}x</div></div>
         <div class="metric-box"><div class="label">CAPEX</div><div class="value">${fmt(Math.round(r.pnl.base.capex/1000))}k€</div></div>
       </div>
@@ -4762,7 +4802,9 @@ function exportPDF() {
       <table>
         <tr><th>Année</th><th>Conservateur</th><th>Base</th><th>Optimiste</th></tr>
         ${[0,1,2,3,4].map(i => `<tr><td style="font-weight:600">A${i+1}</td><td>${fmt(Math.round(r.pnl.conservateur.annualCA[i]/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.annualCA[i]/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.annualCA[i]/1000))}k€</td></tr>`).join('')}
-        <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr}%</td></tr>
+        <tr style="border-top:1px solid #888"><td style="font-size:7px;color:#888">EBITDA A5</td><td style="font-size:7px">${fmt(Math.round(r.pnl.conservateur.annualEBITDA[4]/1000))}k€</td><td style="font-size:7px;font-weight:700">${fmt(Math.round(r.pnl.base.annualEBITDA[4]/1000))}k€</td><td style="font-size:7px">${fmt(Math.round(r.pnl.optimiste.annualEBITDA[4]/1000))}k€</td></tr>
+        <tr><td style="font-size:7px;color:#888">TV (${PNL_DEFAULTS.exitMultiple}x EBITDA)</td><td style="font-size:7px">${fmt(Math.round(r.pnl.conservateur.terminalValue/1000))}k€</td><td style="font-size:7px;font-weight:700">${fmt(Math.round(r.pnl.base.terminalValue/1000))}k€</td><td style="font-size:7px">${fmt(Math.round(r.pnl.optimiste.terminalValue/1000))}k€</td></tr>
+        <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR (incl. TV)</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr}%</td></tr>
         <tr><td style="font-weight:700">NPV</td><td>${fmt(Math.round(r.pnl.conservateur.npv/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.npv/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.npv/1000))}k€</td></tr>
       </table>
     </div>
@@ -5225,7 +5267,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
-        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${fmt(r.pnl.base.fixedOpex)}/mois | OPEX Ops 26% CA | Redev 6%+2% | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
+        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${Math.round(PNL_DEFAULTS.staffRate*100)}% CA (plancher ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRate*100)}% CA | Redev 6%+2% | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
       </div>
       <div style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
         <div style="font-size:8px;font-weight:700;color:var(--accent);margin-bottom:4px">LOYER — Paliers réels Hala Laminor (${PNL_DEFAULTS.rentSteps.surface} m²)</div>
@@ -5422,8 +5464,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <b>Churn/LTV</b> : Modele cohortes calibre sur BP FP France (3800 mbr, 300 clubs). Y1 churn bas (~0.7%/mois) + spike renouvellement annuel (12% a M13/M25/M37/M49) + Y2+ steady-state (~3%/mois). LTV = ARPU/churn. CAC ≈ 50 EUR<br>
         Membres_net(t) = Membres(t-1) + Nouveaux(t) - Churned(t)<br><br>
         <b>P&L</b> : Calibre BP V17 — CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an<br>
-        Staff ${fmt(Math.round(PNL_DEFAULTS.staffAnnualA1/1000))}k/an (+6%/an) | OPEX Ops 26% CA | Redev 6%+2% | CIT 16%<br>
-        IRR = bisection 60 mois | NPV @WACC ${PNL_DEFAULTS.discountRate*100}%<br><br>
+        Staff ${Math.round(PNL_DEFAULTS.staffRate*100)}% CA (plancher ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k/an, +${Math.round(PNL_DEFAULTS.staffGrowth*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRate*100)}% CA | Redev 6%+2% | CIT 16%<br>
+        IRR = bisection 60 mois + Terminal Value (EBITDA Y5 × ${PNL_DEFAULTS.exitMultiple}x exit multiple) | NPV @WACC ${PNL_DEFAULTS.discountRate*100}%<br>
+        IRR Ops = cashflows operationnels purs (sans TV) | Payback = mois ou cumul CF ops > CAPEX<br><br>
         <b>Saisonnalite</b> : Jan +35%, Fev +20%, Jun-Aout -25 a -30%, Sep +15% (IHRSA)<br>
         Appliquee sur ARPU (15% saisonnier) + frequentation (10% saisonnier)<br><br>
         <b>Sensibilite</b> : Tornado chart — 6 variables cles variees ±20-30%<br>
