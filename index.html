@@ -3753,23 +3753,65 @@ function priceElasticity(compSegment) {
 function calcWalkIn(lat, lng) {
   let dailyFootfall = 0;
   let sources = [];
+  let isPremiumMall = false; // CA > 200M€ or >40k visitors/day = premium destination
+  let isDestinationMall = false; // >40k visitors/day = city-wide catchment
 
   // Check nearby malls
   TRAFFIC_GENERATORS.malls.forEach(m => {
     const d = haversine(lat, lng, m.lat, m.lng);
-    if(d < 300) { dailyFootfall += m.dailyVisitors; sources.push({name:m.name,visitors:m.dailyVisitors,type:'in-mall'}); }
-    else if(d < 800) { dailyFootfall += m.dailyVisitors * 0.3; sources.push({name:m.name,visitors:Math.round(m.dailyVisitors*0.3),type:'adjacent'}); }
+    if(d < 300) {
+      dailyFootfall += m.dailyVisitors;
+      sources.push({name:m.name,visitors:m.dailyVisitors,type:'in-mall'});
+      if(m.dailyVisitors >= 40000) { isPremiumMall = true; isDestinationMall = true; }
+    }
+    else if(d < 800) {
+      dailyFootfall += m.dailyVisitors * 0.3;
+      sources.push({name:m.name,visitors:Math.round(m.dailyVisitors*0.3),type:'adjacent'});
+    }
   });
 
   // Walk-in conversion: unique visitors × conversion rate
   // Daily footfall = total visits/day. Average mall visitor comes ~2.5x/month = 30x/year
   const AVG_VISIT_FREQ = 30; // repeat visit frequency (Cushman & Wakefield EU benchmark)
   const annualUnique = Math.round(dailyFootfall * 300 / AVG_VISIT_FREQ); // ~300 operating days / repeat factor
-  // Conversion: 0.7% of annual unique visitors become members (IHRSA benchmark for in-mall fitness)
-  // "in-mall" = club inside the centre → full conversion. "adjacent" = nearby → lower base already in footfall calc
-  const walkInMembers = Math.round(annualUnique * 0.007);
 
-  return { dailyFootfall, annualUnique, walkInMembers, sources, conversionRate: 0.7, avgVisitFreq: AVG_VISIT_FREQ };
+  // PREMIUM MALL CONVERSION BOOST
+  // Malls > 40k visitors/day = ultra-premium clientele (Baneasa 380M€ CA, AFI Cotroceni)
+  // FP at 28€/month = dérisoire vs pouvoir d'achat → conversion rate 1.0% (vs 0.7% standard)
+  const baseConversion = isPremiumMall ? 0.010 : 0.007;
+  const walkInMembers = Math.round(annualUnique * baseConversion);
+
+  return {
+    dailyFootfall, annualUnique, walkInMembers, sources,
+    conversionRate: baseConversion * 100, avgVisitFreq: AVG_VISIT_FREQ,
+    isPremiumMall, isDestinationMall
+  };
+}
+
+// DESTINATION MALL BONUS — natifs from extended catchment (10km)
+// Malls like Baneasa/AFI are not neighborhood malls — people drive 15-20km.
+// The standard 3km radius misses 80% of their real catchment.
+// This bonus captures the extended population at a reduced conversion rate.
+function calcDestinationBonus(lat, lng, walkInResult, standardRadius) {
+  if(!walkInResult.isDestinationMall) return { bonusMembers: 0, extendedPop: 0, extendedRadius: 0 };
+  const EXTENDED_RADIUS = 10000; // 10km for destination malls
+  const extendedPop = estimatePopInRadiusGranular(lat, lng, EXTENDED_RADIUS);
+  const standardPop = estimatePopInRadiusGranular(lat, lng, standardRadius);
+  // Only count the ADDITIONAL population beyond standard radius
+  const deltaPop = Math.max(0, extendedPop.target - standardPop.target);
+  // These distant residents convert at a lower rate — they drive to the mall
+  // but are less likely to commit to a gym (distance friction)
+  // Rate: 0.4% of extended population beyond standard radius
+  const EXTENDED_RATE = 0.004;
+  const bonusMembers = Math.round(deltaPop * EXTENDED_RATE);
+  return {
+    bonusMembers,
+    extendedPop: extendedPop.target,
+    standardPop: standardPop.target,
+    deltaPop,
+    extendedRadius: EXTENDED_RADIUS,
+    rate: EXTENDED_RATE
+  };
 }
 
 // ================================================================
@@ -4668,7 +4710,8 @@ function computeExecSummary(r) {
   if (basePnl.irr > 25) opportunities.push(`IRR attractif (${basePnl.irr}%) — rendement bien au-dessus du WACC`);
   if (r.ltvCacRatio > 15) opportunities.push(`LTV/CAC exceptionnel (${r.ltvCacRatio}x) — acquisition client très efficiente`);
   if (r.native.captured > 1500) opportunities.push(`Fort potentiel de création de marché (${fmt(r.native.captured)} natifs)`);
-  if (r.walkIn.walkInMembers > 200) opportunities.push(`Walk-in significatif (${fmt(r.walkIn.walkInMembers)} mbr) — flux captif`);
+  if (r.walkIn.walkInMembers > 200) opportunities.push(`Walk-in significatif (${fmt(r.walkIn.walkInMembers)} mbr)${r.walkIn.isPremiumMall?' — mall premium (conv. '+r.walkIn.conversionRate.toFixed(1)+'%)':' — flux captif'}`);
+  if (r.destinationBonus?.bonusMembers > 0) opportunities.push(`Mall destination — +${fmt(r.destinationBonus.bonusMembers)} mbr catchment élargi (10km, ${fmt(r.destinationBonus.deltaPop)} pop.)`);
   if (r.popTarget > 40000) opportunities.push(`Bassin de population large (${fmt(r.popTarget)} cible 15-45)`);
 
   return { total, scores, verdict, verdictColor, verdictDesc, risks, opportunities };
@@ -4775,7 +4818,7 @@ function updatePnLDisplay(pnl, exec) {
 // Store all analyzed sites for comparison
 // Cache-buster: AGGRESSIVE clear on model version change
 // Clears: site analyses, custom site cached data, syncs custom site coords with TARGETS
-const MODEL_VERSION = 'v2.8-baneasa';
+const MODEL_VERSION = 'v2.9-destination';
 if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   // 1. Clear ranked analyses cache
   localStorage.removeItem('fpSiteAnalyses');
@@ -4954,7 +4997,8 @@ function exportPDF() {
       <div class="metric-grid">
         <div class="metric-box" style="border-left:3px solid #f97316"><div class="label">Captifs (vols concurrents)</div><div class="value" style="color:#f97316">${fmt(r.totalCaptifs)}</div></div>
         <div class="metric-box" style="border-left:3px solid #10b981"><div class="label">Natifs (création marché)</div><div class="value" style="color:#10b981">${fmt(r.native.captured)}</div></div>
-        <div class="metric-box" style="border-left:3px solid #06b6d4"><div class="label">Walk-in (trafic)</div><div class="value" style="color:#06b6d4">${fmt(r.walkIn.walkInMembers)}</div></div>
+        <div class="metric-box" style="border-left:3px solid #06b6d4"><div class="label">Walk-in (trafic${r.walkIn.isPremiumMall?' premium':''})</div><div class="value" style="color:#06b6d4">${fmt(r.walkIn.walkInMembers)}</div>${r.walkIn.isPremiumMall?'<div class="sublabel">Conv. '+r.walkIn.conversionRate.toFixed(1)+'% (premium)</div>':''}</div>
+        ${r.destinationBonus.bonusMembers > 0 ? `<div class="metric-box" style="border-left:3px solid #a78bfa"><div class="label">Destination bonus (10km)</div><div class="value" style="color:#a78bfa">${fmt(r.destinationBonus.bonusMembers)}</div><div class="sublabel">${fmt(r.destinationBonus.deltaPop)} pop. élargie</div></div>` : ''}
       </div>
     </div>
 
@@ -5158,11 +5202,13 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   // === SOURCE 3: WALK-IN (mall/centre traffic conversion) ===
   const walkIn = calcWalkIn(lat, lng);
 
-  // === TOTAL — capped at realistic club capacity ===
-  // A single FP club = 1,400m2. Max physical capacity ~5,000-6,000 members.
-  // BP target = 4,000 at maturity. Exceptional club = 5,000-6,000.
-  // Above 6,000 is physically impossible (equipment saturation, vestiaires).
-  const rawTotal = totalCaptifs + native.captured + walkIn.walkInMembers;
+  // === SOURCE 4: DESTINATION MALL BONUS (extended catchment 10km) ===
+  // Premium destination malls (>40k visitors/day) attract from city-wide catchment
+  // Standard 3km radius misses 80% of real catchment for Baneasa/AFI-type malls
+  const destinationBonus = calcDestinationBonus(lat, lng, walkIn, captageRadius);
+
+  // === TOTAL ===
+  const rawTotal = totalCaptifs + native.captured + walkIn.walkInMembers + destinationBonus.bonusMembers;
   const totalTheorique = rawTotal; // no cap — show full theoretical potential
   const rampUp = monthlyRampUp(totalTheorique); // legacy 12-month for backward compat
   const pessimiste = Math.round(totalTheorique * 0.6);
@@ -5207,7 +5253,7 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
   return {
     captageRadius, comps: captageDetails,
     totalCaptifs, totalMembersZone,
-    native, walkIn,
+    native, walkIn, destinationBonus,
     currentPenetration: Math.round(currentPenetration * 10) / 10,
     popTarget: popGranular.target,
     fpAttract: Math.round(fpAttract * 100),
@@ -5294,22 +5340,27 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:10px;font-weight:700;margin-top:6px;color:${recoColor};border:1px solid ${recoColor}30;background:${recoColor}10">${recoText}</div>
     </div>
 
-    <div style="display:flex;gap:4px;margin-bottom:12px">
-      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid #f97316">
+    <div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:60px;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid #f97316">
         <div style="font-size:7px;font-weight:700;color:#f97316">CAPTIFS</div>
         <div style="font-size:18px;font-weight:900;color:#f97316">${fmt(r.totalCaptifs)}</div>
         <div style="font-size:7px;color:var(--gray2)">vols concurrents</div>
       </div>
-      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--green)">
+      <div style="flex:1;min-width:60px;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--green)">
         <div style="font-size:7px;font-weight:700;color:var(--green)">NATIFS</div>
         <div style="font-size:18px;font-weight:900;color:var(--green)">${fmt(r.native.captured)}</div>
         <div style="font-size:7px;color:var(--gray2)">création marché</div>
       </div>
-      <div style="flex:1;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--cyan)">
+      <div style="flex:1;min-width:60px;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid var(--cyan)">
         <div style="font-size:7px;font-weight:700;color:var(--cyan)">WALK-IN</div>
         <div style="font-size:18px;font-weight:900;color:var(--cyan)">${fmt(r.walkIn.walkInMembers)}</div>
-        <div style="font-size:7px;color:var(--gray2)">trafic mall/centre</div>
+        <div style="font-size:7px;color:var(--gray2)">${r.walkIn.isPremiumMall?'premium '+r.walkIn.conversionRate.toFixed(1)+'%':'trafic mall'}</div>
       </div>
+      ${r.destinationBonus.bonusMembers > 0 ? `<div style="flex:1;min-width:60px;background:var(--bg);border-radius:6px;padding:6px;text-align:center;border-left:3px solid #a78bfa">
+        <div style="font-size:7px;font-weight:700;color:#a78bfa">DESTINATION</div>
+        <div style="font-size:18px;font-weight:900;color:#a78bfa">${fmt(r.destinationBonus.bonusMembers)}</div>
+        <div style="font-size:7px;color:var(--gray2)">catchment 10km</div>
+      </div>` : ''}
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
