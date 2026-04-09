@@ -4818,7 +4818,7 @@ function updatePnLDisplay(pnl, exec) {
 // Store all analyzed sites for comparison
 // Cache-buster: AGGRESSIVE clear on model version change
 // Clears: site analyses, custom site cached data, syncs custom site coords with TARGETS
-const MODEL_VERSION = 'v2.9-destination';
+const MODEL_VERSION = 'v3.0-users';
 if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   // 1. Clear ranked analyses cache
   localStorage.removeItem('fpSiteAnalyses');
@@ -6894,12 +6894,26 @@ function resetInactivityTimer() {
   document.addEventListener(evt, resetInactivityTimer, {passive:true})
 );
 
-// Seed default admin if no users exist
+// Canonical user list — always ensured (new users added here auto-propagate to existing browsers)
+const CANONICAL_USERS = [
+  {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
+  {email:'ulysse.gaspard0@gmail.com',role:'user',name:'Ulysse Gaspard',pwHash:simpleHash('FP2026')},
+];
+// Seed default users if empty
 if(userList.length === 0) {
-  userList = [
-    {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
-  ];
+  userList = CANONICAL_USERS.slice();
   localStorage.setItem('fpUsers', JSON.stringify(userList));
+} else {
+  // Migration: ensure every canonical user exists in the local list (adds new users on deploy)
+  let _migrated = false;
+  CANONICAL_USERS.forEach(cu => {
+    const existing = userList.find(u => (u.email||'').toLowerCase() === cu.email.toLowerCase());
+    if(!existing) {
+      userList.push(cu);
+      _migrated = true;
+    }
+  });
+  if(_migrated) localStorage.setItem('fpUsers', JSON.stringify(userList));
 }
 
 // Login function
