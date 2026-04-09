@@ -3377,11 +3377,22 @@ async function loadAllCompetitors() {
 }
 
 async function genHeatmap() {
-  if(!allComps.length) await loadAllCompetitors();
+  // Ensure competitor data is loaded WITHOUT displaying markers or flipping the competitors toggle
+  if(!allComps.length) {
+    const wasCompetitorsOn = layers.competitors;
+    await loadAllCompetitors();
+    if(!wasCompetitorsOn) {
+      // User only wanted the heatmap — hide the markers and reset the toggle
+      compCluster.clearLayers();
+      layers.competitors = false;
+      const tgl = el('tglCompetitors');
+      if(tgl) tgl.classList.remove('on');
+    }
+  }
   if(heatLayer) map.removeLayer(heatLayer);
-  heatLayer=L.heatLayer(allComps.map(c=>[c.lat,c.lng,.7]),{
-    radius:30,blur:20,maxZoom:15,
-    gradient:{0.15:'#1e3a5f',0.35:'#3b82f6',0.5:'#06b6d4',0.65:'#eab308',0.8:'#f97316',1:'#ef4444'}
+  heatLayer=L.heatLayer(allComps.map(c=>[c.lat,c.lng,1.0]),{
+    radius:45,blur:35,maxZoom:13,max:0.6,minOpacity:0.35,
+    gradient:{0.05:'#1e3a5f',0.2:'#3b82f6',0.4:'#06b6d4',0.6:'#eab308',0.8:'#f97316',1:'#ef4444'}
   }).addTo(map);
 }
 
