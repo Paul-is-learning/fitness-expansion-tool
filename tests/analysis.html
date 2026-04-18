@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>FP Romania — Analysis Test Suite</title>
+<style>
+  body { font-family: ui-monospace, monospace; background: #0b1220; color: #e2e8f0; padding: 20px; max-width: 1400px; margin: 0 auto; }
+  h1 { color: #fbbf24; }
+  .pass { color: #22c55e; }
+  .fail { color: #ef4444; background: #450a0a; padding: 0 4px; border-radius: 3px; }
+  .info { color: #94a3b8; font-size: 12px; }
+  .group-h { margin-top: 18px; padding: 8px 12px; background: #1e293b; border-radius: 6px; color: #fbbf24; font-weight: 700; }
+  .row { padding: 4px 12px; font-size: 12px; display: flex; gap: 10px; border-bottom: 1px solid #1e293b; }
+  .row span:first-child { flex: 0 0 28px; }
+  .row span:nth-child(2) { flex: 1; }
+  .row span:nth-child(3) { flex: 0 0 auto; color: #64748b; font-size: 11px; }
+  .summary { font-size: 18px; padding: 14px; border-radius: 8px; margin: 16px 0; }
+  .summary.ok { background: #052e16; color: #86efac; border: 1px solid #22c55e; }
+  .summary.ko { background: #450a0a; color: #fca5a5; border: 1px solid #ef4444; }
+  button { background: #fbbf24; color: #0b1220; border: none; padding: 12px 24px; font-weight: 700; cursor: pointer; border-radius: 6px; font-size: 14px; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .stats { display: flex; gap: 24px; font-size: 14px; margin-top: 10px; }
+  .stats span { color: #94a3b8; }
+  .stats b { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<h1>FP Romania — Full Analysis Test Suite</h1>
+<p class="info">
+  Runs 60+ assertions against the financial analysis engine:<br>
+  <b>Baseline regression</b> (exact values for 5 target sites) •
+  <b>Invariants</b> (sums match, bounds respected) •
+  <b>Monotonicity</b> (more pop → more natifs) •
+  <b>Edge cases</b> (empty comps, zero pop, out-of-bounds coords) •
+  <b>Sensitivity</b> (rent slider, radius).
+</p>
+
+<button id="runBtn" onclick="runAll()">▶ Run all tests</button>
+<div class="stats" id="stats"></div>
+<div id="result"></div>
+
+<script>
+  // Build the iframe with a fresh cache-busted src so sub-resources (scripts) also reload.
+  // Done inline before the iframe so the first (and only) load carries the bust.
+  document.write('<iframe id="appFrame" src="../index.html?cb=' + Date.now() +
+    '" style="display:none;width:1200px;height:800px" onload="window._frameReady = true"></iframe>');
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// TEST FRAMEWORK
+// ════════════════════════════════════════════════════════════════
+let CURRENT_GROUP = null, GROUPS = [];
+function group(name) { CURRENT_GROUP = { name, tests: [] }; GROUPS.push(CURRENT_GROUP); }
+function test(name, ok, note) { CURRENT_GROUP.tests.push({ name, ok: !!ok, note: note || '' }); }
+function assertEq(actual, expected, tol) {
+  if (tol === undefined) return JSON.stringify(actual) === JSON.stringify(expected);
+  if (typeof actual !== 'number' || typeof expected !== 'number') return false;
+  return Math.abs(actual - expected) <= tol;
+}
+
+// ════════════════════════════════════════════════════════════════
+// BASELINE (frozen reference values, same as .baseline.json)
+// ════════════════════════════════════════════════════════════════
+const BASELINE = {
+  "Baneasa Shopping City": {members:8762,captifs:283,natifs:290,walkIn:5500,destBonus:2689,comps:4,popTarget:40816,sazFlux:30,sazDens:57,sazYouth:27,irrBase:50.8,npvBase:3016682,beBase:5,pbBase:45,arpu:22.98,ltv:903,ltvCac:18.1,score:68,verdict:"GO CONDITIONNEL"},
+  "Grand Arena": {members:3135,captifs:749,natifs:1336,walkIn:1050,destBonus:0,comps:3,popTarget:119309,sazFlux:15,sazDens:61,sazYouth:22,irrBase:-9.43,npvBase:-963553,beBase:20,pbBase:null,arpu:27.66,ltv:960,ltvCac:19.2,score:50.9,verdict:"WATCH"},
+  "Hala Laminor": {members:7093,captifs:3228,natifs:785,walkIn:3080,destBonus:0,comps:19,popTarget:262792,sazFlux:65,sazDens:69,sazYouth:37,irrBase:47.95,npvBase:2743651,beBase:5,pbBase:47,arpu:27.27,ltv:952,ltvCac:19,score:68.8,verdict:"GO CONDITIONNEL"},
+  "Militari Shopping": {members:3339,captifs:723,natifs:1356,walkIn:1260,destBonus:0,comps:5,popTarget:100316,sazFlux:22,sazDens:70,sazYouth:42,irrBase:-3.84,npvBase:-758063,beBase:13,pbBase:null,arpu:27.69,ltv:963,ltvCac:19.3,score:53.7,verdict:"WATCH"},
+  "Unirea Shopping Center": {members:5810,captifs:2119,natifs:1941,walkIn:1750,destBonus:0,comps:17,popTarget:316718,sazFlux:69,sazDens:61,sazYouth:69,irrBase:30.99,npvBase:1275546,beBase:7,pbBase:null,arpu:25.96,ltv:939,ltvCac:18.8,score:68.6,verdict:"GO CONDITIONNEL"}
+};
+
+// ════════════════════════════════════════════════════════════════
+// MAIN
+// ════════════════════════════════════════════════════════════════
+async function runAll() {
+  document.getElementById('runBtn').disabled = true;
+  GROUPS = [];
+  document.getElementById('result').innerHTML = '<p class="info">Initializing iframe…</p>';
+  while (!window._frameReady) await new Promise(r => setTimeout(r, 100));
+  const w = document.getElementById('appFrame').contentWindow;
+
+  // Login + load comps — run everything via w.eval() since consts don't go on window
+  const analysesResults = await w.eval(`(async () => {
+    document.getElementById('loginEmail').value = 'paulbecaud@isseo-dev.com';
+    document.getElementById('loginPassword').value = 'FP2026!';
+    doLogin();
+    await new Promise(r => setTimeout(r, 1500));
+    await loadAllCompetitors();
+    await new Promise(r => setTimeout(r, 300));
+
+    const arr = [];
+    for (const site of TARGETS) {
+      const r = runCaptageAnalysis(site.lat, site.lng, 3000);
+      const exec = computeExecSummary(r);
+      arr.push({
+        name: site.name, lat: site.lat, lng: site.lng,
+        members: r.totalTheorique, captifs: r.totalCaptifs, totalMembersZone: r.totalMembersZone,
+        natifs: r.native?.captured || 0, walkIn: r.walkIn?.walkInMembers || 0,
+        destBonus: r.destinationBonus?.bonusMembers || 0, comps: r.comps.length,
+        compsSum: r.comps.reduce((a,c) => a + (c.captured||0), 0),
+        membersZoneSum: r.comps.reduce((a,c) => a + (c.membersEst||0), 0),
+        popTarget: r.popTarget, sazFlux: r.saz?.flux, sazDens: r.saz?.densite, sazYouth: r.saz?.jeunesse,
+        irrBase: r.pnl?.base?.irr, irrCons: r.pnl?.conservateur?.irr, irrOpti: r.pnl?.optimiste?.irr,
+        npvBase: Math.round(r.pnl?.base?.npv), npvCons: Math.round(r.pnl?.conservateur?.npv),
+        beBase: r.pnl?.base?.breakevenMonth, pbBase: r.pnl?.base?.paybackMonth,
+        arpu: r.arpu, churnY1: r.churnY1, churnRate: r.churnRate,
+        ltv: Math.round(r.ltv), ltvCac: r.ltvCacRatio,
+        score: exec.total, verdict: typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict,
+        pessimiste: r.pessimiste, optimiste: r.optimiste, realiste: r.realiste
+      });
+    }
+    return arr;
+  })()`);
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 1 — Baseline regression (original test) — 95 assertions
+  // ──────────────────────────────────────────────────────────────
+  group('1. Baseline regression (95 metrics × 5 sites)');
+  for (const a of analysesResults) {
+    const exp = BASELINE[a.name];
+    for (const k of Object.keys(exp)) {
+      const eq = JSON.stringify(a[k]) === JSON.stringify(exp[k]);
+      test(`${a.name}.${k}`, eq, eq ? '' : `got ${a[k]}, expected ${exp[k]}`);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 2 — Internal invariants (sums must match)
+  // ──────────────────────────────────────────────────────────────
+  group('2. Invariants — internal consistency');
+  for (const a of analysesResults) {
+    const expectedTotal = a.captifs + a.natifs + a.walkIn + a.destBonus;
+    test(`${a.name}: members = captifs + natifs + walkIn + destBonus`,
+      Math.abs(a.members - expectedTotal) <= 2, `${a.members} vs ${expectedTotal}`);
+    test(`${a.name}: totalCaptifs = sum(comps.captured)`,
+      Math.abs(a.captifs - a.compsSum) <= 2, `${a.captifs} vs ${a.compsSum}`);
+    test(`${a.name}: totalMembersZone = sum(comps.membersEst)`,
+      Math.abs(a.totalMembersZone - a.membersZoneSum) <= 2, `${a.totalMembersZone} vs ${a.membersZoneSum}`);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 3 — Numeric bounds
+  // ──────────────────────────────────────────────────────────────
+  group('3. Numeric bounds');
+  for (const a of analysesResults) {
+    test(`${a.name}: members ≥ 0`,           a.members >= 0);
+    test(`${a.name}: members finite`,         isFinite(a.members));
+    test(`${a.name}: popTarget ≥ 0`,         a.popTarget >= 0);
+    test(`${a.name}: ARPU ∈ [15, 50]`,        a.arpu >= 15 && a.arpu <= 50, `arpu=${a.arpu}`);
+    test(`${a.name}: churnRate ∈ [0, 1]`,     a.churnRate >= 0 && a.churnRate <= 1, `churn=${a.churnRate}`);
+    test(`${a.name}: SAZ flux ∈ [0, 100]`,    a.sazFlux >= 0 && a.sazFlux <= 100);
+    test(`${a.name}: SAZ densité ∈ [0, 100]`, a.sazDens >= 0 && a.sazDens <= 100);
+    test(`${a.name}: SAZ jeunesse ∈ [0, 100]`,a.sazYouth >= 0 && a.sazYouth <= 100);
+    test(`${a.name}: IRR finite`,             isFinite(a.irrBase));
+    test(`${a.name}: Score ∈ [0, 100]`,       a.score >= 0 && a.score <= 100);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 4 — Scenario ordering (conservateur ≤ base ≤ optimiste)
+  // ──────────────────────────────────────────────────────────────
+  group('4. Scenario monotonicity — pessimiste ≤ realiste ≤ optimiste');
+  for (const a of analysesResults) {
+    test(`${a.name}: pessimiste ≤ realiste`, a.pessimiste <= a.realiste,
+      `${a.pessimiste} vs ${a.realiste}`);
+    test(`${a.name}: realiste ≤ optimiste`,  a.realiste <= a.optimiste,
+      `${a.realiste} vs ${a.optimiste}`);
+    // IRR scenario ordering (relaxed — may not always hold if cohort changes non-linearly)
+    if (isFinite(a.irrCons) && isFinite(a.irrBase) && isFinite(a.irrOpti)) {
+      test(`${a.name}: IRR conservateur ≤ base ≤ optimiste`,
+        a.irrCons <= a.irrBase + 1 && a.irrBase <= a.irrOpti + 1,
+        `${a.irrCons} → ${a.irrBase} → ${a.irrOpti}`);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 5 — Radius monotonicity (bigger radius = more captifs + pop)
+  // ──────────────────────────────────────────────────────────────
+  group('5. Radius monotonicity (bigger radius → ≥ captifs + pop)');
+  const radResults = await w.eval(`(async () => {
+    const site = TARGETS[0]; // Hala Laminor
+    const small = runCaptageAnalysis(site.lat, site.lng, 1500);
+    const med   = runCaptageAnalysis(site.lat, site.lng, 3000);
+    const big   = runCaptageAnalysis(site.lat, site.lng, 5000);
+    return {
+      small: { comps: small.comps.length, captifs: small.totalCaptifs, pop: small.popTarget },
+      med:   { comps: med.comps.length,   captifs: med.totalCaptifs,   pop: med.popTarget },
+      big:   { comps: big.comps.length,   captifs: big.totalCaptifs,   pop: big.popTarget }
+    };
+  })()`);
+  test('comps(1.5km) ≤ comps(3km) ≤ comps(5km)',
+    radResults.small.comps <= radResults.med.comps && radResults.med.comps <= radResults.big.comps,
+    `${radResults.small.comps} / ${radResults.med.comps} / ${radResults.big.comps}`);
+  test('popTarget(1.5km) ≤ popTarget(3km) ≤ popTarget(5km)',
+    radResults.small.pop <= radResults.med.pop && radResults.med.pop <= radResults.big.pop,
+    `${radResults.small.pop} / ${radResults.med.pop} / ${radResults.big.pop}`);
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 6 — Rent sensitivity (higher rent → lower IRR/NPV)
+  // ──────────────────────────────────────────────────────────────
+  group('6. Rent sensitivity (monotonic)');
+  const rentResults = await w.eval(`(async () => {
+    const site = TARGETS[0]; // Hala Laminor
+    const rents = [7, 10.5, 14, 18];
+    const out = {};
+    for (const rent of rents) {
+      window._rentOverride = { y1: rent };
+      const r = runCaptageAnalysis(site.lat, site.lng, 3000);
+      out[rent] = { irr: r.pnl?.base?.irr, npv: Math.round(r.pnl?.base?.npv) };
+    }
+    window._rentOverride = null;
+    return out;
+  })()`);
+  const rents = [7, 10.5, 14, 18];
+  for (let i = 1; i < rents.length; i++) {
+    const prev = rentResults[rents[i-1]], cur = rentResults[rents[i]];
+    test(`IRR decreases when rent rises (${rents[i-1]} → ${rents[i]})`,
+      cur.irr <= prev.irr + 0.01, `${prev.irr} → ${cur.irr}`);
+    test(`NPV decreases when rent rises (${rents[i-1]} → ${rents[i]})`,
+      cur.npv <= prev.npv + 1000, `${prev.npv} → ${cur.npv}`);
+  }
+
+  // Snapshot issues count BEFORE running edge cases (which are EXPECTED to fire invariants)
+  const issuesBeforeEdge = await w.eval(`(window._fpIssues || []).length`);
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 7 — Edge cases (out-of-bounds coords, tiny radius)
+  // ──────────────────────────────────────────────────────────────
+  group('7. Edge cases — robustness');
+  const edgeResults = await w.eval(`(async () => {
+    const out = {};
+    // In middle of sea (no pop, no comps) — EXPECTED to fire lat/lng bounds invariant
+    try {
+      const r = runCaptageAnalysis(42.0, 30.0, 3000);
+      out.sea = { ok: true, members: r.totalTheorique, finite: isFinite(r.totalTheorique) };
+    } catch(e) { out.sea = { ok: false, err: e.message }; }
+
+    // Very tiny radius (500m)
+    try {
+      const r = runCaptageAnalysis(TARGETS[0].lat, TARGETS[0].lng, 500);
+      out.tiny = { ok: true, members: r.totalTheorique, finite: isFinite(r.totalTheorique) };
+    } catch(e) { out.tiny = { ok: false, err: e.message }; }
+
+    // Nominal call — baseline sanity
+    try {
+      const r = runCaptageAnalysis(TARGETS[0].lat, TARGETS[0].lng, 3000);
+      out.nominal = { ok: true, members: r.totalTheorique };
+    } catch(e) { out.nominal = { ok: false, err: e.message }; }
+
+    return out;
+  })()`);
+  test('Out-of-Bucharest coords: does not throw',  edgeResults.sea?.ok, edgeResults.sea?.err || '');
+  test('Out-of-Bucharest: members is finite',       edgeResults.sea?.finite);
+  test('Tiny radius (500m): does not throw',        edgeResults.tiny?.ok, edgeResults.tiny?.err || '');
+  test('Tiny radius: members is finite',            edgeResults.tiny?.finite);
+  test('Nominal call: does not throw',              edgeResults.nominal?.ok, edgeResults.nominal?.err || '');
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 8 — Invariants subsystem loaded + works
+  // ──────────────────────────────────────────────────────────────
+  group('8. Invariants subsystem');
+  const invStatus = await w.eval(`({
+    hasInvariants: typeof window._fpInvariants === 'object',
+    invariantCount: window._fpInvariants?.INVARIANTS?.length || 0,
+    issuesCount: (window._fpIssues || []).length,
+    wrappedCaptage: window.runCaptageAnalysis?.__fpWrapped === true
+  })`);
+  test('Invariant system installed',           invStatus.hasInvariants);
+  test('≥ 10 invariants registered',           invStatus.invariantCount >= 10, `got ${invStatus.invariantCount}`);
+  test('runCaptageAnalysis is wrapped',        invStatus.wrappedCaptage);
+  test('No invariant violations during NOMINAL tests (edge cases excluded)', issuesBeforeEdge === 0,
+    `${issuesBeforeEdge} violations before edge tests — inspect window._fpIssues`);
+  // Edge cases SHOULD fire invariants (validates they catch bad inputs)
+  test('Edge cases DID fire invariants (proves system works)', invStatus.issuesCount > issuesBeforeEdge,
+    `total=${invStatus.issuesCount}, before edge=${issuesBeforeEdge}`);
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 9 — Validators subsystem
+  // ──────────────────────────────────────────────────────────────
+  group('9. Data validators subsystem');
+  const valStatus = await w.eval(`({
+    hasValidators: typeof window._fpValidators === 'object',
+    issues: (window._fpDataIssues || []).slice(0, 5),
+    issuesCount: (window._fpDataIssues || []).length
+  })`);
+  test('Validators system installed', valStatus.hasValidators);
+  test('No data validation issues',   valStatus.issuesCount === 0,
+    valStatus.issuesCount > 0 ? `issues: ${JSON.stringify(valStatus.issues)}` : '');
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 10 — Audit log subsystem
+  // ──────────────────────────────────────────────────────────────
+  group('10. Audit log subsystem');
+  const auditStatus = await w.eval(`({
+    hasAudit: typeof window._fpAudit === 'object',
+    logSize: (window._fpAudit?.load?.() || []).length
+  })`);
+  test('Audit system installed',          auditStatus.hasAudit);
+  test('Audit log has entries (we ran analyses)', auditStatus.logSize >= 5, `got ${auditStatus.logSize}`);
+
+  renderResults();
+  document.getElementById('runBtn').disabled = false;
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════════════
+function renderResults() {
+  let html = '';
+  let total = 0, pass = 0;
+  for (const g of GROUPS) {
+    const gPass = g.tests.filter(t => t.ok).length;
+    html += `<div class="group-h">${g.name} — ${gPass}/${g.tests.length}</div>`;
+    for (const t of g.tests) {
+      total++;
+      if (t.ok) pass++;
+      html += `<div class="row">
+        <span class="${t.ok ? 'pass' : 'fail'}">${t.ok ? '✓' : '✗'}</span>
+        <span>${t.name}</span>
+        <span>${t.note}</span>
+      </div>`;
+    }
+  }
+
+  const summary = pass === total
+    ? `<div class="summary ok">✅ ALL PASS — ${pass}/${total} assertions</div>`
+    : `<div class="summary ko">❌ ${total - pass} FAILURES — ${pass}/${total} passed</div>`;
+
+  document.getElementById('result').innerHTML = summary + html;
+  document.getElementById('stats').innerHTML = `
+    <span>Total: <b>${total}</b></span>
+    <span>Pass: <b style="color:#22c55e">${pass}</b></span>
+    <span>Fail: <b style="color:${total-pass > 0 ? '#ef4444' : '#64748b'}">${total - pass}</b></span>
+    <span>Groups: <b>${GROUPS.length}</b></span>`;
+}
+</script>
+
+</body>
+</html>

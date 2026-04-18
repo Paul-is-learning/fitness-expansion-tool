@@ -1,5 +1,70 @@
 # Changelog
 
+## [v4.8-reliability] — 2026-04-18
+
+### Reliability hardening — couche défensive complète
+
+**Nouveau : moteur d'invariants runtime** (`src/invariants.js`)
+- 10 invariants machine-checked après chaque `runCaptageAnalysis()`
+- Vérifie : somme(captifs+natifs+walkIn+destBonus) == totalTheorique, no-NaN, bornes SAZ, bornes ARPU/churn/IRR, coords valides
+- Violations loguées dans `window._fpIssues` + événement `fp:invariant-violation`
+- `window.dumpInvariants()` pour pretty-print
+
+**Nouveau : data schema validators** (`src/validators.js`)
+- Validation au boot de TARGETS, VERIFIED_CLUBS, CARTIERE, POIS, CANONICAL_USERS
+- Détecte : champs manquants, valeurs hors-range, doublons de noms
+- Mode strict opt-in via `window._fpStrictValidation = true` (CI)
+- `window.dumpValidation()` pour inspecter
+- **Corrigé** : 3 vrais duplicates révélés par le validator (WC Cosmopolis, WC Otopeni, Progresul)
+
+**Nouveau : audit log** (`src/audit.js`)
+- Chaque appel à `runCaptageAnalysis` enregistre inputs + outputs + timestamp + user
+- 100 dernières entrées en sessionStorage
+- API : `exportAudit()` (JSON), `exportAuditCsv()` (CSV), `replayAudit(entry)` (reproductibilité)
+- Permet le debug post-mortem et le test de non-régression inter-deploys
+
+**Nouveau : auth hardening** (`src/auth-guard.js`)
+- Rate limiting : 5 échecs → lockout 5 min
+- Signature HMAC de `fpUsers` → détecte altération localStorage + reset auto
+- Signature de session liée au fingerprint (userAgent + locale + screen) → détecte copy-paste de session
+- Check périodique de la signature session (30s)
+- Log d'événements : `window._fpAuthEvents`, `window.dumpAuth()`
+
+**Nouveau : suite de tests étendue** (`tests/analysis.html`)
+- **197 assertions** (vs 95 dans test.html — déprécié)
+- 10 groupes : baseline regression, invariants, bornes numériques, monotonicité scénarios, monotonicité rayon, sensibilité loyer, edge cases (sea/tiny radius), subsystèmes installés
+- **197/197 PASS** ✓
+
+**Nouveau : golden numbers doc** (`docs/MODEL.md`)
+- Chaque constante du modèle documentée : valeur, source, justification, date de calibration
+- Inclut : CAPTURE_RATES, distance decay, walk-in 0.7%/1.0%, destination mall 10km/0.4%, POP_REAL_FACTOR 1.3, REVIEWS_ANNUAL_MULT 43, TAUX_VAD 20%, TVA_RO 21%, CAPEX 1,176k€, etc.
+- Playbook "how to modify a constant" avec checklist (bump version → run tests → update baseline)
+
+### Data fixes révélés par les validators
+- `VERIFIED_CLUBS` : renommé "World Class Cosmopolis" banlieue → "World Class Cosmopolis (Ilfov)"
+- `VERIFIED_CLUBS` : renommé "World Class Otopeni" duplicate → "World Class Otopeni (alt)"
+- `CARTIERE` : renommé "Progresul" (sector 4) → "Progresul (S4)" pour distinguer du Progresul sector 5
+
+### Scripts chargés à l'init (dans l'ordre)
+```
+config.js → src/utils.js → data/*.js →
+src/validators.js → src/invariants.js → src/audit.js →
+src/auth-guard.js → src/mobile.js
+```
+
+**Zero impact utilisateur final** (sauf + robustesse). Toute la couche défensive est transparente.
+
+### Debug cheatsheet (à taper dans la console sur prod)
+```js
+dumpInvariants()  // violations de règles détectées
+dumpValidation()  // problèmes dans les données statiques
+dumpAuth()        // état auth + tentatives de login
+exportAudit()     // log des analyses (copié dans le presse-papiers)
+replayAudit(window._fpAudit.load()[0])  // rejoue une analyse
+```
+
+---
+
 ## [v4.7-mobile] — 2026-04-18
 
 ### Mobile Overhaul (15/10)

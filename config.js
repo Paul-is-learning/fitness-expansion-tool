@@ -26,4 +26,4 @@ const GOOGLE_CACHE_KEY = 'fp_google_cache';
 const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
 
 // Model version — bumped when cached data format changes; triggers cache clear
-const MODEL_VERSION = 'v4.7-mobile';
+const MODEL_VERSION = 'v4.8-reliability';

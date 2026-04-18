@@ -97,7 +97,7 @@ const CARTIERE = [
   // SECTOR 4 gap: 81k
   {name:'Eroii Revolutiei',lat:44.4050,lng:26.1000,sector:4,pop:18000,price:1600,young:.43,desc:'Metro M2, residentiel'},
   {name:'Vacaresti',lat:44.4050,lng:26.1150,sector:4,pop:15000,price:1500,young:.43,desc:'Parc naturel Vacaresti'},
-  {name:'Progresul',lat:44.3950,lng:26.0900,sector:4,pop:18000,price:1300,young:.42,desc:'Sud-centre, commerce'},
+  {name:'Progresul (S4)',lat:44.3950,lng:26.0900,sector:4,pop:18000,price:1300,young:.42,desc:'Sud-centre, commerce'},
   {name:'Metalurgiei',lat:44.3750,lng:26.1200,sector:4,pop:15000,price:1100,young:.42,desc:'Grand Arena zone'},
   {name:'Popesti-Leordeni lim.',lat:44.3700,lng:26.1400,sector:4,pop:16000,price:1200,young:.44,desc:'Limite sud, en expansion'},
   // SECTOR 5 gap: 102k

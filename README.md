@@ -32,8 +32,26 @@ Le push sur `main` déclenche un redéploiement automatique Vercel (~30s).
 
 ## Tester avant de push
 
-Ouvrir `http://localhost:8091/test.html` → cliquer **Run tests**.
+Deux niveaux de tests :
+
+**Niveau rapide (5 baselines)** : `http://localhost:8091/test.html`
+→ 95 cellules baseline. Pour vérif express.
+
+**Niveau complet (197 assertions)** : `http://localhost:8091/tests/analysis.html`
+→ Baselines + invariants + monotonicité + sensitivité + edge cases.
+**Utilise celui-là** avant chaque push important.
+
 Tous les points doivent être verts. Un point rouge = régression → ne pas pusher.
+
+## Debug en prod (console)
+
+```js
+dumpInvariants()  // violations des règles du modèle (bornes, sommes, etc.)
+dumpValidation()  // problèmes dans data/*.js (champs manquants, doublons)
+dumpAuth()        // état auth, tentatives de login récentes
+exportAudit()     // historique des analyses (copie JSON dans le presse-papiers)
+replayAudit(entry)// rejoue une analyse avec les mêmes inputs pour reproduire un bug
+```
 
 ## Architecture
 

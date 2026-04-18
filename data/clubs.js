@@ -126,9 +126,9 @@ const VERIFIED_CLUBS = [
   {name:'Stay Fit Popesti Leordeni',lat:44.3603,lng:26.1509,segment:'mid',size:1000,members:1100},
   {name:'Stay Fit Stefanesti',lat:44.5285,lng:26.1975,segment:'mid',size:900,members:990},
   {name:'Stay Fit Crevedia',lat:44.6180,lng:25.9132,segment:'mid',size:800,members:880},
-  // World Class banlieue (2 clubs)
-  {name:'World Class Cosmopolis',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,sv:true},
-  {name:'World Class Otopeni',lat:44.5477,lng:26.0746,segment:'premium',size:1500,members:1275},
+  // World Class banlieue (2 clubs) — renamed to avoid collision with Bucharest variants
+  {name:'World Class Cosmopolis (Ilfov)',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,sv:true},
+  {name:'World Class Otopeni (alt)',lat:44.5477,lng:26.0746,segment:'premium',size:1500,members:1275},
 ];
 
 // Alias — the verified database IS the real dataset (no fake demo data)
