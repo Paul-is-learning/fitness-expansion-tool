@@ -438,6 +438,70 @@
   .fp-detail-title .t { font-size: 15px; font-weight: 700; color: var(--white); }
   .fp-detail-title .s { font-size: 11px; color: var(--gray); margin-top: 2px; }
 
+  /* ─── Detail prev/next nav bar ─── */
+  .fp-detail-nav {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 0 0 14px;
+    background: rgba(30,41,59,.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .fp-detail-nav-btn {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    color: var(--gray);
+    font-family: var(--font);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: background .2s, color .2s;
+  }
+  .fp-detail-nav-btn.next { justify-content: flex-end; text-align: right; }
+  .fp-detail-nav-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.5; flex-shrink: 0; }
+  .fp-detail-nav-btn .fp-nav-label {
+    min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .fp-detail-nav-btn:active { background: rgba(212,160,23,.12); color: var(--accent); }
+  .fp-detail-nav-sep {
+    width: 1px; background: var(--border); flex-shrink: 0;
+  }
+
+  /* Detail-swipe transition between sites */
+  .fp-sheet-detail-scroll {
+    transition: transform .2s cubic-bezier(.3,.7,.3,1);
+  }
+  .fp-sheet-detail-scroll.fp-detail-swipe-next { transform: translateX(-8px); opacity: .3; }
+  .fp-sheet-detail-scroll.fp-detail-swipe-prev { transform: translateX(8px); opacity: .3; }
+
+  /* Custom site pin: slightly different style (purple tint) */
+  .fp-target-pin.fp-custom-pin {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+    color: white !important;
+  }
+  .fp-target-pin.fp-custom-pin.active {
+    animation: fpPinPulsePurple 2.2s ease-in-out infinite;
+  }
+  @keyframes fpPinPulsePurple {
+    0%, 100% {
+      box-shadow: 0 6px 18px rgba(139,92,246,.7),
+                  0 0 0 4px rgba(139,92,246,.3);
+    }
+    50% {
+      box-shadow: 0 8px 26px rgba(139,92,246,.9),
+                  0 0 0 14px rgba(139,92,246,.05);
+    }
+  }
+
   /* Accordion sections built from original analysis */
   .fp-accordion { display: flex; flex-direction: column; gap: 10px; }
   .fp-accordion-item {

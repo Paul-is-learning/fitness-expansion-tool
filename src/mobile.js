@@ -28,6 +28,38 @@
 
   const qs  = (s, ctx = document) => ctx.querySelector(s);
   const qsa = (s, ctx = document) => Array.from(ctx.querySelectorAll(s));
+
+  // ─── ALL SITES = TARGETS + custom sites ────────────────────────
+  // Merges the canonical 5 TARGETS with user-added custom sites so both
+  // the map pins and the carousel reflect the same list.
+  function getAllSites() {
+    const canonicals = (typeof TARGETS !== 'undefined' ? TARGETS : []).map((t, i) => ({
+      ...t, _kind: 'target', _origIndex: i
+    }));
+    let customs = [];
+    try {
+      const raw = localStorage.getItem('fpCustomSites') || '[]';
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        customs = list.map(c => ({
+          name: c.name || 'Site custom',
+          lat: c.lat,
+          lng: c.lng,
+          phase: c.phase || '—',
+          sector: c.sector || '—',
+          area: c.area || '—',
+          rent: c.rent || '—',
+          status: c.status || 'Custom',
+          opening: c.opening || '',
+          note: c.notes || '',
+          capex: c.capex || 1176000,
+          _kind: 'custom',
+          _id: c.id
+        }));
+      }
+    } catch {}
+    return canonicals.concat(customs);
+  }
   const fmtNum = (n) => n === null || n === undefined || !isFinite(n) ? '—' : Math.round(n).toLocaleString('fr-FR');
   const fmtPct = (n) => n === null || n === undefined || !isFinite(n) ? '—' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   const fmtM = (n) => {
@@ -131,12 +163,12 @@
   function renderCarousel() {
     const car = qs('#fpCarousel');
     if (!car) return;
-    const targets = (typeof TARGETS !== 'undefined' && TARGETS) ? TARGETS : [];
-    if (targets.length === 0) {
+    const sites = getAllSites();
+    if (sites.length === 0) {
       car.innerHTML = `<div class="fp-site-card"><div class="fp-site-name">Chargement…</div></div>`;
       return;
     }
-    car.innerHTML = targets.map((t, i) => renderCard(t, i, analyses[i])).join('');
+    car.innerHTML = sites.map((t, i) => renderCard(t, i, analyses[i])).join('');
     qsa('.fp-site-card', car).forEach(card => {
       card.addEventListener('click', () => {
         const i = parseInt(card.dataset.idx);
@@ -286,8 +318,8 @@
 
     let scrollTimeout, liveTimeout;
 
-    // Live detection during scroll — updates pin highlight in real time
-    // without firing the expensive map flyTo
+    // Live detection during scroll — updates pin highlight AND map view in real time
+    // using setView(animate:false) to avoid Leaflet flyTo freeze/white-flash.
     car.addEventListener('scroll', () => {
       if (state !== 'peek') return;
       clearTimeout(liveTimeout);
@@ -297,19 +329,21 @@
           activeIdx = best;
           updatePinHighlight();
           updateActiveCardUI();
+          // Instant map recenter — zero lag during rapid swipes
+          flyMapToActive(0, true);
         }
-      }, 40);
+      }, 30);
 
-      // After scroll settles, fly the map to the new active site
+      // After scroll settles, smooth finishing pan + haptic
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
         const best = detectCenteredCard(car);
         if (best !== -1) {
           activeIdx = best;
-          flyMapToActive(.9);   // smooth pan (not a full flyTo)
+          flyMapToActive(.3);
           haptic(10);
         }
-      }, 160);
+      }, 220);
     }, { passive: true });
 
     // Delegate CTA clicks (tap → detail)
@@ -350,18 +384,44 @@
     qsa('.fp-site-card').forEach((c, idx) => c.classList.toggle('active', idx === activeIdx));
   }
 
-  function flyMapToActive(duration) {
-    if (typeof TARGETS === 'undefined' || !window._fpMap) return;
-    const t = TARGETS[activeIdx];
+  // When user is rapidly swiping the carousel, we use setView (instant, no animation)
+  // to avoid the Leaflet flyTo freeze. A smooth pan is only used on an explicit tap
+  // (big distance) or when the map is stationary long enough to animate nicely.
+  function flyMapToActive(duration, instant) {
+    if (!window._fpMap) return;
+    const sites = getAllSites();
+    const t = sites[activeIdx];
     if (!t) return;
-    // Use panTo for smoothness during browsing, flyTo only for distant jumps
-    const current = window._fpMap.getCenter();
-    const dist = Math.hypot(current.lat - t.lat, current.lng - t.lng);
-    if (dist > 0.05) {
-      window._fpMap.flyTo([t.lat, t.lng], Math.max(window._fpMap.getZoom(), 13), { duration: duration || .7 });
+    const cur = window._fpMap.getCenter();
+    const dist = Math.hypot(cur.lat - t.lat, cur.lng - t.lng);
+    if (instant) {
+      // Hard setView, no animation — zero lag, perfect for rapid swipes
+      window._fpMap.setView([t.lat, t.lng], Math.max(window._fpMap.getZoom(), 13), { animate: false });
+    } else if (dist > 0.03) {
+      // Short panTo (kinder on rendering than flyTo which re-projects everything)
+      window._fpMap.panTo([t.lat, t.lng], { animate: true, duration: duration || .45 });
     } else {
-      window._fpMap.panTo([t.lat, t.lng], { animate: true, duration: duration || .5 });
+      window._fpMap.panTo([t.lat, t.lng], { animate: true, duration: duration || .3 });
     }
+  }
+
+  // Pre-warm tile cache by briefly touching bounds that cover all target sites.
+  // Leaflet will load tiles in this area, so subsequent setViews feel instant.
+  function prewarmTiles() {
+    if (!window._fpMap || !L) return;
+    try {
+      const sites = getAllSites();
+      if (sites.length === 0) return;
+      const bounds = L.latLngBounds(sites.map(s => [s.lat, s.lng]));
+      // fitBounds with no animation — triggers tile load without moving the visible view
+      const origCenter = window._fpMap.getCenter();
+      const origZoom = window._fpMap.getZoom();
+      window._fpMap.fitBounds(bounds.pad(0.25), { animate: false, padding: [60, 60] });
+      // Restore the original Bucharest-wide view after a micro-delay
+      setTimeout(() => {
+        window._fpMap.setView(origCenter, origZoom, { animate: false });
+      }, 50);
+    } catch (e) { console.warn('[FP mobile] prewarm failed:', e); }
   }
 
   // ─── HAPTIC FEEDBACK ───────────────────────────────────────────
@@ -371,13 +431,13 @@
 
   // ─── ACTIVATE SITE ─────────────────────────────────────────────
   function activateSite(i, flyTo) {
-    if (typeof TARGETS === 'undefined') return;
+    const sites = getAllSites();
+    if (!sites[i]) return;
     activeIdx = i;
 
     updatePinHighlight();
     updateActiveCardUI();
 
-    // Scroll carousel to center this card
     const car = qs('#fpCarousel');
     const card = qsa('.fp-site-card', car)[i];
     if (car && card && flyTo) {
@@ -385,16 +445,10 @@
       car.scrollTo({ left: targetLeft, behavior: 'smooth' });
     }
 
-    // Compute analysis if not yet
     ensureAnalysis(i);
-
-    // Fly map to site
-    if (flyTo) flyMapToActive(.85);
-
+    if (flyTo) flyMapToActive(.5);
     haptic(12);
-
-    // Dispatch event for external listeners
-    window.dispatchEvent(new CustomEvent('fp:site-activated', { detail: { index: i, target: TARGETS[i] } }));
+    window.dispatchEvent(new CustomEvent('fp:site-activated', { detail: { index: i, target: sites[i] } }));
   }
 
   // Hide competitor clusters on mobile — focus stays on the FP targets.
@@ -414,7 +468,9 @@
     if (typeof runCaptageAnalysis !== 'function') return;
     if (typeof computeExecSummary !== 'function') return;
     if (typeof loadAllCompetitors !== 'function') return;
-    const t = TARGETS[i];
+    const sites = getAllSites();
+    const t = sites[i];
+    if (!t) return;
     const doIt = () => {
       try {
         const r = runCaptageAnalysis(t.lat, t.lng, 3000);
@@ -442,7 +498,9 @@
   function refreshCard(i) {
     const card = qsa('.fp-site-card')[i];
     if (!card) return;
-    const t = TARGETS[i];
+    const sites = getAllSites();
+    const t = sites[i];
+    if (!t) return;
     card.outerHTML = renderCard(t, i, analyses[i]);
     const newCard = qsa('.fp-site-card')[i];
     if (newCard) {
@@ -458,8 +516,10 @@
   function buildDetail() {
     const det = qs('#fpDetail');
     if (!det) return;
-    const t = TARGETS[activeIdx];
+    const sites = getAllSites();
+    const t = sites[activeIdx];
     const a = analyses[activeIdx];
+    if (!t) return;
     if (!a || !a.raw) {
       det.innerHTML = '<p style="padding:40px 20px;text-align:center;color:var(--gray)">Calcul en cours…</p>';
       setTimeout(() => { ensureAnalysis(activeIdx); buildDetail(); }, 600);
@@ -472,16 +532,31 @@
     const score = a.score;
     const verClass = verdictClass(a.verdict);
 
+    const totalSites = sites.length;
+    const prevIdx = (activeIdx - 1 + totalSites) % totalSites;
+    const nextIdx = (activeIdx + 1) % totalSites;
+
     det.innerHTML = `
       <div class="fp-detail-header">
-        <div class="fp-detail-back" id="fpDetailBack">
+        <div class="fp-detail-back" id="fpDetailBack" aria-label="Retour">
           <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
         </div>
         <div class="fp-detail-title">
           <div class="t">${t.name}</div>
-          <div class="s">Secteur ${t.sector} · Phase ${t.phase} · ${t.opening || ''}</div>
+          <div class="s">Secteur ${t.sector} · Phase ${t.phase} · ${activeIdx + 1} / ${totalSites}</div>
         </div>
         <span class="fp-verdict ${verClass}" style="font-size:10px">${String(a.verdict).replace('GO CONDITIONNEL', 'GO COND')}</span>
+      </div>
+      <div class="fp-detail-nav">
+        <button class="fp-detail-nav-btn" data-dir="prev" aria-label="Site précédent">
+          <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+          <span class="fp-nav-label">${sites[prevIdx].name}</span>
+        </button>
+        <div class="fp-detail-nav-sep"></div>
+        <button class="fp-detail-nav-btn next" data-dir="next" aria-label="Site suivant">
+          <span class="fp-nav-label">${sites[nextIdx].name}</span>
+          <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
       </div>
 
       <!-- KEY METRICS HERO -->
@@ -620,6 +695,20 @@
     `;
 
     qs('#fpDetailBack').addEventListener('click', () => { haptic(10); transitionTo('summary'); });
+
+    // Prev / Next site navigation buttons
+    qsa('.fp-detail-nav-btn', det).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.dataset.dir;
+        const sitesAll = getAllSites();
+        const n = sitesAll.length;
+        const newIdx = dir === 'next' ? (activeIdx + 1) % n : (activeIdx - 1 + n) % n;
+        switchToSiteInDetail(newIdx, dir);
+      });
+    });
+
+    // Horizontal swipe gesture to switch sites
+    wireDetailHorizontalSwipe(det);
 
     // Accordion toggles with stagger animation + data-driven viz reveal
     qsa('.fp-accordion-item', det).forEach(item => {
@@ -1218,16 +1307,23 @@
     qs('.fp-secondary-backdrop')?.classList.remove('on');
   }
 
-  // ─── NUMBERED PINS FOR TARGETS ─────────────────────────────────
+  // ─── NUMBERED PINS FOR ALL SITES (targets + customs) ───────────
   function buildTargetPins() {
-    if (!window._fpMap || typeof TARGETS === 'undefined' || pinMarkers.length > 0) return;
-    if (typeof L === 'undefined') return;
+    if (!window._fpMap || typeof L === 'undefined') return;
+    // Always rebuild to reflect latest custom sites
+    if (pinLayer) {
+      try { pinLayer.clearLayers(); } catch {}
+    } else {
+      pinLayer = L.layerGroup().addTo(window._fpMap);
+    }
+    pinMarkers = [];
 
-    pinLayer = L.layerGroup().addTo(window._fpMap);
-    TARGETS.forEach((t, i) => {
+    const sites = getAllSites();
+    sites.forEach((t, i) => {
+      const isCustom = t._kind === 'custom';
       const icon = L.divIcon({
         className: '',
-        html: `<div class="fp-target-pin${i === activeIdx ? ' active' : ''}">${i + 1}</div>`,
+        html: `<div class="fp-target-pin${i === activeIdx ? ' active' : ''}${isCustom ? ' fp-custom-pin' : ''}">${i + 1}</div>`,
         iconSize: [36, 36], iconAnchor: [18, 18]
       });
       const m = L.marker([t.lat, t.lng], { icon, zIndexOffset: 700 }).addTo(pinLayer);
@@ -1236,6 +1332,85 @@
         if (state === 'peek') transitionTo('summary');
       });
       pinMarkers.push(m);
+    });
+  }
+  // Expose a public refresh so new custom sites appear immediately
+  window._fpMobileRefreshSites = function() {
+    renderCarousel();
+    buildTargetPins();
+  };
+
+  // ─── DETAIL: switch to another site in-place (prev/next/swipe) ──
+  function switchToSiteInDetail(newIdx, dir) {
+    const det = qs('#fpDetail');
+    if (!det) return;
+    haptic(12);
+    activeIdx = newIdx;
+    updatePinHighlight();
+    // Ensure analysis is ready for this site
+    ensureAnalysis(newIdx);
+    // Sync the hidden carousel underneath (so peek state is consistent)
+    const car = qs('#fpCarousel');
+    const card = qsa('.fp-site-card', car)[newIdx];
+    if (car && card) {
+      car.scrollTo({ left: card.offsetLeft, behavior: 'auto' });
+    }
+    updateActiveCardUI();
+    // Pan map instantly to new site
+    flyMapToActive(0, true);
+    // Slide animation on the detail scroll area
+    det.classList.remove('fp-detail-swipe-prev', 'fp-detail-swipe-next');
+    if (dir) det.classList.add('fp-detail-swipe-' + dir);
+    // Rebuild detail with the new site
+    setTimeout(() => {
+      buildDetail();
+      det.classList.remove('fp-detail-swipe-prev', 'fp-detail-swipe-next');
+      det.scrollTop = 0;
+    }, 140);
+  }
+
+  function wireDetailHorizontalSwipe(det) {
+    if (det.__swipeWired) return;
+    det.__swipeWired = true;
+
+    let startX = 0, startY = 0, tracking = false, dragging = false;
+    const THRESHOLD = 60; // px to trigger switch
+    const ANGLE_GUARD = 1.5; // horizontal must dominate vertical
+
+    det.addEventListener('touchstart', (e) => {
+      if (det.scrollTop > 10) return; // let vertical scroll take over
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = true;
+      dragging = false;
+    }, { passive: true });
+
+    det.addEventListener('touchmove', (e) => {
+      if (!tracking) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (!dragging && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * ANGLE_GUARD) {
+        dragging = true;
+      }
+      if (dragging) {
+        // Visual rubber band as user drags
+        det.style.transform = `translateX(${dx * 0.35}px)`;
+        det.style.transition = 'none';
+      }
+    }, { passive: true });
+
+    det.addEventListener('touchend', (e) => {
+      if (!tracking) return;
+      tracking = false;
+      if (!dragging) return;
+      const dx = (e.changedTouches?.[0]?.clientX || 0) - startX;
+      det.style.transform = '';
+      det.style.transition = '';
+      if (Math.abs(dx) > THRESHOLD) {
+        const n = getAllSites().length;
+        const newIdx = dx < 0 ? (activeIdx + 1) % n : (activeIdx - 1 + n) % n;
+        switchToSiteInDetail(newIdx, dx < 0 ? 'next' : 'prev');
+      }
     });
   }
 
@@ -1488,6 +1663,8 @@
     if (window._fpMap && typeof TARGETS !== 'undefined' && typeof L !== 'undefined') {
       buildTargetPins();
       wireMapDoubleTap();
+      // Pre-warm tile cache around all sites → eliminates map freeze on swipe
+      setTimeout(() => prewarmTiles(), 400);
       return;
     }
     if (tries > 30) return;

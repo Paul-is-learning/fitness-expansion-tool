@@ -1,5 +1,41 @@
 # Changelog
 
+## [v5.3-fluid-nav] — 2026-04-18
+
+### 3 demandes après test iPhone
+
+**1. Fix map freeze pendant le swipe carrousel**
+- Bug : en swipe rapide, la carte en fond freeze brièvement (white flash visible sur screenshot de Paul)
+- Cause : `flyTo` / `panTo` de Leaflet lancent des animations coûteuses qui se chevauchent
+- Fix 1 : **pre-warm tile cache** au boot — `fitBounds` instantané autour des 5 sites pour forcer le chargement des tiles, puis restauration de la vue. Les tiles sont en cache → plus de lag.
+- Fix 2 : **setView(animate:false)** pendant le scroll live du carrousel au lieu de flyTo. Zéro animation Leaflet = zéro freeze. Un `panTo` très court (300ms) est joué à la fin du settle pour polish.
+- Fix 3 : `getAllSites()` utilisé partout au lieu de `TARGETS` direct.
+
+**2. Centralisation "Mes sites" = TARGETS + custom sites**
+- Avant : seuls les 5 TARGETS apparaissaient dans le carrousel + pins map
+- Maintenant : `getAllSites()` merge TARGETS canoniques + `fpCustomSites` de localStorage
+  - Carrousel montre tous (cards sans distinction)
+  - Pins map : **TARGETS en gold**, **custom sites en violet** (fp-custom-pin)
+  - Pin violet a sa propre animation pulse (`fpPinPulsePurple`)
+- API publique `window._fpMobileRefreshSites()` : à appeler après ajout/retrait d'un custom site → renderCarousel + rebuild pins
+
+**3. Navigation detail view plus naturelle**
+- **Nav bar prev/next** dans le detail view :
+  - Boutons `← Site précédent` / `Site suivant →` qui montrent le nom du site adjacent
+  - Tap = switch in-place du detail (haptic + pan map instant + refresh accordions)
+- **Swipe horizontal** sur le detail :
+  - Rubber band pendant le drag (0.35 resistance)
+  - Guard anti-conflict avec scroll vertical (ratio dominance 1.5)
+  - > 60px = switch de site
+- Subtitle updated avec "X / N" (1/6, 2/6, etc.)
+- Wrap circulaire : dernier site → prev vers premier et inversement
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Desktop inchangé
+
+---
+
 ## [v5.2-polish-fixes] — 2026-04-18
 
 ### 3 fixes demandés par Paul après test sur iPhone
