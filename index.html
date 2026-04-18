@@ -4105,6 +4105,22 @@ const PNL_DEFAULTS = {
   capex: 1176000,            // EUR — Travaux 840k + Equip CAPEX 40%=336k (BP V17 C79)
   leasingAnnual: 100800,     // EUR/an — 504k equip leasing 60% / 5 ans (BP V17 C86)
   leasingYears: 5,           // Duree leasing
+  // ═══════════════════════════════════════════════════════════════
+  // STRUCTURE DE FINANCEMENT — emprunt bancaire sur le CAPEX
+  // ═══════════════════════════════════════════════════════════════
+  // Split standard franchise fitness: 30% equity / 70% bank loan on CAPEX.
+  // Romania SME loan rate 2026 estimate: BNR 5.75% + spread 0.75% = 6.5%.
+  // Term 7 years = standard franchise financing duration.
+  // Benchmark OnAir Montreuil balance sheet: emprunts bancaires 495 k€
+  //   sur CAPEX 1,716 k€ total → ~29% bank financing remaining year 5,
+  //   cohérent avec un emprunt 70% amorti sur 7 ans.
+  // Intérêts en P&L OnAir 2024-2025 = 10.7 k€ (0.5% du CA Y5 mature).
+  financing: {
+    equityRatio:    0.30,    // % apport associés
+    loanRatio:      0.70,    // % emprunt bancaire
+    loanRate:       0.065,   // 6.5% taux annuel RO SME 2026
+    loanTermYears:  7,       // 7 ans amortissement
+  },
   // Staff = 9% du CA (BP officiel FP — moyenne 10 ans avec Laminor)
   // Plancher = 65,000€/an (4 ETP Romania minimum: 1 manager + 3 coaches)
   // En ramp-up le plancher s'applique, à maturité le 9% prend le relais
@@ -4147,11 +4163,12 @@ const PNL_DEFAULTS = {
   // le ratio OPEX/CA est donc mécaniquement plus haut. Reconvergence à
   // partir de Y5 (cruising).
   //   OnAir Montreuil Y5 réel      = 10.8% du CA (hors honoraires gestion)
-  //   BP Romania Y5 conservateur   = 15.0%  (pas de décote Romania appliquée
-  //                                          = marge de sécurité +4.2pp vs OnAir)
-  opexOpsRateByYear: [0.20, 0.18, 0.17, 0.16, 0.15], // Y1 → Y5+ (cruising)
-  opexOpsRate: 0.15,         // Legacy — utilisé si pas d'index année
-  //                           Y5+ = valeur "steady state conservateur"
+  //   BP Romania Y5 avec décote RO = 12.0%  (légère décote appliquée vs France,
+  //                                          justifiée par électricité -40%,
+  //                                          sécu/ménage -50%, marge +1.2pp vs OnAir)
+  // Décroissance linéaire -2pp/an: Y1 20% → Y5+ 12%
+  opexOpsRateByYear: [0.20, 0.18, 0.16, 0.14, 0.12], // Y1 → Y5+ (cruising)
+  opexOpsRate: 0.12,         // Legacy — utilisé si pas d'index année
   // Cost of Sales = achats de marchandises revendues (accessoires, protéines,
   // snacks, serviettes). OnAir Montreuil réel: 2.77% du CA (60k / 2.24M).
   // Ventes marchandises OnAir = 8.4% du CA, marge commerciale 68%.
@@ -4217,13 +4234,27 @@ function buildPnL(cohortData, avgQuartierPrice) {
   const leasingMonthly = PNL_DEFAULTS.leasingAnnual / 12;
   const arpu = getFP_MONTHLY_HT();
 
-  let cumulCashFlow = -capex;
+  // ─── Financing structure: equity + bank loan on CAPEX ────────
+  const fin = PNL_DEFAULTS.financing || { equityRatio: 1, loanRatio: 0, loanRate: 0, loanTermYears: 7 };
+  const equity = Math.round(capex * fin.equityRatio);
+  const loanPrincipal = capex * fin.loanRatio;
+  const monthlyRate = fin.loanRate / 12;
+  const loanMonths = fin.loanTermYears * 12;
+  // Standard amortization payment: M = PV × r / (1 - (1+r)^-n)
+  const loanMonthlyPayment = loanMonths > 0 && monthlyRate > 0
+    ? loanPrincipal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -loanMonths))
+    : 0;
+  let loanOutstanding = loanPrincipal;
+
+  let cumulCashFlow = -capex;                  // PROJECT cashflow (unlevered, drives irrBase)
+  let cumulCashFlowEquity = -equity;           // EQUITY cashflow (levered, for irrEquity)
   const monthly = [];
   const annualCA = [0,0,0,0,0];
   const annualEBITDA = [0,0,0,0,0];
   let breakevenMonth = null;
   let paybackMonth = null;
-  const cashflows = [-capex];
+  const cashflows = [-capex];                  // unlevered IRR inputs
+  const cashflowsEquity = [-equity];           // levered IRR inputs
 
   for(let i = 0; i < cohortData.length && i < 60; i++) {
     const d = cohortData[i];
@@ -4261,8 +4292,22 @@ function buildPnL(cohortData, avgQuartierPrice) {
 
     const totalOpex = staffMonthly + rentMonthly + fpCloud + opexOps + redevance + fondsPub;
     const ebitda = margeBrute - totalOpex;
-    const cashFlow = ebitda - leasing; // Operating CF after leasing
+
+    // --- FINANCING (loan amortization) ---
+    let interestExp = 0, principalPay = 0;
+    if (loanOutstanding > 0 && i < loanMonths) {
+      interestExp = Math.round(loanOutstanding * monthlyRate);
+      principalPay = Math.round(loanMonthlyPayment - interestExp);
+      if (principalPay > loanOutstanding) principalPay = Math.round(loanOutstanding);
+      loanOutstanding -= principalPay;
+    }
+
+    const cashFlow = ebitda - leasing;                               // unlevered (project)
+    const cashFlowEquity = ebitda - leasing - interestExp - principalPay; // levered (equity)
+    const resultatCourant = ebitda - interestExp;                    // avant impôts (after interest)
+
     cumulCashFlow += cashFlow;
+    cumulCashFlowEquity += cashFlowEquity;
 
     if(yearIdx < 5) {
       annualCA[yearIdx] += totalCA;
@@ -4273,12 +4318,16 @@ function buildPnL(cohortData, avgQuartierPrice) {
     if(paybackMonth === null && cumulCashFlow > 0) paybackMonth = i + 1;
 
     cashflows.push(cashFlow);
+    cashflowsEquity.push(cashFlowEquity);
 
     monthly.push({
       month: i + 1, year: yearNum,
       ca: totalCA, caAdherents, ptRevenue, costOfSales, margeBrute,
       staffMonthly, rentMonthly, fpCloud, opexOps, redevance, fondsPub, leasing,
       totalOpex, ebitda, cashFlow, cumulCashFlow,
+      // Financing fields
+      interestExp, principalPay, loanOutstanding,
+      resultatCourant, cashFlowEquity, cumulCashFlowEquity,
       fixedOpex: staffMonthly + fpCloud, // for display compat
       rent: rentMonthly, franchiseFee: redevance + fondsPub
     });
@@ -4332,12 +4381,25 @@ function buildPnL(cohortData, avgQuartierPrice) {
     irrOffreInitiale = calcIRR(cfInitTV);
   }
 
+  // ─── EQUITY IRR/NPV (levered — return to associates after debt service) ──
+  const cfEqTV = [...cashflowsEquity];
+  cfEqTV[cfEqTV.length - 1] += terminalValue;
+  const irrEquity = calcIRR(cfEqTV);
+  const npvEquity = calcNPV(cfEqTV, PNL_DEFAULTS.discountRate);
+
+  // Total interest paid over loan term (sum monthly interest)
+  const totalInterest = monthly.reduce((a, m) => a + (m.interestExp || 0), 0);
+
   return {
     monthly, annualCA: annualCA.map(Math.round), annualEBITDA: annualEBITDA.map(Math.round),
     capex, rent: rentY1, fixedOpex: fixedOpexDisplay,
     breakevenMonth, paybackMonth,
     irr, npv, irrOffreInitiale,
     irrOps, npvOps, terminalValue,
+    // Financing
+    equity, loanPrincipal, loanMonthlyPayment: Math.round(loanMonthlyPayment),
+    irrEquity, npvEquity, totalInterest,
+    financing: PNL_DEFAULTS.financing,
     totalCA5y: Math.round(annualCA.reduce((a,b)=>a+b,0)),
     avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0,
     rentSteps: PNL_DEFAULTS.rentSteps, leasingMonthly

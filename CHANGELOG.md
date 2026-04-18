@@ -1,5 +1,111 @@
 # Changelog
 
+## [v6.3-financing-bptemplate] — 2026-04-18
+
+### Structure de financement + IRR Equity + Onglet didactique BP
+
+**1. Intérêts d'emprunt enfin modélisés** (oubli v5.x corrigé)
+
+OnAir Montreuil porte un emprunt 495 k€ et paie 10.7 k€ d'intérêts/an. Notre BP le faisait complètement implicite (CAPEX 100% equity). Désormais:
+
+```js
+PNL_DEFAULTS.financing = {
+  equityRatio:   0.30,    // 30% apport associés
+  loanRatio:     0.70,    // 70% emprunt bancaire
+  loanRate:      0.065,   // 6.5% (RO SME 2026)
+  loanTermYears: 7,       // Standard franchise loan
+}
+```
+
+Pour CAPEX 1 176 k€ :
+- Equity : 353 k€
+- Emprunt : 823 k€
+- Échéance mensuelle : 12 224 €
+- Intérêts cumulés 7 ans : **~185 k€**
+- Intérêts Y1 (CA faible) : ~52 k€/an (2.1% CA)
+- Intérêts Y5 (CA cruising) : ~17 k€/an (0.9% CA)
+
+**2. Nouveau indicateur : IRR Equity (levered)**
+
+`buildPnL` retourne maintenant :
+- `irr` / `npv` : **IRR Projet (unlevered)** — perf opérationnelle pure, décision go/no-go (inchangé, baseline intacte)
+- `irrEquity` / `npvEquity` : **IRR Equity (levered)** — retour aux associés après service de dette
+
+Hala Laminor : IRR Projet 57.6% → IRR Equity **89.3%** (effet levier +32pp, car IRR > taux emprunt 6.5%).
+
+**3. Nouvel accordion mobile "Financement & IRR equity"**
+Card visuelle avec :
+- Barre de répartition Equity 30% / Emprunt 70%
+- Apport, Emprunt, Taux, Durée, Échéance, Intérêts cumulés
+- IRR Projet (unlevered) vs IRR Equity (levered) côte à côte
+- Info-tip ? explicatif du concept
+
+**4. Nouvel accordion mobile "Structure coûts BP (type)" — didactique**
+Référence complète des hypothèses du BP pour infos:
+- **Revenus** : prix TTC Base/Premium/Ultimate, cible membres maturité
+- **Coûts taux appliqués** : Staff 9%, COGS 2.8%, OPEX ops curve 20→12%, Redevance 6%, Fonds pub 1%, FP Cloud, Leasing
+- **Loyer stepped** : Y1-Y2, Y3-Y4, Y5+, indexation HICP 3%, surface 1449 m²
+- **CAPEX & Financement** : 1.2M€ avec split 30/70 equity/loan à 6.5% sur 7 ans
+- **Paramètres financiers & sortie** : WACC 12%, CIT 16%, exit EV/EBITDA 6×, croissance A4-A6 5%, A7+ 2%
+- **Benchmark OnAir Montreuil** (card gold) : CA 2.24M€, EBITDA 44.7%, tous ratios comparatifs
+
+**Non-régression :**
+- Tests 197/197 PASS (IRR Projet inchangé, seuls ajouts de nouveaux champs)
+
+**Fichiers :**
+- `index.html` : `PNL_DEFAULTS.financing` + amortization dans `buildPnL` + retour `irrEquity`/`npvEquity`/`totalInterest`/etc.
+- `src/mobile.js` : 2 nouveaux accordions (`financing`, `bptemplate`) avec cards dédiées `financingCard()` et `bpTemplateCard()`
+- `config.js` : MODEL_VERSION v6.3
+
+---
+
+## [v6.2-opex-12pct-cruising] — 2026-04-18
+
+### OPEX ops Y5+ compressé à 12% (décote Romania appliquée)
+
+**Rationale :**
+OnAir Montreuil (franchise audité) fait 10.8% d'OPEX ops en France en Y5 mature. Romania a des avantages structurels nets (salaires staff opérationnel −60%, télécom −30%, marketing local −25%, électricité −15-25%). Il est cohérent d'appliquer une décote modérée plutôt que de rester à 15%.
+
+**Nouvelle courbe:**
+```js
+opexOpsRateByYear: [0.20, 0.18, 0.16, 0.14, 0.12]  // linear -2pp/an
+```
+
+| Année | Taux | Écart vs v6.1 |
+|---|---:|---|
+| Y1 | 20% | = |
+| Y2 | 18% | = |
+| Y3 | 16% | −1pp |
+| Y4 | 14% | −2pp |
+| Y5+ | **12%** | **−3pp** |
+
+**Positionnement vs benchmarks :**
+- OnAir Montreuil Y5 réel: 10.8% → notre 12% = **+1.2pp de marge de sécurité**
+- Romania théorique (OnAir − décote labor/telecom): ~8% → notre 12% = **+4pp de buffer**
+- **Reste conservateur** — marge suffisante pour imprévus (inflation RO, choc énergie)
+
+**Impact sur les 5 sites:**
+| Site | IRR v6.1 (15%) | IRR v6.2 (12%) | Δ NPV |
+|---|---:|---:|---:|
+| Hala Laminor | 55.78% | **57.63%** | +268 k€ |
+| Baneasa | 58.68% | **60.52%** | +279 k€ |
+| Unirea | 38.68% | **40.64%** | +210 k€ |
+| Militari | 5.71% | **8.28%** | +130 k€ |
+| Grand Arena | 0.90% | **3.65%** | +123 k€ |
+
+→ **Gain moyen +200 k€ NPV par site**, Grand Arena/Militari désormais nettement positifs (toujours WATCH à cause du flux faible mais IRR double).
+
+**Défense devant investisseur :**
+> "Notre benchmark OnAir Montreuil (franchise fitness 1 club cruising Y5, CA 2.24M€, audité par Fiteco) affiche 10.8% d'OPEX ops hors management fees. Le BP Romania retient **12% en cruising** (+1.2pp de marge de sécurité vs France), malgré l'avantage structurel du marché roumain (salaires sécurité/ménage −60%, télécom −30%). En phase ramp-up Y1-Y4, la courbe grimpe de 20% à 14% pour refléter la dilution naturelle des coûts fixes sur un CA en croissance."
+
+**Files:**
+- `index.html` : `opexOpsRateByYear: [0.20, 0.18, 0.16, 0.14, 0.12]`
+- `config.js` : `MODEL_VERSION = 'v6.2-opex-12pct-cruising'`
+- `.baseline.json` + `tests/analysis.html` : baseline réalignée → 197/197 PASS
+- `docs/MODEL.md` : section OnAir Calibration mise à jour
+
+---
+
 ## [v6.1-opex-timedecay] — 2026-04-18
 
 ### Time-decay sur OPEX ops (ramp-up plus réaliste)

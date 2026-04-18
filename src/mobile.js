@@ -824,6 +824,30 @@
           </div>
         </div>
 
+        <div class="fp-accordion-item" data-sec="financing">
+          <div class="fp-accordion-head">
+            <div class="icon">🏦</div>
+            <div class="lbl">Financement & IRR equity</div>
+            <div class="hint">${fmtPct(r.pnl?.base?.irrEquity)}</div>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="fp-accordion-body">
+            ${financingCard(r.pnl?.base)}
+          </div>
+        </div>
+
+        <div class="fp-accordion-item" data-sec="bptemplate">
+          <div class="fp-accordion-head">
+            <div class="icon">📚</div>
+            <div class="lbl">Structure coûts BP (type)</div>
+            <div class="hint">Template Romania</div>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="fp-accordion-body">
+            ${bpTemplateCard()}
+          </div>
+        </div>
+
         <div class="fp-accordion-item" data-sec="comps">
           <div class="fp-accordion-head">
             <div class="icon">🥊</div>
@@ -1151,6 +1175,138 @@
           <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">D'où viennent nos ${fmtNum(totalCaptifs)} captifs</div>
         </div>
         ${brandBars}
+      </div>
+    `;
+  }
+
+  // ─── FINANCING CARD: equity/debt split + IRR project vs equity ──
+  function financingCard(pnlBase) {
+    if (!pnlBase) return '';
+    const fin = pnlBase.financing || {};
+    const equity = pnlBase.equity || 0;
+    const loan = pnlBase.loanPrincipal || 0;
+    const monthlyPmt = pnlBase.loanMonthlyPayment || 0;
+    const totalInt = pnlBase.totalInterest || 0;
+    const irrProj = pnlBase.irr;
+    const irrEq = pnlBase.irrEquity;
+
+    return `
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Structure financement CAPEX</div>
+        <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">
+          <div style="flex:${(fin.equityRatio || 0.3) * 100};background:linear-gradient(90deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:800">Equity ${Math.round((fin.equityRatio || 0.3) * 100)}%</div>
+          <div style="flex:${(fin.loanRatio || 0.7) * 100};background:linear-gradient(90deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">Emprunt ${Math.round((fin.loanRatio || 0.7) * 100)}%</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px">
+          <div><div style="color:var(--gray2)">Apport associés</div><div style="color:#34d399;font-weight:800;font-size:14px">${fmtM(equity)}</div></div>
+          <div><div style="color:var(--gray2)">Emprunt bancaire</div><div style="color:#60a5fa;font-weight:800;font-size:14px">${fmtM(loan)}</div></div>
+          <div><div style="color:var(--gray2)">Taux annuel</div><div style="color:var(--white);font-weight:700">${((fin.loanRate || 0.065) * 100).toFixed(1)}%</div></div>
+          <div><div style="color:var(--gray2)">Durée</div><div style="color:var(--white);font-weight:700">${fin.loanTermYears || 7} ans</div></div>
+          <div><div style="color:var(--gray2)">Échéance mensuelle</div><div style="color:var(--white);font-weight:700">${fmtNum(monthlyPmt)} €</div></div>
+          <div><div style="color:var(--gray2)">Intérêts cumulés 7 ans</div><div style="color:#f87171;font-weight:700">${fmtM(totalInt)}</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">IRR Projet vs IRR Equity
+          <span class="info-tip" style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:var(--card3);color:var(--gray);align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px">?
+            <div class="tip-content"><strong>IRR Projet (unlevered)</strong> = rentabilité opérationnelle du club, peu importe comment il est financé. Base de décision go/no-go.<br><br>
+            <strong>IRR Equity (levered)</strong> = rentabilité pour les associés après service de dette. Inclut l'effet de levier de l'emprunt → généralement plus élevé que l'IRR Projet quand le IRR Projet > taux d'emprunt.<br><br>
+            <span style="color:var(--gray2)">Exemple: si IRR Projet 40% et taux 6.5%, l'effet levier amplifie → IRR Equity peut dépasser 60-80%.</span></div>
+          </span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="padding:12px;background:rgba(30,41,59,.45);border-radius:8px">
+            <div style="font-size:10px;color:var(--gray2);text-transform:uppercase">IRR Projet</div>
+            <div style="font-size:22px;font-weight:900;color:${irrProj > 0 ? '#34d399' : '#f87171'};margin-top:4px">${fmtPct(irrProj)}</div>
+            <div style="font-size:9px;color:var(--gray2);margin-top:2px">Unlevered (perf. op.)</div>
+          </div>
+          <div style="padding:12px;background:rgba(30,41,59,.45);border-radius:8px;border:1px solid rgba(212,160,23,.3)">
+            <div style="font-size:10px;color:var(--accent);text-transform:uppercase;font-weight:700">IRR Equity ⭐</div>
+            <div style="font-size:22px;font-weight:900;color:${irrEq > 0 ? '#34d399' : '#f87171'};margin-top:4px">${fmtPct(irrEq)}</div>
+            <div style="font-size:9px;color:var(--gray2);margin-top:2px">Pour les associés</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── BP TEMPLATE: didactic cost structure reference ─────────────
+  function bpTemplateCard() {
+    // Uses the current PNL_DEFAULTS values for display
+    const P = (typeof PNL_DEFAULTS !== 'undefined' ? PNL_DEFAULTS : {});
+    const opexCurve = P.opexOpsRateByYear || [0.20, 0.18, 0.16, 0.14, 0.12];
+    const fin = P.financing || {};
+
+    const row = (label, val, color, hint) => `
+      <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid rgba(71,85,115,.18)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--white)">${label}</div>
+          ${hint ? `<div style="font-size:10px;color:var(--gray2);margin-top:2px">${hint}</div>` : ''}
+        </div>
+        <div style="flex:0 0 auto;font-size:14px;font-weight:800;color:${color || 'var(--accent)'};font-variant-numeric:tabular-nums">${val}</div>
+      </div>
+    `;
+
+    return `
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Revenus</div>
+        ${row('FP Base TTC', (P.priceBaseTTC || 28) + ' €/mo', '#34d399', 'Abonnement standard HT ~23 €')}
+        ${row('FP Premium TTC', (P.pricePremiumTTC || 40) + ' €/mo', '#34d399', 'Couple / accès multi-clubs')}
+        ${row('FP Ultimate TTC', (P.priceUltimateTTC || 50) + ' €/mo', '#34d399', 'Sports collectifs + coaching')}
+        ${row('Cible membres maturité', fmtNum(P.targetMembers || 4000), 'var(--accent)', 'A3 (BP V17 C34)')}
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Coûts — Taux appliqués</div>
+        ${row('Staff (salaires + charges)', '9.0% du CA', '#f87171', 'Plancher 65 k€/an (4 ETP) + 3%/an inflation. BP officiel FP aligné OnAir.')}
+        ${row('Cost of Sales (marchandises)', ((P.costOfSalesRate || 0.028) * 100).toFixed(1) + '% du CA', '#f87171', 'Calibré OnAir 2.77% (achats revendus hors abo)')}
+        ${row('OPEX ops Y1 (ramp-up)', (opexCurve[0] * 100).toFixed(0) + '% du CA', '#f87171', 'Coûts fixes à pleine charge sur CA faible')}
+        ${row('OPEX ops Y5+ (cruising)', (opexCurve[4] * 100).toFixed(0) + '% du CA', '#f87171', 'Décote Romania appliquée. +1.2pp vs OnAir 10.8% réel France.')}
+        ${row('Redevance franchise', ((P.redevanceRate || 0.06) * 100).toFixed(0) + '% CA adh.', '#f87171', 'Master-franchise Isseo (vs 4% franchise classique)')}
+        ${row('Fonds publicitaire', ((P.fondsPubRate || 0.01) * 100).toFixed(0) + '% CA adh.', '#f87171', 'Standard franchise fitness EU')}
+        ${row('FP Cloud SaaS', (P.fpCloudMonthly || 600) + ' €/mois', '#f87171', '+1%/an inflation logicielle')}
+        ${row('Leasing équipement', fmtNum((P.leasingAnnual || 100800) / 12) + ' €/mo', '#f87171', 'Financement 60% matériel, 5 ans')}
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Loyer stepped (Hala Laminor — objectif négo)</div>
+        ${row('Y1-Y2', '10.5 €/m² base → 16 €/m² all-in', 'var(--accent)', '+ service charges 5€ + marketing fee 0.5€')}
+        ${row('Y3-Y4', '11.5 €/m² → 17 €/m² all-in', 'var(--accent)', '')}
+        ${row('Y5+', '13 €/m² → 18.5 €/m² all-in', 'var(--accent)', '')}
+        ${row('Indexation HICP', '3%/an à partir de Y2', 'var(--gray)', 'Eurostat HICP 27 EU moyenne')}
+        ${row('Surface type', '1 449 m²', 'var(--accent)', 'Hala Laminor G-28 First Floor')}
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">CAPEX & Financement</div>
+        ${row('CAPEX total', fmtM(P.capex || 1176000), 'var(--accent)', 'Travaux 840k + Equip 336k (BP V17 C79)')}
+        ${row('Apport associés', ((fin.equityRatio || 0.3) * 100).toFixed(0) + '% = ' + fmtM((P.capex || 1176000) * (fin.equityRatio || 0.3)), '#34d399', '')}
+        ${row('Emprunt bancaire', ((fin.loanRatio || 0.7) * 100).toFixed(0) + '% = ' + fmtM((P.capex || 1176000) * (fin.loanRatio || 0.7)), '#60a5fa', '')}
+        ${row('Taux emprunt', ((fin.loanRate || 0.065) * 100).toFixed(1) + '%', 'var(--white)', 'RO SME 2026 (BNR + spread 0.75%)')}
+        ${row('Durée emprunt', (fin.loanTermYears || 7) + ' ans', 'var(--white)', 'Standard franchise loan')}
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Paramètres financiers & sortie</div>
+        ${row('WACC (actualisation)', ((P.discountRate || 0.12) * 100).toFixed(0) + '%', 'var(--accent)', 'BP V17 C112')}
+        ${row('CIT Roumanie', ((P.citRate || 0.16) * 100).toFixed(0) + '%', 'var(--gray)', 'Non utilisé (EBITDA brut)')}
+        ${row('Exit multiple EV/EBITDA', (P.exitMultiple || 6) + '×', 'var(--accent)', 'Standard franchise fitness EU, Y5')}
+        ${row('Horizon P&L', '60 mois (5 ans)', 'var(--gray)', '')}
+        ${row('Croissance A4-A6', '+5%/an', 'var(--gray)', 'Post-maturité')}
+        ${row('Croissance A7+', '+2%/an', 'var(--gray)', 'Long terme (= inflation)')}
+      </div>
+
+      <div class="card" style="padding:14px 16px;background:linear-gradient(135deg,rgba(212,160,23,.08),transparent);border:1px solid rgba(212,160,23,.2)">
+        <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px">📊 Benchmark OnAir Montreuil (référence)</div>
+        <div style="font-size:12px;color:var(--white);line-height:1.55">
+          Franchise fitness 1 club en <b>Y5 cruising</b> — exercice 09/2024-08/2025 (certifié Fiteco).<br>
+          • CA: <b>2.24 M€</b> — EBITDA <b>44.7%</b> — Résultat net <b>25.4%</b><br>
+          • Staff <b>9.0%</b> — Loyer all-in <b>12.4%</b> — OPEX ops <b>10.8%</b><br>
+          • Royalties <b>4%</b> + fonds pub <b>1%</b>
+          <br><br>
+          <span style="color:var(--gray2);font-size:11px">Notre BP Romania: conservateur sur redevance (6% master-franchise) et OPEX ops (12% cruising), agressif sur CA cible (4000 mbr A3).</span>
+        </div>
       </div>
     `;
   }
