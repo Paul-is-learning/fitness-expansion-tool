@@ -1,5 +1,64 @@
 # Changelog
 
+## [v5.0-apple-like] — 2026-04-18
+
+### UX excellence — polish "Apple-like 2026"
+
+**3 demandes explicites Paul :**
+- ✅ **Clusters concurrents masqués par défaut mobile** → carte ne montre que les 5 pins FP numérotés (focus total)
+- ✅ **Swipe carrousel ↔ map pin sync** → le swipe change aussi le pin actif + `flyTo` la carte (smooth 700ms)
+- ✅ **Slider loyer inline dans le detail P&L** → glisse 5-25 €/m² avec affichage live gros chiffre gold + recalcule les 3 scénarios en temps réel (debounce 90ms)
+
+**Micro-interactions haptiques** (axes 1 + 5)
+- `navigator.vibrate` sur chaque tap majeur (8-15ms selon action)
+- Transitions de state sheet : vibration subtile
+- Slider : tick léger par pas
+- Carousel scroll settle : vibration après fly-to
+- CTAs : vibration forte (15ms) au déclenchement
+
+**Motion design** (axe 3)
+- Hero metrics sur detail : **animated number counting** (0→valeur en 700ms ease-out-cubic)
+- Recomputation loyer : animation incrémentale des nouveaux chiffres (500ms)
+- Accordion items : **stagger entry** (50-400ms, 6 sections en cascade)
+- FAB : `scale(0) rotate(-90deg)` en état detail (disparait en rotation)
+- Sheet transitions : cubic-bezier spring (.34, 1.56, .64, 1)
+- `prefers-reduced-motion` respected
+
+**Profondeur visuelle** (axe 2)
+- Active pin : **pulse animation** (`fpPinPulse` 2.2s) + halo radiant
+- Verdict pills : **glow match** leur couleur (box-shadow coloré)
+- Active site card : radial gradient gold + border glow
+- CTAs : shimmer sweep animé (2.4s infinite)
+- Cards loading : **shimmer placeholders** sur les valeurs "—"
+- FAB + avatar + search pill : spring scale sur tap (.9 / .97)
+
+**Parallax depth** (axe 6)
+- Map scale 1 → 0.97 → 0.92 quand sheet peek → summary → detail
+- Transform-origin `center 35%` pour que le zoom paraisse naturel
+- Transition 500ms cubic-bezier smooth
+
+**Accessibilité**
+- `@media (prefers-reduced-motion: reduce)` désactive toutes les animations non-essentielles
+- Fingerprint auth retiré `screen.width` (v4.9 fix)
+
+**Impact visible :**
+- Carte mobile montre UNIQUEMENT les 5 pins FP (plus 40 clusters jaunes qui obscurcissaient)
+- Swipe carousel = la carte suit (effet wow Google Maps style)
+- Le slider permet de tester 5→25 €/m² en 1 seconde et voir l'IRR changer de +8% à +76%
+- Chaque tap a un feedback kinesthésique (vibration + scale)
+- Les chiffres s'animent (plus premium que flash statique)
+
+**Non-régression:**
+- Tests 197/197 PASS ✓
+- Desktop strictement inchangé
+
+**Fichiers modifiés :**
+- `mobile.css` (21KB) — spring vars, pulse keyframes, shimmer, parallax, verdict glows
+- `src/mobile.js` (32KB) — haptic helper, live pin update, rent slider + recompute, animated counters, map flyTo sync
+- `config.js` — MODEL_VERSION bump
+
+---
+
 ## [v4.9-mobile-excellence] — 2026-04-18
 
 ### Mobile — refonte complète "Site Browser"

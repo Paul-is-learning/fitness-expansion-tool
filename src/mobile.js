@@ -189,7 +189,7 @@
     return 'loading';
   }
 
-  // ─── SHEET STATE TRANSITIONS ──────────────────────────────────
+  // ─── SHEET STATE TRANSITIONS (with parallax map zoom) ──────────
   function transitionTo(newState) {
     if (!sheet) return;
     state = newState;
@@ -204,8 +204,16 @@
       buildDetail();
     }
 
+    // Parallax: subtle scale on the map as sheet grows (gives depth)
+    const scaleByState = { peek: 1.0, summary: 0.97, detail: 0.92 };
+    document.documentElement.style.setProperty('--map-parallax', scaleByState[newState] || 1);
+
+    haptic(8);
+
     // Invalidate map size after transition
-    setTimeout(() => { if (window._fpMap?.invalidateSize) window._fpMap.invalidateSize(); }, 450);
+    setTimeout(() => {
+      if (window._fpMap?.invalidateSize) window._fpMap.invalidateSize();
+    }, 450);
   }
 
   // ─── HANDLE DRAG ───────────────────────────────────────────────
@@ -263,58 +271,103 @@
     });
   }
 
-  // ─── CAROUSEL SCROLL SYNC ──────────────────────────────────────
+  // ─── CAROUSEL SCROLL SYNC (with map fly-to) ────────────────────
   function wireCarouselScroll() {
     const car = qs('#fpCarousel');
     if (!car) return;
 
-    // Detect which card is centered via scrollLeft
-    let scrollTimeout;
+    let scrollTimeout, liveTimeout;
+
+    // Live detection during scroll — updates pin highlight in real time
+    // without firing the expensive map flyTo
     car.addEventListener('scroll', () => {
-      if (state !== 'peek') return; // only in peek
+      if (state !== 'peek') return;
+      clearTimeout(liveTimeout);
+      liveTimeout = setTimeout(() => {
+        const best = detectCenteredCard(car);
+        if (best !== -1 && best !== activeIdx) {
+          activeIdx = best;
+          updatePinHighlight();
+          updateActiveCardUI();
+        }
+      }, 40);
+
+      // After scroll settles, fly the map to the new active site
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
-        const cards = qsa('.fp-site-card', car);
-        if (cards.length === 0) return;
-        const carRect = car.getBoundingClientRect();
-        const mid = carRect.left + carRect.width / 2;
-        let best = 0, bestD = Infinity;
-        cards.forEach((c, i) => {
-          const r = c.getBoundingClientRect();
-          const cMid = r.left + r.width / 2;
-          const d = Math.abs(cMid - mid);
-          if (d < bestD) { bestD = d; best = i; }
-        });
-        if (best !== activeIdx) activateSite(best, false);
-      }, 120);
+        const best = detectCenteredCard(car);
+        if (best !== -1) {
+          activeIdx = best;
+          flyMapToActive(.9);   // smooth pan (not a full flyTo)
+          haptic(10);
+        }
+      }, 160);
     }, { passive: true });
 
-    // Delegate CTA clicks
+    // Delegate CTA clicks (tap → detail)
     car.addEventListener('click', (e) => {
       if (e.target.closest('[data-cta="detail"]')) {
         e.stopPropagation();
+        haptic(15);
         transitionTo('detail');
       }
     });
+  }
+
+  function detectCenteredCard(car) {
+    const cards = qsa('.fp-site-card', car);
+    if (cards.length === 0) return -1;
+    const carRect = car.getBoundingClientRect();
+    const mid = carRect.left + carRect.width / 2;
+    let best = -1, bestD = Infinity;
+    cards.forEach((c, i) => {
+      const r = c.getBoundingClientRect();
+      const cMid = r.left + r.width / 2;
+      const d = Math.abs(cMid - mid);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  function updatePinHighlight() {
+    pinMarkers.forEach((m, idx) => {
+      const el = m.getElement?.();
+      if (el) {
+        const inner = el.querySelector('.fp-target-pin');
+        if (inner) inner.classList.toggle('active', idx === activeIdx);
+      }
+    });
+  }
+  function updateActiveCardUI() {
+    qsa('.fp-site-card').forEach((c, idx) => c.classList.toggle('active', idx === activeIdx));
+  }
+
+  function flyMapToActive(duration) {
+    if (typeof TARGETS === 'undefined' || !window._fpMap) return;
+    const t = TARGETS[activeIdx];
+    if (!t) return;
+    // Use panTo for smoothness during browsing, flyTo only for distant jumps
+    const current = window._fpMap.getCenter();
+    const dist = Math.hypot(current.lat - t.lat, current.lng - t.lng);
+    if (dist > 0.05) {
+      window._fpMap.flyTo([t.lat, t.lng], Math.max(window._fpMap.getZoom(), 13), { duration: duration || .7 });
+    } else {
+      window._fpMap.panTo([t.lat, t.lng], { animate: true, duration: duration || .5 });
+    }
+  }
+
+  // ─── HAPTIC FEEDBACK ───────────────────────────────────────────
+  function haptic(ms) {
+    try { navigator.vibrate?.(ms); } catch {}
   }
 
   // ─── ACTIVATE SITE ─────────────────────────────────────────────
   function activateSite(i, flyTo) {
     if (typeof TARGETS === 'undefined') return;
     activeIdx = i;
-    const target = TARGETS[i];
 
-    // Update pin highlights
-    pinMarkers.forEach((m, idx) => {
-      const el = m.getElement?.();
-      if (el) {
-        const inner = el.querySelector('.fp-target-pin');
-        if (inner) inner.classList.toggle('active', idx === i);
-      }
-    });
-
-    // Update card active state
-    qsa('.fp-site-card').forEach((c, idx) => c.classList.toggle('active', idx === i));
+    updatePinHighlight();
+    updateActiveCardUI();
 
     // Scroll carousel to center this card
     const car = qs('#fpCarousel');
@@ -328,12 +381,24 @@
     ensureAnalysis(i);
 
     // Fly map to site
-    if (flyTo && window._fpMap && target) {
-      window._fpMap.flyTo([target.lat, target.lng], Math.max(window._fpMap.getZoom(), 13), { duration: .8 });
-    }
+    if (flyTo) flyMapToActive(.85);
+
+    haptic(12);
 
     // Dispatch event for external listeners
-    window.dispatchEvent(new CustomEvent('fp:site-activated', { detail: { index: i, target } }));
+    window.dispatchEvent(new CustomEvent('fp:site-activated', { detail: { index: i, target: TARGETS[i] } }));
+  }
+
+  // Hide competitor clusters on mobile — focus stays on the FP targets.
+  // The `allComps` array still populates (needed for analysis), we just
+  // keep them invisible on the map until user explicitly enables.
+  function hideCompetitorMarkers() {
+    try {
+      if (typeof compCluster !== 'undefined' && compCluster) compCluster.clearLayers();
+      if (typeof layers !== 'undefined') layers.competitors = false;
+      const tgl = document.getElementById('tglCompetitors');
+      if (tgl) tgl.classList.remove('on');
+    } catch {}
   }
 
   function ensureAnalysis(i) {
@@ -356,12 +421,13 @@
           raw: r
         };
         refreshCard(i);
+        hideCompetitorMarkers(); // keep the map clean post-analysis
       } catch (e) { console.warn('[FP mobile] analysis failed:', e); }
     };
     if (typeof allComps !== 'undefined' && allComps && allComps.length > 0) {
       doIt();
     } else {
-      loadAllCompetitors().then(doIt);
+      loadAllCompetitors().then(() => { hideCompetitorMarkers(); doIt(); });
     }
   }
 
@@ -548,14 +614,36 @@
       </div>
     `;
 
-    qs('#fpDetailBack').addEventListener('click', () => transitionTo('summary'));
+    qs('#fpDetailBack').addEventListener('click', () => { haptic(10); transitionTo('summary'); });
 
-    // Accordion toggles
+    // Accordion toggles with stagger animation
     qsa('.fp-accordion-item', det).forEach(item => {
       item.querySelector('.fp-accordion-head').addEventListener('click', () => {
+        haptic(8);
         item.classList.toggle('open');
       });
     });
+
+    // Rent slider live recomputation
+    const slider = qs('#fpRentSlider');
+    if (slider) {
+      slider.addEventListener('input', (e) => onRentSliderChange(e.target.value));
+    }
+
+    // Animate the hero metrics in from zero on detail open
+    setTimeout(() => {
+      const heroCards = qsa('#fpDetail > div[style*="grid-template-columns"] > div');
+      if (heroCards.length >= 4) {
+        const mNode = heroCards[0].querySelector('div[style*="font-size:26px"]');
+        const iNode = heroCards[1].querySelector('div[style*="font-size:26px"]');
+        const nNode = heroCards[2].querySelector('div[style*="font-size:22px"]');
+        const sNode = heroCards[3].querySelector('div[style*="font-size:26px"]');
+        if (mNode) animateNumber(mNode, 0, a.members,  700, v => fmtNum(v));
+        if (iNode) animateNumber(iNode, 0, a.irrBase,  700, v => fmtPct(v));
+        if (nNode) animateNumber(nNode, 0, a.npvBase,  700, v => fmtM(v));
+        if (sNode) animateNumber(sNode, 0, Math.round(a.score), 700, v => Math.round(v));
+      }
+    }, 80);
   }
 
   function sazBar(label, score, color) {
@@ -594,25 +682,143 @@
       { key: 'base',         label: 'Base',         color: 'var(--accent)' },
       { key: 'optimiste',    label: 'Optimiste',    color: '#34d399' }
     ];
-    return `<div class="card" style="padding:0">
-      ${scenarios.map(s => {
-        const p = r.pnl?.[s.key];
-        if (!p) return '';
-        return `
-          <div style="padding:12px 14px;border-bottom:1px solid rgba(71,85,115,.2)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label}</div>
-              <div style="font-size:18px;font-weight:900;color:${p.irr > 0 ? '#34d399' : '#f87171'}">${fmtPct(p.irr)}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
-              <div><div style="color:var(--gray2)">NPV</div><div style="font-weight:700;color:var(--white)">${fmtM(p.npv)}</div></div>
-              <div><div style="color:var(--gray2)">Breakeven</div><div style="font-weight:700;color:var(--white)">${p.breakevenMonth ? p.breakevenMonth + ' mo' : '—'}</div></div>
-              <div><div style="color:var(--gray2)">Payback</div><div style="font-weight:700;color:var(--white)">${p.paybackMonth ? p.paybackMonth + ' mo' : '—'}</div></div>
-            </div>
+    // Rent slider UI — recomputes everything on input
+    const currentRent = window._rentOverride?.y1 ?? 10.5;
+    return `
+      <!-- Rent slider -->
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(135deg,rgba(30,41,59,.8),rgba(17,24,39,.4))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Loyer Y1</div>
+            <div style="font-size:14px;font-weight:700;color:var(--white)">Simulation en temps réel</div>
           </div>
-        `;
-      }).join('')}
-    </div>`;
+          <div style="text-align:right">
+            <div id="fpRentValue" style="font-size:24px;font-weight:900;color:var(--accent);line-height:1">${currentRent.toFixed(1)}<span style="font-size:12px;color:var(--gray)"> €/m²</span></div>
+          </div>
+        </div>
+        <input type="range" id="fpRentSlider" min="5" max="25" step="0.5" value="${currentRent}"
+               style="width:100%;accent-color:var(--accent);margin:0">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray2);margin-top:4px">
+          <span>5 €/m² aggressif</span>
+          <span>Marché 10-14</span>
+          <span>25 €/m² premium</span>
+        </div>
+      </div>
+
+      <div class="card" id="fpPnlScenarios" style="padding:0">
+        ${scenarios.map(s => {
+          const p = r.pnl?.[s.key];
+          if (!p) return '';
+          return `
+            <div style="padding:12px 14px;border-bottom:1px solid rgba(71,85,115,.2)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label}</div>
+                <div class="fp-scenario-irr" data-key="${s.key}" style="font-size:18px;font-weight:900;color:${p.irr > 0 ? '#34d399' : '#f87171'}">${fmtPct(p.irr)}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
+                <div><div style="color:var(--gray2)">NPV</div><div class="fp-scenario-npv" data-key="${s.key}" style="font-weight:700;color:var(--white)">${fmtM(p.npv)}</div></div>
+                <div><div style="color:var(--gray2)">Breakeven</div><div class="fp-scenario-be" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.breakevenMonth ? p.breakevenMonth + ' mo' : '—'}</div></div>
+                <div><div style="color:var(--gray2)">Payback</div><div class="fp-scenario-pb" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.paybackMonth ? p.paybackMonth + ' mo' : '—'}</div></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // ─── Live rent recalc (triggered by slider) ────────────────────
+  let rentDebounce;
+  function onRentSliderChange(val) {
+    const v = parseFloat(val);
+    qs('#fpRentValue').innerHTML = v.toFixed(1) + '<span style="font-size:12px;color:var(--gray)"> €/m²</span>';
+    haptic(4); // subtle tick per step
+    clearTimeout(rentDebounce);
+    rentDebounce = setTimeout(() => recomputeCurrentAnalysis(v), 90);
+  }
+  function recomputeCurrentAnalysis(rentY1) {
+    try {
+      window._rentOverride = { y1: rentY1 };
+      const t = TARGETS[activeIdx];
+      const r = runCaptageAnalysis(t.lat, t.lng, 3000);
+      const exec = computeExecSummary(r);
+      const a = analyses[activeIdx];
+      const oldMembers = a?.members, oldIrr = a?.irrBase, oldNpv = a?.npvBase;
+      if (a) {
+        a.members  = r.totalTheorique;
+        a.irrBase  = r.pnl?.base?.irr;
+        a.npvBase  = r.pnl?.base?.npv;
+        a.beBase   = r.pnl?.base?.breakevenMonth;
+        a.verdict  = typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict;
+        a.score    = exec.total;
+        a.raw      = r;
+      }
+      // Update the active site card
+      refreshCard(activeIdx);
+      // Update hero metric cards (top of detail view) with animated counters
+      updateDetailHero(r, a, { oldMembers, oldIrr, oldNpv });
+      // Update P&L scenarios inline
+      updatePnLInline(r);
+      // Re-run invariants check (via audit wrapper automatic)
+    } catch (e) { console.warn('[FP rent-slider] recompute failed:', e); }
+  }
+
+  function updateDetailHero(r, a, prev) {
+    const container = qs('#fpDetail');
+    if (!container) return;
+    // Find the 4 hero cards — they have labels in uppercase
+    const heroCards = qsa('#fpDetail > div[style*="grid-template-columns"] > div');
+    // Cards order: Membres, IRR, NPV, SAZ
+    if (heroCards.length >= 4) {
+      const mNode = heroCards[0].querySelector('div[style*="font-size:26px"]');
+      const iNode = heroCards[1].querySelector('div[style*="font-size:26px"]');
+      const nNode = heroCards[2].querySelector('div[style*="font-size:22px"]');
+      const sNode = heroCards[3].querySelector('div[style*="font-size:26px"]');
+      if (mNode) animateNumber(mNode, prev.oldMembers || 0, a.members, 500, (v) => fmtNum(v));
+      if (iNode) {
+        iNode.style.color = (a.irrBase > 0 ? '#34d399' : '#f87171');
+        animateNumber(iNode, prev.oldIrr || 0, a.irrBase, 500, (v) => fmtPct(v));
+      }
+      if (nNode) {
+        nNode.style.color = (a.npvBase > 0 ? '#34d399' : '#f87171');
+        animateNumber(nNode, prev.oldNpv || 0, a.npvBase, 500, (v) => fmtM(v));
+      }
+      if (sNode) sNode.textContent = Math.round(a.score);
+      // Also update Payback hint
+      const pbHint = heroCards[1].querySelector('div[style*="font-size:10px"][style*="color:var(--gray)"]');
+      if (pbHint) pbHint.textContent = 'Payback ' + (a.beBase ? a.beBase + ' mois' : '—');
+    }
+  }
+
+  function updatePnLInline(r) {
+    ['conservateur','base','optimiste'].forEach(key => {
+      const p = r.pnl?.[key];
+      if (!p) return;
+      const irrEl = qs(`.fp-scenario-irr[data-key="${key}"]`);
+      const npvEl = qs(`.fp-scenario-npv[data-key="${key}"]`);
+      const beEl  = qs(`.fp-scenario-be[data-key="${key}"]`);
+      const pbEl  = qs(`.fp-scenario-pb[data-key="${key}"]`);
+      if (irrEl) { irrEl.textContent = fmtPct(p.irr); irrEl.style.color = p.irr > 0 ? '#34d399' : '#f87171'; }
+      if (npvEl) npvEl.textContent = fmtM(p.npv);
+      if (beEl)  beEl.textContent  = p.breakevenMonth ? p.breakevenMonth + ' mo' : '—';
+      if (pbEl)  pbEl.textContent  = p.paybackMonth ? p.paybackMonth + ' mo' : '—';
+    });
+  }
+
+  // ─── ANIMATED NUMBER COUNTING ──────────────────────────────────
+  function animateNumber(el, from, to, duration, formatter) {
+    if (!el) return;
+    from = isFinite(from) ? from : 0;
+    to = isFinite(to) ? to : 0;
+    const start = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3); // ease-out-cubic
+    function frame(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const v = from + (to - from) * ease(t);
+      el.textContent = formatter(v);
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
   }
 
   // ─── FAB + SECONDARY SHEET ─────────────────────────────────────
