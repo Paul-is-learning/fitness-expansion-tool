@@ -41,6 +41,7 @@
 <script src="src/audit.js" defer></script>
 <script src="src/auth-guard.js" defer></script>
 <script src="src/i18n.js" defer></script>
+<script src="src/onboarding-tour.js" defer></script>
 <script src="src/mobile.js" defer></script>
 <style>
 /* ================================================================
@@ -7057,6 +7058,8 @@ function doLogin() {
   if(document.getElementById('userAvatar')) document.getElementById('userAvatar').textContent = (user.name||user.email)[0].toUpperCase();
   init();
   applyRole();
+  // Broadcast login for onboarding tour + future listeners
+  try { window.dispatchEvent(new CustomEvent('fp:login-success', { detail: { user, email: user.email } })); } catch {}
 }
 
 // Check if already logged in (session-based — must re-login each visit)
@@ -7068,6 +7071,8 @@ function checkAuth() {
     resetInactivityTimer();
     init();
     applyRole();
+    // Broadcast session-restored login for onboarding tour
+    try { window.dispatchEvent(new CustomEvent('fp:login-success', { detail: { user: currentUser, email: currentUser.email } })); } catch {}
   }
   // Pre-fill email from localStorage for convenience (not session)
   const lastEmail = localStorage.getItem('fpLastEmail');
