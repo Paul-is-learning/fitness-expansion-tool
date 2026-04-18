@@ -1,5 +1,50 @@
 # Changelog
 
+## [v4.7-mobile] — 2026-04-18
+
+### Mobile Overhaul (15/10)
+Refonte complète du mobile inspirée de Google Maps / Apple Maps / Citymapper.
+
+**Nouveau pattern :**
+- **Carte plein écran** (100dvh) comme hero visual
+- **Bottom sheet draggable** 3 snap points :
+  - `collapsed` (140px) — handle + tabs visibles
+  - `mid` (55vh) — pour browsing
+  - `full` (vh - 80) — pour analyse détaillée
+- **Top bar flottant** compact : search pill + avatar
+- **Search overlay plein écran** (tap sur la pill)
+- **Fiche site → auto-snap à `full`** quand on clique un site sur la carte
+- **Close button** flottant pour fermer la Fiche
+
+**Touch-first :**
+- Tap targets ≥ 44px (WCAG)
+- Tooltips `.info-tip` → **tap-to-open** (au lieu de hover)
+- Slider loyer : thumb 28px + track 6px
+- Toggles : 44×26px avec dot 20px
+- `touch-action: manipulation` pour éviter double-tap zoom
+
+**Responsive breakpoints :**
+- ≤ 768px → layout mobile (bottom sheet)
+- ≤ 414px → compact (plus petit, plus dense)
+- ≤ 360px → ultra-compact (iPhone SE, vieux Androids)
+- Paysage ≤ 500px haut → sheet collapsed à 80px
+
+**Gestion safe-area :**
+- `env(safe-area-inset-top/bottom)` respectée partout
+- `100dvh` (dynamic viewport) pour éviter le bug barre d'URL mobile
+
+**Fichiers ajoutés :**
+- `mobile.css` (14KB) — toute la feuille responsive
+- `src/mobile.js` (11KB) — drag sheet, tooltips tap, search overlay
+
+**Desktop :** strictement identique à v3.1. Les éléments mobiles sont hidden via `@media (min-width: 769px)`.
+
+**Verification :**
+- Tests visuels sur 320, 375, 414, 768, 1280px ✓
+- `test.html` : **95/95 cells PASS** (zero régression calcul) ✓
+
+---
+
 ## [v3.1-refactor] — 2026-04-18
 
 ### Architecture

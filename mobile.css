@@ -1,0 +1,507 @@
+/* ================================================================
+   FITNESS PARK ROMANIA — MOBILE OVERHAUL (v4.7)
+   ================================================================
+   Pattern: Full-screen map + draggable bottom sheet + top bar.
+   Inspired by Google Maps, Apple Maps, Citymapper.
+
+   Breakpoints:
+     ≤ 768px  → mobile layout (bottom sheet, FABs, full-screen analysis)
+     ≤ 414px  → compact mode (smaller fonts, tighter spacing)
+     ≤ 360px  → ultra-compact (iPhone SE, old Androids)
+
+   Zero impact on desktop (> 768px).
+   ================================================================ */
+
+/* Desktop: hide mobile-only DOM elements injected by src/mobile.js */
+@media (min-width: 769px) {
+  .mobile-topbar,
+  .sheet-handle,
+  .mobile-close-btn,
+  .mobile-search-overlay { display: none !important; }
+}
+
+@media (max-width: 768px) {
+
+  /* ─── CSS custom properties for mobile ─── */
+  :root {
+    --sheet-collapsed: 140px;        /* handle + tabs visible */
+    --sheet-mid: 55vh;               /* most browsing */
+    --sheet-full: calc(100vh - 80px);/* max height */
+    --top-bar-h: 56px;
+    --bottom-nav-h: 60px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --tap-min: 44px;
+  }
+
+  body { overflow: hidden; height: 100dvh; /* dynamic viewport for mobile browsers */ }
+
+  /* ─── App grid → stack ─── */
+  .app {
+    display: block !important;
+    grid-template-columns: none !important;
+    height: 100dvh !important;
+    position: relative;
+  }
+  .app.panel-open { grid-template-columns: none !important; }
+
+  /* ─── MAP fills the screen ─── */
+  .map-area {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw !important;
+    height: 100dvh !important;
+    z-index: 1;
+  }
+  #map { height: 100dvh !important; }
+
+  /* ─── Top bar: compact header floating above map ─── */
+  .mobile-topbar {
+    position: fixed;
+    top: var(--safe-top);
+    left: 0; right: 0;
+    height: var(--top-bar-h);
+    background: linear-gradient(180deg, rgba(6,8,15,.96) 0%, rgba(6,8,15,.86) 70%, rgba(6,8,15,0) 100%);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    pointer-events: none; /* let map clicks pass through background gradient */
+  }
+  .mobile-topbar > * { pointer-events: auto; }
+  .mobile-topbar .logo-img {
+    height: 24px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
+  }
+  .mobile-topbar .search-pill {
+    flex: 1;
+    height: 40px;
+    background: rgba(17,24,39,.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(212,160,23,.25);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    color: var(--gray);
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  .mobile-topbar .search-pill svg {
+    width: 16px; height: 16px; stroke: var(--gray); fill: none; stroke-width: 2;
+    flex-shrink: 0;
+  }
+  .mobile-topbar .avatar-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: #000;
+    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    flex-shrink: 0;
+  }
+
+  /* ─── Search overlay: full-screen when user taps pill ─── */
+  .mobile-search-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,8,15,.98);
+    z-index: 9998;
+    display: none;
+    flex-direction: column;
+    padding: calc(var(--safe-top) + 12px) 12px 12px;
+  }
+  .mobile-search-overlay.on { display: flex; }
+  .mobile-search-overlay .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--top-bar-h);
+  }
+  .mobile-search-overlay .back-btn {
+    width: var(--tap-min); height: var(--tap-min);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--card2); border-radius: 50%;
+    cursor: pointer;
+  }
+  .mobile-search-overlay input {
+    flex: 1;
+    height: 48px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 14px;
+    color: var(--white);
+    font-size: 15px;
+    font-family: var(--font);
+  }
+  .mobile-search-overlay input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .mobile-search-overlay .results { margin-top: 10px; overflow-y: auto; flex: 1; }
+
+  /* ─── Bottom sheet: sidebar becomes draggable panel ─── */
+  .sidebar {
+    position: fixed !important;
+    left: 0; right: 0;
+    bottom: 0;
+    top: auto !important;
+    height: var(--sheet-height, var(--sheet-collapsed)) !important;
+    max-height: var(--sheet-full) !important;
+    min-height: var(--sheet-collapsed);
+    border-radius: 20px 20px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: rgba(17,24,39,.97);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 -8px 40px rgba(0,0,0,.6);
+    overflow: hidden;
+    z-index: 1001;
+    transition: height .32s cubic-bezier(.3,.7,.3,1);
+    display: flex !important;
+    flex-direction: column;
+  }
+  .sidebar.dragging { transition: none !important; }
+
+  /* Drag handle: clickable to cycle snap points */
+  .sheet-handle {
+    position: sticky;
+    top: 0;
+    flex-shrink: 0;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    background: transparent;
+    z-index: 2;
+    touch-action: none;
+  }
+  .sheet-handle:active { cursor: grabbing; }
+  .sheet-handle::before {
+    content: '';
+    width: 44px; height: 5px;
+    background: var(--gray2);
+    border-radius: 3px;
+    opacity: .6;
+  }
+  .sheet-handle:active::before { opacity: 1; background: var(--accent); }
+
+  /* Hide the original desktop header (logo + search) inside the sidebar */
+  .sidebar-header { display: none !important; }
+
+  /* Tabs as pills, horizontally scrollable at top of sheet */
+  .tabs {
+    flex-shrink: 0;
+    display: flex !important;
+    gap: 6px;
+    padding: 4px 12px 12px !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto !important;
+    height: 36px;
+    padding: 0 16px !important;
+    background: var(--card2);
+    border-radius: 18px;
+    font-size: 12px !important;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--gray);
+    border: 1px solid transparent;
+    display: flex; align-items: center;
+    min-width: auto !important;
+  }
+  .tab.active {
+    background: var(--accent) !important;
+    color: #000 !important;
+    border-color: var(--accent) !important;
+  }
+  .tab.active::after { display: none !important; }  /* hide desktop underline */
+
+  .sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px !important;
+    padding-bottom: calc(40px + var(--safe-bottom)) !important;
+  }
+  .sidebar-body .tab-panel,
+  .sidebar-body .card,
+  .sidebar-body .card * {
+    max-width: 100%;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  /* Long metric rows: label left, value right, truncate label if needed */
+  .sidebar-body .metric-row, .sidebar-body .detail-row {
+    gap: 8px;
+  }
+  .sidebar-body .metric-label, .sidebar-body .detail-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-body .metric-value, .sidebar-body .detail-value {
+    flex-shrink: 0;
+    min-width: auto;
+  }
+
+  /* ─── Cards compact ─── */
+  .card {
+    border-radius: 14px !important;
+    padding: 14px !important;
+    margin-bottom: 10px !important;
+  }
+  .card-title { font-size: 13px !important; }
+
+  /* ─── Toggle layers: bigger touch targets ─── */
+  .toggle {
+    width: 44px !important;
+    height: 26px !important;
+    flex-shrink: 0;
+  }
+  .toggle::before {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .toggle.on::before {
+    transform: translateX(18px) !important;
+  }
+  .layer-label { font-size: 14px !important; }
+  .layer-hint { font-size: 11px !important; }
+
+  /* ─── Buttons: min tap target ─── */
+  .btn, button:not(.tab):not(.sheet-handle):not(.back-btn):not(.fab):not(.mobile-close) {
+    min-height: var(--tap-min);
+    font-size: 13px;
+  }
+
+  /* ─── Right panel → full-screen overlay ─── */
+  .right-panel {
+    display: none;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    z-index: 9999;
+    background: var(--bg) !important;
+    overflow-y: auto;
+    padding: calc(var(--safe-top) + 56px) 12px calc(var(--safe-bottom) + 20px) !important;
+  }
+  .app.panel-open .right-panel { display: block !important; }
+  .mobile-close-btn {
+    position: fixed;
+    top: calc(var(--safe-top) + 10px);
+    left: 10px;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    background: var(--card2);
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    box-shadow: 0 2px 10px rgba(0,0,0,.5);
+    border: 1px solid var(--border);
+    color: var(--white);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .app.panel-open .mobile-close-btn { display: flex; }
+
+  /* ─── Leaflet controls on mobile ─── */
+  /* Hide zoom buttons — pinch-to-zoom is natural on touch */
+  .leaflet-control-zoom { display: none !important; }
+
+  /* Tile style selector → compact vertical stack top-right (below topbar) */
+  .tile-selector {
+    display: flex !important;
+    flex-direction: column;
+    gap: 2px !important;
+    margin: calc(var(--safe-top) + 64px) 8px 0 0 !important;
+  }
+  .tile-selector > * {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 16px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    line-height: 36px !important;
+  }
+
+  /* Hide attribution (takes valuable space; OSM legal lives in about page) */
+  .leaflet-control-attribution {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    background: rgba(0,0,0,.4) !important;
+    color: rgba(148,163,184,.6) !important;
+    margin-bottom: calc(var(--sheet-collapsed) + 2px) !important;
+  }
+  .leaflet-control-attribution a { color: var(--accent) !important; }
+
+  /* ─── Map overlays: hide redundant boxes on mobile ─── */
+  /* Info is already in the bottom sheet — avoid duplicating on small screens */
+  .map-box, #pointBox, #sazBox, #legend, .legend,
+  .map-overlay-tr, #mapOverlayTR { display: none !important; }
+
+  /* Small floating status badge only (top-right under topbar) */
+  #statusBar, .status-bar {
+    position: fixed !important;
+    top: calc(var(--safe-top) + 64px) !important;
+    right: 8px !important;
+    padding: 4px 10px !important;
+    font-size: 10px !important;
+    background: rgba(17,24,39,.92) !important;
+    border-radius: 12px;
+    z-index: 1000;
+  }
+
+  /* ─── Tooltips: tap-to-open instead of hover ─── */
+  .info-tip {
+    min-width: 22px;
+    min-height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+  }
+  .info-tip .tip-content {
+    display: none;
+    position: fixed !important;
+    top: 50% !important; left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(90vw, 340px) !important;
+    max-height: 70vh !important;
+    overflow-y: auto;
+    padding: 18px !important;
+    font-size: 13px !important;
+    line-height: 1.5;
+    background: var(--card) !important;
+    border: 1px solid var(--accent);
+    box-shadow: 0 12px 48px rgba(0,0,0,.7), 0 0 0 9999px rgba(0,0,0,.6);
+    border-radius: 16px;
+    z-index: 99999;
+  }
+  .info-tip.open .tip-content { display: block !important; }
+  .info-tip:hover .tip-content { display: none !important; }
+  .info-tip.open::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 99990;
+  }
+
+  /* ─── Login page fit ─── */
+  #loginPage > div {
+    width: 95vw !important;
+    padding: 24px 20px !important;
+  }
+
+  /* ─── Tables: stack on mobile to avoid overflow ─── */
+  table.zone-table, table.compare-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 11px;
+  }
+
+  /* ─── Charts: force square-ish ratio ─── */
+  .chart-wrap { max-height: 220px !important; }
+  .chart-wrap canvas { max-height: 220px !important; }
+
+  /* ─── Slider loyer : tactile ─── */
+  input[type=range] {
+    height: 44px !important;
+    -webkit-appearance: none;
+    background: transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px !important;
+    background: var(--card3);
+    border-radius: 3px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--white);
+    margin-top: -11px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--white);
+    cursor: pointer;
+  }
+
+  /* ─── Site analysis cards: full width, better spacing ─── */
+  .metric-box { padding: 10px !important; }
+  .saz-radial { gap: 14px !important; }
+
+  /* ─── Modals/overlays fit screen ─── */
+  .modal-overlay, .overlay-content {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    padding: 16px !important;
+  }
+
+  /* ─── Prevent accidental double-tap zoom on controls ─── */
+  .toggle, .tab, .btn, .sheet-handle, .tab-label {
+    touch-action: manipulation;
+  }
+
+  /* ─── Chart.js tooltip tweaks for finger use ─── */
+  .chartjs-tooltip { font-size: 13px !important; }
+}
+
+/* ─── Compact mode (phones) ─── */
+@media (max-width: 414px) {
+  .tab { padding: 0 12px !important; height: 32px; font-size: 11px !important; }
+  .card { padding: 12px !important; }
+  .card-title { font-size: 12px !important; }
+  .mobile-topbar .search-pill { font-size: 12px; }
+  .layer-label { font-size: 13px !important; }
+}
+
+/* ─── Ultra-compact (iPhone SE, old Android) ─── */
+@media (max-width: 360px) {
+  :root {
+    --sheet-collapsed: 120px;
+    --top-bar-h: 52px;
+  }
+  .mobile-topbar .logo-img { height: 20px; }
+  .mobile-topbar .avatar-btn { width: 36px; height: 36px; }
+  .card { padding: 10px !important; }
+}
+
+/* ─── Landscape on phones: reorganize ─── */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --sheet-collapsed: 80px;
+    --sheet-mid: 80vh;
+  }
+  .mobile-topbar { height: 48px; }
+  .tabs { padding: 4px 10px 8px !important; }
+  .tab { height: 32px; }
+}
