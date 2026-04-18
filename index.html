@@ -4133,13 +4133,26 @@ const PNL_DEFAULTS = {
   rentGrowth: 0.03,          // HICP indexation (replaces fixed 2%)
   fpCloudMonthly: 600,       // EUR/mois (BP V17 C64)
   fpCloudGrowth: 0.01,       // ~1%/an
-  // OPEX operations = 27% du CA (BP officiel FP — Maint/Secu/Menage/Energie)
-  // Moyenne 10 ans avec Laminor pluggé. Inclut: maintenance 8%, énergie 4%,
-  // sécu/ménage ~8%, assurance/IT/admin/marketing local ~7%
-  opexOpsRate: 0.20,         // % du CA Total — compressé Romania (vs 27% France)
-  costOfSalesRate: 0.05,     // % du CA Total — accessoires VAD (BP V17 C63)
-  redevanceRate: 0.06,       // % du CA Adherents — marque → FP France (BP V17 C21)
-  fondsPubRate: 0.02,        // % du CA Adherents — fonds publicitaire (BP V17 C17)
+  // ═══════════════════════════════════════════════════════════════
+  // CALIBRATION OnAir Montreuil (TEMATACA, exercice 09/2024-08/2025)
+  // CA 2.24M€, EBITDA 44.7%, Résultat net 25.4% — 1 club franchisé
+  // Source: Plaquette TEMATACA (Fiteco expert-comptable)
+  // ═══════════════════════════════════════════════════════════════
+  // OPEX operations = énergie + maintenance + assurances + sécu + télécom
+  // + marketing local + IT/admin (hors staff, loyer, leasing, franchise, COGS)
+  // OnAir Montreuil réel: ~12% du CA. BP Romania: 15% (marge prudence
+  // pour économies d'échelle + inflation RO énergie). Initialement 20% (trop haut).
+  opexOpsRate: 0.15,         // % du CA Total — calibré OnAir (était 0.20)
+  // Cost of Sales = achats de marchandises revendues (accessoires, protéines,
+  // snacks, serviettes). OnAir Montreuil réel: 2.77% du CA (60k / 2.24M).
+  // Ventes marchandises OnAir = 8.4% du CA, marge commerciale 68%.
+  costOfSalesRate: 0.028,    // % du CA Total — calibré OnAir (était 0.05)
+  // Redevance franchise (brand fee → FP France). Maintenue à 6% car contrat
+  // master-franchise Isseo = taux supérieur à franchise classique OnAir (4%).
+  redevanceRate: 0.06,       // % du CA Adherents — master-franchise FP France
+  // Fonds publicitaire (pot commun marketing réseau). OnAir réel: 1% du CA.
+  // Alignement sur le standard franchise fitness (était 2%).
+  fondsPubRate: 0.01,        // % du CA Adherents — calibré OnAir (était 0.02)
   ptMonthlyRevenue: 2000,    // EUR/mois — 4 PT × 500€ (BP V17 C48)
   ptGrowth: 0.05,            // +5%/an
   clubSurface: 1449,         // m2 — Hala Laminor (was 1400 in BP V17)

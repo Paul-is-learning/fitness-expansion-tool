@@ -1,5 +1,54 @@
 # Changelog
 
+## [v6.0-onair-calibrated] — 2026-04-18
+
+### Recalibration complète du BP — benchmark OnAir Montreuil
+
+Après analyse du **bilan TEMATACA** (franchise OnAir Montreuil, exercice 09/2024 → 08/2025, CA 2.24 M€, EBITDA 44.7%, certifié Fiteco), les taux de charges du BP Romania ont été recalés sur le réel.
+
+**Modifications `PNL_DEFAULTS`:**
+| Poste | v5.x | v6.0 | OnAir réel | Raison |
+|---|---:|---:|---:|---|
+| `costOfSalesRate` | 5.0% | **2.8%** | 2.77% | OnAir vend 8.4% du CA en marchandises avec 68% de marge → COGS réel 2.77%. Notre 5% implicitait 15% du CA en VAD, irréaliste. |
+| `opexOpsRate` | 20.0% | **15.0%** | ~12% | OnAir hors staff/loyer/franchise/COGS = ~12%. Romania: économies d'échelle sur salaires/énergie/sécu. 15% = conservateur. |
+| `fondsPubRate` | 2.0% | **1.0%** | 1.0% | Standard franchise fitness EU. Pas de raison d'être 2× plus haut. |
+| `redevanceRate` | 6.0% | **6.0%** (inchangé) | 4.0% | Maintenu à 6% car **master-franchise Isseo** a un taux supérieur à la franchise classique OnAir. |
+
+**Impact sur les 5 sites (NPV base 5 ans):**
+| Site | IRR avant | IRR après | NPV avant | NPV après |
+|---|---:|---:|---:|---:|
+| Hala Laminor | 48.0% | **57.6%** | 2.74 M€ | **3.70 M€** |
+| Baneasa Shopping City | 50.8% | **60.6%** | 3.02 M€ | **4.01 M€** |
+| Unirea Shopping Center | 31.0% | **40.0%** | 1.28 M€ | **2.02 M€** |
+| Grand Arena | −9.4% | **+1.7%** | −0.96 M€ | **−0.53 M€** |
+| Militari Shopping | −3.8% | **+6.5%** | −0.76 M€ | **−0.29 M€** |
+
+→ **Gain moyen: +10pp IRR, +600 k€ NPV par site**
+→ Grand Arena et Militari passent d'IRR négatif à légèrement positif (toujours WATCH à cause du flux faible)
+
+**Template futur BP (à utiliser pour tous les nouveaux sites)**:
+```js
+PNL_DEFAULTS = {
+  // Calibrated OnAir Montreuil benchmark (Fiteco 09/2024-08/2025)
+  costOfSalesRate: 0.028,    // Cost of Sales (achats marchandises revendues)
+  opexOpsRate:     0.15,     // OPEX ops (énergie, maint, assu, télécom, marketing local)
+  redevanceRate:   0.06,     // Master-franchise Isseo (vs 4% franchise classique)
+  fondsPubRate:    0.01,     // Fonds publicitaire réseau
+  staffRate:       0.09,     // Staff (BP FP officiel)
+  staffFloorAnnual: 65000,   // Plancher 4 ETP Romania
+  // ... (loyer stepped + leasing + FP Cloud inchangés)
+}
+```
+
+**Fichiers mis à jour:**
+- `index.html` : `PNL_DEFAULTS` avec commentaires OnAir benchmark
+- `config.js` : `MODEL_VERSION = 'v6.0-onair-calibrated'`
+- `.baseline.json` : nouvelles valeurs de référence pour les 5 sites
+- `tests/analysis.html` : BASELINE aligné (197/197 PASS avec nouvelles valeurs)
+- `docs/MODEL.md` : section "OnAir Calibration v6.0" documente la méthodologie
+
+---
+
 ## [v5.9-session-zoom-caf] — 2026-04-18
 
 ### 4 améliorations post-test Paul

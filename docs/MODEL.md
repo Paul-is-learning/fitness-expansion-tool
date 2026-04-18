@@ -2,7 +2,29 @@
 
 > **Purpose:** Every constant that drives the financial model, with source, reasoning, and date of last calibration. If you change a number here, bump `MODEL_VERSION` in `config.js` and re-run `tests/analysis.html`.
 
-Last audited: **2026-04-18** (v4.8-reliability)
+Last audited: **2026-04-18** (v6.0-onair-calibrated)
+
+---
+
+## 🎯 OnAir Calibration (v6.0)
+
+All % of revenue ratios have been calibrated against the **OnAir Montreuil** (TEMATACA franchise) real financial statements (exercise 09/2024 → 08/2025, CA 2.24 M€, EBITDA 44.7%). Source: Plaquette TEMATACA (Fiteco expert-comptable).
+
+| Poste | BP v5.x | BP v6.0 | OnAir réel | Notes |
+|---|---:|---:|---:|---|
+| Cost of Sales | 5.0% | **2.8%** | 2.77% | Achats marchandises revendues |
+| OPEX ops | 20.0% | **15.0%** | ~12% | Énergie+maint+assu+télécom+marketing local. Calibré OnAir + prudence RO. |
+| Fonds publicitaire | 2.0% | **1.0%** | 1.0% | Standard franchise fitness EU |
+| Redevance franchise | 6.0% | **6.0%** | 4.0% | Maintenu 6% car **master-franchise Isseo** (vs franchise classique OnAir) |
+| Staff | 9.0% | **9.0%** | 9.0% | Identique — taux BP FP officiel aligné réel |
+| Loyer all-in | 12-15% | 12-15% | 12.4% | Steps Hala Laminor (real data) |
+
+**Impact 5 sites vs v5.x :**
+- Hala Laminor: IRR 48% → 58%, NPV 2.74 M€ → 3.70 M€
+- Baneasa: IRR 51% → 61%, NPV 3.02 M€ → 4.01 M€
+- Unirea: IRR 31% → 40%, NPV 1.28 M€ → 2.02 M€
+- Grand Arena: IRR −9% → +2%, NPV −0.96 M€ → −0.53 M€
+- Militari: IRR −4% → +7%, NPV −0.76 M€ → −0.29 M€
 
 ---
 
