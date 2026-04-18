@@ -614,18 +614,26 @@
     try { navigator.vibrate?.(ms); } catch {}
   }
 
+  // ─── Per-site override restore / persist ─────────────────────
+  // Called anywhere the active site changes OR a slider writes a value.
+  // Keeps the 3 global singular overrides (`_rentOverride`, `_chargeOverride`,
+  // `_surfaceOverride`) in sync with the per-site maps. Fundamental invariant:
+  // sliders are always SCOPED to the active site, never leak to other sites.
+  function siteKeyFor(t) { return t.lat.toFixed(3) + ',' + t.lng.toFixed(3); }
+  function restoreSiteOverrides(key) {
+    window._rentOverride    = window._rentOverrides?.[key]    ? { y1: window._rentOverrides[key] }                  : null;
+    window._chargeOverride  = window._chargeOverrides?.[key]  ? { chargeTotal: window._chargeOverrides[key] }       : null;
+    window._surfaceOverride = window._surfaceOverrides?.[key] ? { surface: window._surfaceOverrides[key] }          : null;
+  }
+
   // ─── ACTIVATE SITE ─────────────────────────────────────────────
   function activateSite(i, flyTo) {
     const sites = getAllSites();
     if (!sites[i]) return;
     activeIdx = i;
 
-    // Restore per-site rent/charge/surface overrides (or reset to null)
     const t = sites[i];
-    const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
-    window._rentOverride    = window._rentOverrides?.[key]    ? { y1: window._rentOverrides[key] }                  : null;
-    window._chargeOverride  = window._chargeOverrides?.[key]  ? { chargeTotal: window._chargeOverrides[key] }       : null;
-    window._surfaceOverride = window._surfaceOverrides?.[key] ? { surface: window._surfaceOverrides[key] }          : null;
+    restoreSiteOverrides(siteKeyFor(t));
 
     updatePinHighlight();
     updateActiveCardUI();
@@ -1533,7 +1541,16 @@
     haptic(4); // subtle tick per step
     updateRentAllInHint();
     clearTimeout(rentDebounce);
-    rentDebounce = setTimeout(() => recomputeCurrentAnalysis(v), 90);
+    rentDebounce = setTimeout(() => {
+      // Persist per-site so override stays scoped to this site across navigations.
+      const t = getAllSites()[activeIdx];
+      if (t) {
+        const key = siteKeyFor(t);
+        window._rentOverrides = window._rentOverrides || {};
+        window._rentOverrides[key] = v;
+      }
+      recomputeCurrentAnalysis(v);
+    }, 90);
   }
   function recomputeCurrentAnalysis(rentY1) {
     try {
@@ -2108,6 +2125,12 @@
     if (!det) return;
     haptic(12);
     activeIdx = newIdx;
+    // Restore per-site overrides BEFORE ensureAnalysis so runCaptageAnalysis
+    // uses the correct scoped values for this site (bugfix: sliders bleed
+    // across sites on swipe/prev-next if we don't reset here).
+    const sites = getAllSites();
+    const t = sites[newIdx];
+    if (t) restoreSiteOverrides(siteKeyFor(t));
     updatePinHighlight();
     // Ensure analysis is ready for this site
     ensureAnalysis(newIdx);
