@@ -3553,9 +3553,9 @@ function updateUserParam(key, value) {
   // Re-render BOTH captage containers + P&L
   if(window._lastCaptageLocation) {
     const {lat, lng, radius} = window._lastCaptageLocation;
-    // Re-render whichever containers are visible
-    if(el('captageContent') && el('captageContent').innerHTML) renderCaptageAnalysis('captageContent', lat, lng, radius);
-    if(el('captageContentSite') && el('captageContentSite').innerHTML) renderCaptageAnalysis('captageContentSite', lat, lng, radius);
+    // Single ref lookup (was racing: element could be removed between check and access).
+    const cc = el('captageContent'); if(cc && cc.innerHTML) renderCaptageAnalysis('captageContent', lat, lng, radius);
+    const ccs = el('captageContentSite'); if(ccs && ccs.innerHTML) renderCaptageAnalysis('captageContentSite', lat, lng, radius);
   }
 }
 function resetUserParams() {
@@ -4946,7 +4946,10 @@ if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
 }
 // Load custom sites (if not already loaded by cache-buster)
 if(customSites.length === 0) _loadCustomSites();
-window._siteAnalyses = JSON.parse(localStorage.getItem('fpSiteAnalyses') || '[]');
+// Protège contre localStorage JSON corrompu — sinon toute la suite du script
+// ne se charge pas (module-scope throw = app brickée).
+try { window._siteAnalyses = JSON.parse(localStorage.getItem('fpSiteAnalyses') || '[]'); }
+catch(e) { console.warn('[fp] fpSiteAnalyses corrompu, reset', e); window._siteAnalyses = []; try { localStorage.removeItem('fpSiteAnalyses'); } catch {} }
 
 function saveSiteAnalysis(name, lat, lng, r, exec) {
   const existing = window._siteAnalyses.findIndex(s => Math.abs(s.lat - lat) < 0.001 && Math.abs(s.lng - lng) < 0.001);
@@ -6304,6 +6307,9 @@ function initTabs() {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  // Peupler les compareSelects avec TARGETS dès l'ouverture — sinon l'user voit
+  // des dropdowns quasi-vides tant qu'aucune zone n'a été analysée.
+  if(name==='dash' && typeof updateCompareSelects==='function') updateCompareSelects();
 }
 
 // ================================================================
@@ -6996,12 +7002,22 @@ function _authStorage() {
 
 // Users with passwords stored in localStorage (always)
 // Check localStorage first (mobile remember-me), fallback to sessionStorage
-let currentUser = JSON.parse(
-  localStorage.getItem('fpCurrentUser') ||
-  sessionStorage.getItem('fpCurrentUser') ||
-  'null'
-);
-let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
+// Protège contre JSON corrompu — sinon l'user est kické et ne peut plus se reconnecter.
+let currentUser;
+try {
+  currentUser = JSON.parse(
+    localStorage.getItem('fpCurrentUser') ||
+    sessionStorage.getItem('fpCurrentUser') ||
+    'null'
+  );
+} catch(e) {
+  console.warn('[fp] fpCurrentUser corrompu, reset', e);
+  try { localStorage.removeItem('fpCurrentUser'); sessionStorage.removeItem('fpCurrentUser'); } catch {}
+  currentUser = null;
+}
+let userList;
+try { userList = JSON.parse(localStorage.getItem('fpUsers')||'[]'); }
+catch(e) { console.warn('[fp] fpUsers corrompu, reset', e); try { localStorage.removeItem('fpUsers'); } catch {} userList = []; }
 
 // ── Inactivity timeout: auto-logout after 10 minutes (DESKTOP ONLY) ──
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000;

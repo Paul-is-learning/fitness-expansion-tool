@@ -1,5 +1,31 @@
 # Changelog
 
+## [v6.10-hardening] — 2026-04-18
+
+### Audit complet + 3 fix de fiabilité (cible 100/100 fonctionnalité)
+
+**Contexte** : audit exhaustif du codebase (code + preview mobile/desktop) pour détecter les vrais bugs avant de prétendre 100/100. 90 onclick handlers checked → 0 manquant ; 8 accordions mobile + sliders rent/charge/surface + per-site override isolation : OK ; locale toggle FR/EN : OK ; 6 tabs desktop + 8 layer toggles + 22 brand filters : OK ; charts clonés (v6.9) : OK. 3 bugs réels identifiés et corrigés :
+
+**Fix #1 — Desktop : `compareSelects` vides à l'ouverture du tab Dashboard**
+`switchTab('dash')` ne peuplait pas les dropdowns de comparaison — l'user voyait juste `-- Choisir --` tant qu'il n'avait pas déjà analysé une zone. Les 5 TARGETS existent en mémoire dès le boot mais n'étaient injectés que via `renderDash()` (appelé depuis `addZone()`). Fix : appeler `updateCompareSelects()` directement dans `switchTab('dash')`.
+
+**Fix #2 — JSON.parse module-scope sans try/catch → app brickée si localStorage corrompu**
+3 parses au niveau module (pas dans une fonction) faisaient planter tout le script si la valeur était invalide :
+- `window._siteAnalyses = JSON.parse(localStorage.getItem('fpSiteAnalyses') || '[]')`
+- `currentUser = JSON.parse(...)` (localStorage OR sessionStorage)
+- `userList = JSON.parse(localStorage.getItem('fpUsers')||'[]')`
+
+Symptôme : l'user avec une clé corrompue (bug antérieur, manip manuelle) ne pouvait plus charger l'app du tout. Fix : try/catch avec fallback sûr + auto-cleanup de la clé corrompue. Validé en preview : avec 3 clés corrompues, l'app charge la login page au lieu de crasher, l'user peut se reconnecter, les users canoniques sont re-seedés.
+
+**Fix #3 — Race condition dans `updateUserParams()` re-render captage**
+`if(el('captageContent') && el('captageContent').innerHTML)` appelait `el()` deux fois → théoriquement l'élément pouvait être retiré entre les deux appels. Fix : single ref stockée dans une variable locale (`const cc = el('...')`).
+
+**Non-bugs confirmés** : doLogin errEl null (faux positif — #loginError toujours présent), compareSelects selectedOptions[0] (guardé par vA/vB check), Chart.js canvas null (tous présents au boot), email.toLowerCase null (tous les seed users ont un email). Ces items de l'audit initial ont été vérifiés et écartés.
+
+**Tests** : 197/197 PASS (aucun impact modèle, uniquement couche défensive + UX).
+
+---
+
 ## [v6.9-mobile-charts] — 2026-04-18
 
 ### Fix : charts vides dans le FAB secondary sheet mobile
