@@ -96,10 +96,10 @@
   }
 
   // ─── Session signature ────────────────────────────────────────
-  // Binds session to a fingerprint (userAgent hash). If someone
-  // copies fpCurrentUser to another browser, signature won't match.
+  // Binds session to a fingerprint that is stable across resizes,
+  // orientation changes, and zoom. Only uses immutable identifiers.
   function fingerprint() {
-    return sign(navigator.userAgent + '::' + navigator.language + '::' + (window.screen?.width || 0));
+    return sign(navigator.userAgent + '::' + navigator.language + '::' + navigator.platform);
   }
   function signSession() {
     try {
@@ -227,19 +227,27 @@
   if (document.readyState === 'complete') tryInstall();
   else window.addEventListener('load', () => tryInstall());
 
-  // Periodic session sig check (every 30s)
+  // Periodic session sig check (every 60s) — only acts on 2 consecutive failures
+  // to avoid false positives on harmless env changes (browser updates, language swap).
+  let consecutiveTamper = 0;
   setInterval(() => {
     const s = checkSessionSig();
     if (s === 'tampered') {
-      logEvent('session-tamper-detected-runtime', {});
-      alert('⚠ Session altérée en cours d\'utilisation. Reconnexion requise.');
-      try {
-        sessionStorage.removeItem('fpCurrentUser');
-        sessionStorage.removeItem(KEY_SESSIG);
-      } catch {}
-      window.location.reload();
+      consecutiveTamper++;
+      logEvent('session-tamper-detected-runtime', { consecutive: consecutiveTamper });
+      if (consecutiveTamper >= 2) {
+        // Two checks in a row say tampered — real. Force reconnect.
+        try {
+          sessionStorage.removeItem('fpCurrentUser');
+          sessionStorage.removeItem(KEY_SESSIG);
+        } catch {}
+        alert('⚠ Session altérée. Reconnexion requise.');
+        window.location.reload();
+      }
+    } else {
+      consecutiveTamper = 0;
     }
-  }, 30000);
+  }, 60000);
 
   // ─── Public API ───────────────────────────────────────────────
   window.dumpAuth = function() {

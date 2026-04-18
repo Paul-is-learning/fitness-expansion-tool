@@ -1,383 +1,622 @@
 /* ================================================================
-   FITNESS PARK ROMANIA — MOBILE OVERHAUL (v4.7)
+   FITNESS PARK ROMANIA — MOBILE v4.9 "SITE BROWSER"
    ================================================================
-   Pattern: Full-screen map + draggable bottom sheet + top bar.
-   Inspired by Google Maps, Apple Maps, Citymapper.
+   Pattern: Immersive map + horizontal site carousel + rich detail.
+   Inspired by Airbnb, Apple Maps (newer), Citymapper.
 
-   Breakpoints:
-     ≤ 768px  → mobile layout (bottom sheet, FABs, full-screen analysis)
-     ≤ 414px  → compact mode (smaller fonts, tighter spacing)
-     ≤ 360px  → ultra-compact (iPhone SE, old Androids)
+   Screen states (bottom sheet):
+     PEEK    → 140px — handle + active site card swipeable carousel
+     SUMMARY → 55vh  — rich summary (big metrics, CTA)
+     DETAIL  → 95vh  — accordion full analysis
 
    Zero impact on desktop (> 768px).
    ================================================================ */
 
-/* Desktop: hide mobile-only DOM elements injected by src/mobile.js */
+/* Desktop: hide all mobile-only DOM injected by src/mobile.js */
 @media (min-width: 769px) {
-  .mobile-topbar,
-  .sheet-handle,
-  .mobile-close-btn,
-  .mobile-search-overlay { display: none !important; }
+  .fp-mobile-topbar,
+  .fp-mobile-fab,
+  .fp-sheet-handle,
+  .fp-sheet-carousel,
+  .fp-sheet-detail-btn,
+  .fp-sheet-tabs,
+  .fp-onboarding-hint,
+  .fp-mobile-close-btn,
+  .fp-mobile-search-overlay,
+  .fp-secondary-sheet { display: none !important; }
 }
 
 @media (max-width: 768px) {
 
-  /* ─── CSS custom properties for mobile ─── */
   :root {
-    --sheet-collapsed: 140px;        /* handle + tabs visible */
-    --sheet-mid: 55vh;               /* most browsing */
-    --sheet-full: calc(100vh - 80px);/* max height */
-    --top-bar-h: 56px;
-    --bottom-nav-h: 60px;
+    --peek-h: 168px;
+    --summary-h: 58vh;
+    --detail-h: calc(100dvh - 72px);
+    --topbar-h: 56px;
+    --fab-size: 52px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --tap-min: 44px;
+    --radius-xl: 24px;
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 10px;
+    --transition-snap: .42s cubic-bezier(.22,.8,.28,1);
+    --shadow-lift: 0 -12px 40px rgba(0,0,0,.65);
+    --shadow-card: 0 4px 24px rgba(0,0,0,.5);
+    --tap: 44px;
   }
 
-  body { overflow: hidden; height: 100dvh; /* dynamic viewport for mobile browsers */ }
+  html, body { overflow: hidden; height: 100dvh; overscroll-behavior: none; }
 
-  /* ─── App grid → stack ─── */
-  .app {
-    display: block !important;
-    grid-template-columns: none !important;
-    height: 100dvh !important;
-    position: relative;
-  }
+  /* Hide desktop chrome entirely on mobile — we render our own UI */
+  .app { display: block !important; grid-template-columns: none !important; height: 100dvh !important; }
   .app.panel-open { grid-template-columns: none !important; }
+  .sidebar { display: none !important; } /* desktop sidebar hidden; we use fp-sheet instead */
+  .right-panel { display: none !important; } /* right panel too */
 
-  /* ─── MAP fills the screen ─── */
+  /* MAP fills screen */
   .map-area {
     position: fixed !important;
     top: 0; left: 0; right: 0; bottom: 0;
-    width: 100vw !important;
-    height: 100dvh !important;
+    width: 100vw !important; height: 100dvh !important;
     z-index: 1;
   }
   #map { height: 100dvh !important; }
 
-  /* ─── Top bar: compact header floating above map ─── */
-  .mobile-topbar {
+  /* Hide Leaflet default controls (pinch replaces zoom, attribution invasive) */
+  .leaflet-control-zoom,
+  .tile-selector { display: none !important; }
+  .leaflet-control-attribution {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    background: rgba(0,0,0,.35) !important;
+    color: rgba(148,163,184,.5) !important;
+    margin-bottom: calc(var(--peek-h) + 2px) !important;
+    pointer-events: none;
+  }
+
+  /* Hide redundant legacy overlays */
+  .map-box, #pointBox, #sazBox, #legend, .legend,
+  .map-overlay-tr, #mapOverlayTR { display: none !important; }
+
+  /* ═════ TOP BAR ═════ */
+  .fp-mobile-topbar {
     position: fixed;
     top: var(--safe-top);
     left: 0; right: 0;
-    height: var(--top-bar-h);
-    background: linear-gradient(180deg, rgba(6,8,15,.96) 0%, rgba(6,8,15,.86) 70%, rgba(6,8,15,0) 100%);
-    z-index: 1002;
+    height: var(--topbar-h);
+    z-index: 900;
+    padding: 0 12px;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0 12px;
-    pointer-events: none; /* let map clicks pass through background gradient */
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(6,8,15,.85) 0%, rgba(6,8,15,.0) 100%);
   }
-  .mobile-topbar > * { pointer-events: auto; }
-  .mobile-topbar .logo-img {
-    height: 24px;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
+  .fp-mobile-topbar > * { pointer-events: auto; }
+  .fp-mobile-topbar .fp-logo {
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: .5px;
+    color: var(--white);
+    text-shadow: 0 2px 8px rgba(0,0,0,.8);
+    flex-shrink: 0;
   }
-  .mobile-topbar .search-pill {
+  .fp-mobile-topbar .fp-logo em {
+    color: var(--accent); font-style: normal;
+  }
+  .fp-search-pill {
     flex: 1;
     height: 40px;
-    background: rgba(17,24,39,.92);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(212,160,23,.25);
+    background: rgba(17,24,39,.95);
+    backdrop-filter: blur(14px) saturate(180%);
+    border: 1px solid rgba(212,160,23,.3);
     border-radius: 20px;
     display: flex;
     align-items: center;
     padding: 0 14px;
-    gap: 8px;
+    gap: 10px;
     color: var(--gray);
     font-size: 13px;
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    box-shadow: var(--shadow-card);
+    transition: transform .2s;
   }
-  .mobile-topbar .search-pill svg {
+  .fp-search-pill:active { transform: scale(.97); }
+  .fp-search-pill svg {
     width: 16px; height: 16px; stroke: var(--gray); fill: none; stroke-width: 2;
     flex-shrink: 0;
   }
-  .mobile-topbar .avatar-btn {
+  .fp-avatar {
     width: 40px; height: 40px;
     border-radius: 50%;
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #000;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 14px; color: #000;
-    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    font-weight: 800; font-size: 15px;
+    box-shadow: var(--shadow-card);
     flex-shrink: 0;
-  }
-
-  /* ─── Search overlay: full-screen when user taps pill ─── */
-  .mobile-search-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(6,8,15,.98);
-    z-index: 9998;
-    display: none;
-    flex-direction: column;
-    padding: calc(var(--safe-top) + 12px) 12px 12px;
-  }
-  .mobile-search-overlay.on { display: flex; }
-  .mobile-search-overlay .row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    height: var(--top-bar-h);
-  }
-  .mobile-search-overlay .back-btn {
-    width: var(--tap-min); height: var(--tap-min);
-    display: flex; align-items: center; justify-content: center;
-    background: var(--card2); border-radius: 50%;
     cursor: pointer;
   }
-  .mobile-search-overlay input {
-    flex: 1;
-    height: 48px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0 14px;
-    color: var(--white);
-    font-size: 15px;
-    font-family: var(--font);
-  }
-  .mobile-search-overlay input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
-  .mobile-search-overlay .results { margin-top: 10px; overflow-y: auto; flex: 1; }
 
-  /* ─── Bottom sheet: sidebar becomes draggable panel ─── */
-  .sidebar {
-    position: fixed !important;
+  /* ═════ FAB (Floating Action Button) bottom-right ═════ */
+  .fp-mobile-fab {
+    position: fixed;
+    right: 14px;
+    bottom: calc(var(--peek-h) + 16px + var(--safe-bottom));
+    width: var(--fab-size); height: var(--fab-size);
+    border-radius: 50%;
+    background: rgba(17,24,39,.96);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(212,160,23,.35);
+    box-shadow: var(--shadow-card);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    z-index: 950;
+    transition: bottom var(--transition-snap), transform .2s;
+    cursor: pointer;
+  }
+  .fp-mobile-fab:active { transform: scale(.9); }
+  .fp-mobile-fab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+  body.fp-sheet-summary .fp-mobile-fab { bottom: calc(var(--summary-h) + 12px); }
+  body.fp-sheet-detail .fp-mobile-fab { transform: scale(0); pointer-events: none; }
+
+  /* ═════ BOTTOM SHEET (the main interactive surface) ═════ */
+  .fp-sheet {
+    position: fixed;
     left: 0; right: 0;
     bottom: 0;
-    top: auto !important;
-    height: var(--sheet-height, var(--sheet-collapsed)) !important;
-    max-height: var(--sheet-full) !important;
-    min-height: var(--sheet-collapsed);
-    border-radius: 20px 20px 0 0;
+    height: var(--peek-h);
+    max-height: var(--detail-h);
+    background: rgba(17,24,39,.98);
+    backdrop-filter: blur(22px) saturate(160%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     border: 1px solid var(--border);
     border-bottom: none;
-    background: rgba(17,24,39,.97);
-    backdrop-filter: blur(16px);
-    box-shadow: 0 -8px 40px rgba(0,0,0,.6);
-    overflow: hidden;
+    box-shadow: var(--shadow-lift);
     z-index: 1001;
-    transition: height .32s cubic-bezier(.3,.7,.3,1);
-    display: flex !important;
+    transition: height var(--transition-snap);
+    display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
-  .sidebar.dragging { transition: none !important; }
+  .fp-sheet.dragging { transition: none; }
 
-  /* Drag handle: clickable to cycle snap points */
-  .sheet-handle {
-    position: sticky;
-    top: 0;
+  .fp-sheet-handle {
+    position: relative;
     flex-shrink: 0;
-    height: 28px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: grab;
-    background: transparent;
-    z-index: 2;
     touch-action: none;
+    z-index: 2;
   }
-  .sheet-handle:active { cursor: grabbing; }
-  .sheet-handle::before {
+  .fp-sheet-handle:active { cursor: grabbing; }
+  .fp-sheet-handle::before {
     content: '';
     width: 44px; height: 5px;
     background: var(--gray2);
     border-radius: 3px;
-    opacity: .6;
+    opacity: .55;
+    transition: opacity .2s, background .2s;
   }
-  .sheet-handle:active::before { opacity: 1; background: var(--accent); }
+  .fp-sheet-handle:active::before { opacity: 1; background: var(--accent); }
 
-  /* Hide the original desktop header (logo + search) inside the sidebar */
-  .sidebar-header { display: none !important; }
-
-  /* Tabs as pills, horizontally scrollable at top of sheet */
-  .tabs {
+  /* ─── CAROUSEL (peek + summary state) ─── */
+  .fp-sheet-carousel {
     flex-shrink: 0;
-    display: flex !important;
-    gap: 6px;
-    padding: 4px 12px 12px !important;
     overflow-x: auto;
+    scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    padding: 4px 14px 14px;
   }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    flex: 0 0 auto !important;
-    height: 36px;
-    padding: 0 16px !important;
-    background: var(--card2);
-    border-radius: 18px;
-    font-size: 12px !important;
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: normal;
-    color: var(--gray);
-    border: 1px solid transparent;
-    display: flex; align-items: center;
-    min-width: auto !important;
-  }
-  .tab.active {
-    background: var(--accent) !important;
-    color: #000 !important;
-    border-color: var(--accent) !important;
-  }
-  .tab.active::after { display: none !important; }  /* hide desktop underline */
+  .fp-sheet-carousel::-webkit-scrollbar { display: none; }
 
-  .sidebar-body {
+  .fp-site-card {
+    flex: 0 0 86%;
+    scroll-snap-align: center;
+    background: linear-gradient(180deg, rgba(30,41,59,.6) 0%, rgba(17,24,39,0) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform .2s, border-color .2s;
+    position: relative;
+  }
+  .fp-site-card:active { transform: scale(.985); }
+  .fp-site-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(212,160,23,.3), 0 6px 20px rgba(212,160,23,.15);
+  }
+
+  .fp-site-card .fp-site-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .fp-site-card .fp-site-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: .8px;
+  }
+  .fp-site-card .fp-site-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+  }
+  .fp-site-card .fp-verdict {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 8px;
+    letter-spacing: .5px;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .fp-verdict.go-cond { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.4); }
+  .fp-verdict.go       { background: rgba(34,197,94,.2);  color: #4ade80; border: 1px solid rgba(34,197,94,.5); }
+  .fp-verdict.watch    { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.4); }
+  .fp-verdict.no-go    { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.4); }
+  .fp-verdict.loading  { background: rgba(100,116,139,.15); color: var(--gray2); border: 1px solid var(--border); }
+
+  .fp-site-card .fp-site-meta {
+    display: flex; gap: 14px;
+    font-size: 11px;
+    color: var(--gray);
+  }
+  .fp-site-card .fp-site-meta b {
+    color: var(--white);
+    font-weight: 700;
+  }
+
+  .fp-site-card .fp-mini-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .fp-site-card .fp-mini-metric {
+    text-align: center;
+  }
+  .fp-site-card .fp-mini-metric .v {
+    font-size: 17px; font-weight: 800;
+    color: var(--white);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .fp-site-card .fp-mini-metric.good .v { color: #34d399; }
+  .fp-site-card .fp-mini-metric.bad  .v { color: #f87171; }
+  .fp-site-card .fp-mini-metric .l {
+    font-size: 9px;
+    color: var(--gray2);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-top: 2px;
+  }
+
+  /* ─── SUMMARY STATE: bigger hero metrics ─── */
+  body.fp-sheet-summary .fp-site-card.active {
+    flex: 0 0 100%;
+    min-height: 180px;
+  }
+  .fp-sheet[data-state="summary"] .fp-sheet-carousel,
+  .fp-sheet[data-state="detail"]  .fp-sheet-carousel { overflow-x: hidden; }
+  .fp-sheet[data-state="summary"] .fp-site-card:not(.active),
+  .fp-sheet[data-state="detail"]  .fp-site-card:not(.active) { display: none; }
+
+  /* Detail view CTA (shown in summary state, inside active card) */
+  .fp-detail-cta {
+    display: none;
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #000;
+    font-weight: 800;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: .3px;
+    box-shadow: 0 4px 14px rgba(212,160,23,.35);
+  }
+  .fp-detail-cta:active { transform: scale(.98); }
+  .fp-detail-cta svg { width: 16px; height: 16px; fill: currentColor; }
+  body.fp-sheet-summary .fp-detail-cta { display: flex; }
+  body.fp-sheet-detail  .fp-detail-cta { display: none; }
+
+  /* ─── DETAIL STATE: full analysis as accordion ─── */
+  .fp-sheet-detail-scroll {
+    display: none;
     flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding: 12px !important;
-    padding-bottom: calc(40px + var(--safe-bottom)) !important;
+    overflow-x: hidden;
+    padding: 0 14px 30px;
   }
-  .sidebar-body .tab-panel,
-  .sidebar-body .card,
-  .sidebar-body .card * {
-    max-width: 100%;
-    box-sizing: border-box;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-  }
-  /* Long metric rows: label left, value right, truncate label if needed */
-  .sidebar-body .metric-row, .sidebar-body .detail-row {
-    gap: 8px;
-  }
-  .sidebar-body .metric-label, .sidebar-body .detail-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .sidebar-body .metric-value, .sidebar-body .detail-value {
-    flex-shrink: 0;
-    min-width: auto;
-  }
+  body.fp-sheet-detail .fp-sheet-detail-scroll { display: block; }
 
-  /* ─── Cards compact ─── */
-  .card {
-    border-radius: 14px !important;
-    padding: 14px !important;
+  .fp-detail-header {
+    position: sticky; top: 0;
+    background: linear-gradient(180deg, rgba(17,24,39,.98) 60%, rgba(17,24,39,0) 100%);
+    padding: 6px 0 14px;
+    z-index: 3;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fp-detail-back {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--card2);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .fp-detail-back:active { transform: scale(.92); }
+  .fp-detail-back svg { width: 18px; height: 18px; stroke: var(--white); fill: none; stroke-width: 2.5; }
+  .fp-detail-title { flex: 1; min-width: 0; }
+  .fp-detail-title .t { font-size: 15px; font-weight: 700; color: var(--white); }
+  .fp-detail-title .s { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+  /* Accordion sections built from original analysis */
+  .fp-accordion { display: flex; flex-direction: column; gap: 10px; }
+  .fp-accordion-item {
+    background: rgba(30,41,59,.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .fp-accordion-item.open { border-color: rgba(212,160,23,.4); }
+  .fp-accordion-head {
+    padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    cursor: pointer;
+    min-height: var(--tap);
+  }
+  .fp-accordion-head .icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(212,160,23,.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .fp-accordion-head .lbl { flex: 1; font-weight: 700; font-size: 13.5px; color: var(--white); }
+  .fp-accordion-head .hint { font-size: 11px; color: var(--gray2); }
+  .fp-accordion-head .chev {
+    width: 18px; height: 18px; stroke: var(--gray); fill: none; stroke-width: 2.5;
+    transition: transform .25s;
+  }
+  .fp-accordion-item.open .chev { transform: rotate(180deg); color: var(--accent); }
+  .fp-accordion-body {
+    display: none;
+    padding: 0 14px 14px;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .fp-accordion-item.open .fp-accordion-body { display: block; }
+  .fp-accordion-body > * { max-width: 100%; box-sizing: border-box; word-wrap: break-word; }
+  .fp-accordion-body .card {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 12px !important;
     margin-bottom: 10px !important;
   }
-  .card-title { font-size: 13px !important; }
-
-  /* ─── Toggle layers: bigger touch targets ─── */
-  .toggle {
-    width: 44px !important;
-    height: 26px !important;
-    flex-shrink: 0;
+  .fp-accordion-body .card:last-child { margin-bottom: 0 !important; }
+  .fp-accordion-body .metric-row {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(71,85,115,.2);
+    gap: 8px;
   }
-  .toggle::before {
-    width: 20px !important;
-    height: 20px !important;
-  }
-  .toggle.on::before {
-    transform: translateX(18px) !important;
-  }
-  .layer-label { font-size: 14px !important; }
-  .layer-hint { font-size: 11px !important; }
-
-  /* ─── Buttons: min tap target ─── */
-  .btn, button:not(.tab):not(.sheet-handle):not(.back-btn):not(.fab):not(.mobile-close) {
-    min-height: var(--tap-min);
-    font-size: 13px;
+  .fp-accordion-body .metric-row:last-child { border-bottom: none; }
+  .fp-accordion-body .metric-label, .fp-accordion-body .detail-label {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* ─── Right panel → full-screen overlay ─── */
-  .right-panel {
-    display: none;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    max-width: none !important;
-    z-index: 9999;
-    background: var(--bg) !important;
-    overflow-y: auto;
-    padding: calc(var(--safe-top) + 56px) 12px calc(var(--safe-bottom) + 20px) !important;
-  }
-  .app.panel-open .right-panel { display: block !important; }
-  .mobile-close-btn {
+  /* ═════ FAB SECONDARY SHEET (Layers + tools) ═════ */
+  .fp-secondary-sheet {
     position: fixed;
-    top: calc(var(--safe-top) + 10px);
-    left: 10px;
-    width: var(--tap-min);
-    height: var(--tap-min);
+    left: 0; right: 0;
+    bottom: 0;
+    transform: translateY(100%);
+    height: 70vh;
+    max-height: 520px;
+    background: rgba(17,24,39,.98);
+    backdrop-filter: blur(22px) saturate(160%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-lift);
+    z-index: 1100;
+    transition: transform var(--transition-snap);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fp-secondary-sheet.open { transform: translateY(0); }
+  .fp-secondary-sheet .head {
+    flex-shrink: 0;
+    padding: 20px 16px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .fp-secondary-sheet .head .title {
+    font-size: 16px; font-weight: 800; color: var(--white);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fp-secondary-sheet .head .close-btn {
+    width: 32px; height: 32px; border-radius: 50%;
     background: var(--card2);
-    border-radius: 50%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    box-shadow: 0 2px 10px rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--white); cursor: pointer;
     border: 1px solid var(--border);
-    color: var(--white);
-    font-size: 22px;
-    line-height: 1;
+  }
+  .fp-secondary-sheet .body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+  }
+
+  .fp-secondary-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 14px 12px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .fp-secondary-tabs::-webkit-scrollbar { display: none; }
+  .fp-secondary-tab {
+    flex: 0 0 auto;
+    height: 34px;
+    padding: 0 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 17px;
+    color: var(--gray);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
     cursor: pointer;
   }
-  .app.panel-open .mobile-close-btn { display: flex; }
+  .fp-secondary-tab.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .fp-secondary-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1099;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+  }
+  .fp-secondary-backdrop.on { opacity: 1; pointer-events: auto; }
 
-  /* ─── Leaflet controls on mobile ─── */
-  /* Hide zoom buttons — pinch-to-zoom is natural on touch */
-  .leaflet-control-zoom { display: none !important; }
+  /* Bigger toggles inside secondary sheet */
+  .fp-secondary-sheet .toggle { width: 48px !important; height: 28px !important; }
+  .fp-secondary-sheet .toggle::before { width: 22px !important; height: 22px !important; }
+  .fp-secondary-sheet .toggle.on::before { transform: translateX(20px) !important; }
+  .fp-secondary-sheet .layer-label { font-size: 14px !important; }
 
-  /* Tile style selector → compact vertical stack top-right (below topbar) */
-  .tile-selector {
-    display: flex !important;
+  /* ═════ SEARCH OVERLAY ═════ */
+  .fp-mobile-search-overlay {
+    position: fixed; inset: 0;
+    background: rgba(6,8,15,.98);
+    backdrop-filter: blur(16px);
+    z-index: 9998;
+    display: none;
     flex-direction: column;
-    gap: 2px !important;
-    margin: calc(var(--safe-top) + 64px) 8px 0 0 !important;
+    padding: calc(var(--safe-top) + 12px) 14px 14px;
   }
-  .tile-selector > * {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 16px !important;
-    padding: 0 !important;
-    border-radius: 8px !important;
-    line-height: 36px !important;
+  .fp-mobile-search-overlay.on { display: flex; }
+  .fp-mobile-search-overlay .row {
+    display: flex; align-items: center; gap: 10px;
+    height: var(--topbar-h);
   }
-
-  /* Hide attribution (takes valuable space; OSM legal lives in about page) */
-  .leaflet-control-attribution {
-    font-size: 8px !important;
-    padding: 1px 4px !important;
-    background: rgba(0,0,0,.4) !important;
-    color: rgba(148,163,184,.6) !important;
-    margin-bottom: calc(var(--sheet-collapsed) + 2px) !important;
+  .fp-mobile-search-overlay .back-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--card2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
   }
-  .leaflet-control-attribution a { color: var(--accent) !important; }
-
-  /* ─── Map overlays: hide redundant boxes on mobile ─── */
-  /* Info is already in the bottom sheet — avoid duplicating on small screens */
-  .map-box, #pointBox, #sazBox, #legend, .legend,
-  .map-overlay-tr, #mapOverlayTR { display: none !important; }
-
-  /* Small floating status badge only (top-right under topbar) */
-  #statusBar, .status-bar {
-    position: fixed !important;
-    top: calc(var(--safe-top) + 64px) !important;
-    right: 8px !important;
-    padding: 4px 10px !important;
-    font-size: 10px !important;
-    background: rgba(17,24,39,.92) !important;
-    border-radius: 12px;
-    z-index: 1000;
+  .fp-mobile-search-overlay input {
+    flex: 1; height: 46px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0 16px;
+    color: var(--white);
+    font-size: 15px;
+    font-family: var(--font);
+  }
+  .fp-mobile-search-overlay input:focus {
+    outline: 2px solid var(--accent); border-color: var(--accent);
+  }
+  .fp-mobile-search-overlay .results {
+    margin-top: 12px; overflow-y: auto; flex: 1;
   }
 
-  /* ─── Tooltips: tap-to-open instead of hover ─── */
+  /* ═════ ONBOARDING HINT ═════ */
+  .fp-onboarding-hint {
+    position: fixed;
+    bottom: calc(var(--peek-h) + 18px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #000;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(212,160,23,.5);
+    z-index: 905;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .4s;
+    display: flex; align-items: center; gap: 6px;
+    animation: fpBounce 2.2s ease-in-out infinite;
+  }
+  .fp-onboarding-hint.show { opacity: 1; }
+  .fp-onboarding-hint::before {
+    content: '';
+    width: 18px; height: 2px; background: currentColor;
+    border-radius: 1px;
+    margin-right: 4px;
+    opacity: .5;
+  }
+  @keyframes fpBounce {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, -6px); }
+  }
+
+  /* ═════ PIN ENHANCEMENTS (numbered) ═════ */
+  /* Prepare class for when JS adds FP target pins */
+  .fp-target-pin {
+    background: var(--accent) !important;
+    width: 36px !important; height: 36px !important;
+    border-radius: 50% !important;
+    border: 3px solid var(--white) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.5), 0 0 0 1px rgba(212,160,23,.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #000 !important;
+    font-weight: 900 !important;
+    font-size: 15px !important;
+    font-family: var(--font) !important;
+  }
+  .fp-target-pin.active {
+    transform: scale(1.15);
+    box-shadow: 0 6px 18px rgba(212,160,23,.7), 0 0 0 4px rgba(212,160,23,.3) !important;
+    z-index: 1000 !important;
+  }
+
+  /* ═════ HELPERS ═════ */
+  /* Touch action on interactive zones */
+  .fp-sheet *,
+  .fp-mobile-topbar *,
+  .fp-mobile-fab,
+  .fp-secondary-sheet * { touch-action: manipulation; }
+
+  /* Tooltip tap-to-open (desktop .info-tip was hover-only) */
   .info-tip {
-    min-width: 22px;
-    min-height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
+    min-width: 22px; min-height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
     cursor: pointer;
   }
   .info-tip .tip-content {
@@ -394,42 +633,14 @@
     background: var(--card) !important;
     border: 1px solid var(--accent);
     box-shadow: 0 12px 48px rgba(0,0,0,.7), 0 0 0 9999px rgba(0,0,0,.6);
-    border-radius: 16px;
+    border-radius: var(--radius-md);
     z-index: 99999;
   }
   .info-tip.open .tip-content { display: block !important; }
   .info-tip:hover .tip-content { display: none !important; }
-  .info-tip.open::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 99990;
-  }
 
-  /* ─── Login page fit ─── */
-  #loginPage > div {
-    width: 95vw !important;
-    padding: 24px 20px !important;
-  }
-
-  /* ─── Tables: stack on mobile to avoid overflow ─── */
-  table.zone-table, table.compare-table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    font-size: 11px;
-  }
-
-  /* ─── Charts: force square-ish ratio ─── */
-  .chart-wrap { max-height: 220px !important; }
-  .chart-wrap canvas { max-height: 220px !important; }
-
-  /* ─── Slider loyer : tactile ─── */
-  input[type=range] {
-    height: 44px !important;
-    -webkit-appearance: none;
-    background: transparent;
-  }
+  /* Sliders touch-friendly */
+  input[type=range] { height: 44px !important; background: transparent; }
   input[type=range]::-webkit-slider-runnable-track {
     height: 6px !important;
     background: var(--card3);
@@ -437,71 +648,52 @@
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 28px !important;
-    height: 28px !important;
+    width: 28px !important; height: 28px !important;
     border-radius: 50%;
     background: var(--accent);
     border: 3px solid var(--white);
     margin-top: -11px;
     box-shadow: 0 2px 8px rgba(0,0,0,.4);
-    cursor: pointer;
   }
   input[type=range]::-moz-range-thumb {
-    width: 28px !important;
-    height: 28px !important;
+    width: 28px !important; height: 28px !important;
     border-radius: 50%;
     background: var(--accent);
     border: 3px solid var(--white);
-    cursor: pointer;
   }
 
-  /* ─── Site analysis cards: full width, better spacing ─── */
-  .metric-box { padding: 10px !important; }
-  .saz-radial { gap: 14px !important; }
+  /* Login page fit */
+  #loginPage > div { width: 95vw !important; padding: 24px 20px !important; }
 
-  /* ─── Modals/overlays fit screen ─── */
-  .modal-overlay, .overlay-content {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    padding: 16px !important;
+  /* Tables: avoid horizontal overflow */
+  table.zone-table, table.compare-table {
+    display: block; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 11px;
   }
 
-  /* ─── Prevent accidental double-tap zoom on controls ─── */
-  .toggle, .tab, .btn, .sheet-handle, .tab-label {
-    touch-action: manipulation;
-  }
-
-  /* ─── Chart.js tooltip tweaks for finger use ─── */
-  .chartjs-tooltip { font-size: 13px !important; }
+  /* Charts: constrain height */
+  .chart-wrap { max-height: 220px !important; }
+  .chart-wrap canvas { max-height: 220px !important; }
 }
 
-/* ─── Compact mode (phones) ─── */
-@media (max-width: 414px) {
-  .tab { padding: 0 12px !important; height: 32px; font-size: 11px !important; }
-  .card { padding: 12px !important; }
-  .card-title { font-size: 12px !important; }
-  .mobile-topbar .search-pill { font-size: 12px; }
-  .layer-label { font-size: 13px !important; }
+/* Compact phones */
+@media (max-width: 375px) {
+  :root { --peek-h: 152px; }
+  .fp-site-card { flex: 0 0 88%; padding: 12px 14px; }
+  .fp-site-card .fp-site-name { font-size: 14px; }
+  .fp-site-card .fp-mini-metric .v { font-size: 16px; }
 }
 
-/* ─── Ultra-compact (iPhone SE, old Android) ─── */
-@media (max-width: 360px) {
-  :root {
-    --sheet-collapsed: 120px;
-    --top-bar-h: 52px;
-  }
-  .mobile-topbar .logo-img { height: 20px; }
-  .mobile-topbar .avatar-btn { width: 36px; height: 36px; }
-  .card { padding: 10px !important; }
+@media (max-width: 320px) {
+  :root { --peek-h: 148px; --topbar-h: 52px; }
+  .fp-site-card .fp-mini-metric .v { font-size: 14px; }
+  .fp-site-card .fp-site-meta { font-size: 10px; gap: 10px; }
 }
 
-/* ─── Landscape on phones: reorganize ─── */
+/* Landscape phones */
 @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
-  :root {
-    --sheet-collapsed: 80px;
-    --sheet-mid: 80vh;
-  }
-  .mobile-topbar { height: 48px; }
-  .tabs { padding: 4px 10px 8px !important; }
-  .tab { height: 32px; }
+  :root { --peek-h: 110px; --summary-h: 80vh; }
+  .fp-site-card { min-height: 80px; padding: 10px 12px; }
+  .fp-mobile-topbar { height: 48px; }
 }

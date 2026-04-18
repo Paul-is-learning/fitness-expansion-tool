@@ -1670,6 +1670,10 @@ function init() {
     console.log('[Google API] Key detected — Google Places, Geocoding, and Nearby Search active');
   }
   map = L.map('map',{center:BUCHAREST,zoom:12,zoomControl:false,attributionControl:false});
+  // Expose Leaflet map instance globally so out-of-IIFE modules (src/mobile.js, etc.) can use it.
+  // `window.map` would otherwise be the #map DIV (auto-exposed by browsers).
+  window._fpMap = map;
+  window.dispatchEvent(new CustomEvent('fp:map-ready', { detail: { map } }));
   L.control.zoom({position:'topright'}).addTo(map);
   L.control.attribution({position:'bottomright',prefix:false}).addTo(map).addAttribution('&copy; OSM &copy; CARTO');
 
