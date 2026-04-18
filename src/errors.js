@@ -142,20 +142,20 @@
         url: location.href,
         ua: navigator.userAgent
       };
+      const noisy = isNoisyThirdParty(err);
+      // Noisy third-party errors: skip record + console (clutter), never toast.
+      if (noisy) return;
       record(entry);
       console.error('[FP error]', ctx, err);
-
-      // User-visible toast (suppressed for noisy third-party failures)
-      if (!isNoisyThirdParty(err)) {
-        showToast((err && err.message) || String(err), 'error', { title: 'Erreur: ' + ctx });
-      }
+      showToast((err && err.message) || String(err), 'error', { title: 'Erreur: ' + ctx });
     } catch {} // never throw
   }
 
   function isNoisyThirdParty(err) {
     const msg = String(err && err.message || err).toLowerCase();
-    // Leaflet tile load errors, Overpass 429s, extension errors, ResizeObserver loop (harmless Chrome quirk)
-    return /resizeobserver loop|leaflet|tile|overpass|nominatim|google.*quota|network request failed/.test(msg);
+    // Cross-origin "Script error." (no stack available), Leaflet tile errors,
+    // Overpass 429s, extension errors, ResizeObserver loop (harmless Chrome quirk)
+    return /^script error\.?$|resizeobserver loop|leaflet|tile|overpass|nominatim|google.*quota|network request failed/.test(msg);
   }
 
   /** Sync wrapper: returns { ok: bool, value?, err? } — never throws. */

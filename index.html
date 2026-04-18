@@ -4831,6 +4831,17 @@ function updatePnLDisplay(pnl, exec) {
       const caEl = e('pnl-ca'+(i+1)+'-'+key);
       if(caEl) caEl.textContent = fmt(Math.round(p.annualCA[i]/1000)) + 'k';
     }
+    // Annual EBITDA (live update, margin % inline, colored by margin vs CA of same year)
+    for(let i=0;i<5;i++) {
+      const ebEl = e('pnl-ebitda'+(i+1)+'-'+key);
+      if(ebEl) {
+        const eb = p.annualEBITDA?.[i] || 0;
+        const ca = p.annualCA?.[i] || 0;
+        const m = ca > 0 ? Math.round(eb / ca * 100) : 0;
+        ebEl.innerHTML = fmt(Math.round(eb/1000)) + 'k <span style="color:var(--gray2);font-weight:500">('+m+'%)</span>';
+        ebEl.style.color = eb < 0 ? 'var(--red)' : m >= 35 ? 'var(--green)' : m >= 20 ? 'var(--yellow)' : 'var(--gray)';
+      }
+    }
     const beEl = e('pnl-be-'+key);
     if(beEl) { beEl.textContent = p.breakevenMonth ? 'M'+p.breakevenMonth : 'N/A'; beEl.style.color = p.breakevenMonth ? 'var(--green)' : 'var(--red)'; }
     const pbEl = e('pnl-pb-'+key);
@@ -5524,6 +5535,14 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           return `<div style="background:var(--bg2);border-radius:4px;padding:4px 6px;font-size:9px;border-top:2px solid ${sc.color}">
             <div style="color:${sc.color};font-size:7px;font-weight:700;margin-bottom:3px">${sc.label.toUpperCase()}</div>
             ${p.annualCA.map((ca,i) => `<div class="metric-row"><span class="metric-label">A${i+1} CA</span><span class="metric-value" id="pnl-ca${i+1}-${key}">${fmt(Math.round(ca/1000))}k</span></div>`).join('')}
+            <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.15)">
+              ${(p.annualEBITDA || []).map((eb,i) => {
+                const ca = p.annualCA?.[i] || 0;
+                const m = ca > 0 ? Math.round(eb / ca * 100) : 0;
+                const col = eb < 0 ? 'var(--red)' : m >= 35 ? 'var(--green)' : m >= 20 ? 'var(--yellow)' : 'var(--gray)';
+                return `<div class="metric-row"><span class="metric-label">A${i+1} EBITDA</span><span class="metric-value" id="pnl-ebitda${i+1}-${key}" style="color:${col}">${fmt(Math.round(eb/1000))}k <span style="color:var(--gray2);font-weight:500">(${m}%)</span></span></div>`;
+              }).join('')}
+            </div>
             <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.15)">
               <div class="metric-row"><span class="metric-label">Breakeven</span><span class="metric-value" id="pnl-be-${key}" style="color:${p.breakevenMonth?'var(--green)':'var(--red)'}">${p.breakevenMonth?'M'+p.breakevenMonth:'N/A'}</span></div>
               <div class="metric-row"><span class="metric-label">Payback</span><span class="metric-value" id="pnl-pb-${key}" style="color:${p.paybackMonth?'var(--green)':'var(--red)'}">${p.paybackMonth?'M'+p.paybackMonth:'>60M'}</span></div>
