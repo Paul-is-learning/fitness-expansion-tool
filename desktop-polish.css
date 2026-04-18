@@ -1,0 +1,506 @@
+/* ================================================================
+   FITNESS PARK ROMANIA — DESKTOP POLISH (v5.5)
+   ================================================================
+   "Apple-like art" layer for viewports > 768px.
+   Pure CSS enhancements — zero impact on functionality or data.
+
+   Pattern: frosted glass, smooth springs, delightful micro-interactions.
+
+   Applies ONLY on desktop: guarded by @media (min-width: 769px).
+   Mobile experience untouched.
+   ================================================================ */
+
+@media (min-width: 769px) {
+
+  :root {
+    --d-spring-bounce: .32s cubic-bezier(.34, 1.56, .64, 1);
+    --d-ease-smooth:  .28s cubic-bezier(.22, .9, .3, 1);
+    --d-glass-bg:     rgba(17, 24, 39, .7);
+    --d-glass-border: rgba(212, 160, 23, .15);
+    --d-hover-lift:   0 8px 28px rgba(0, 0, 0, .4);
+    --d-hover-glow:   0 0 24px rgba(212, 160, 23, .15);
+  }
+
+  /* ═════ SIDEBAR — frosted glass with subtle vertical gradient ═════ */
+  .sidebar {
+    background:
+      linear-gradient(180deg,
+        rgba(30, 41, 59, .55) 0%,
+        rgba(17, 24, 39, .65) 40%,
+        rgba(6, 8, 15, .75) 100%),
+      var(--card) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-right: 1px solid rgba(212, 160, 23, .12) !important;
+    box-shadow: 8px 0 40px -8px rgba(0, 0, 0, .4);
+    position: relative;
+  }
+  /* Subtle inner sheen */
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 400px 300px at top left,
+                rgba(212, 160, 23, .06) 0%,
+                transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .sidebar > * { position: relative; z-index: 1; }
+
+  /* ═════ HEADER — refined logo + brand rhythm ═════ */
+  .sidebar-header {
+    padding: 20px 22px 16px !important;
+    border-bottom: 1px solid rgba(212, 160, 23, .08) !important;
+    background: linear-gradient(135deg,
+                rgba(212, 160, 23, .03) 0%,
+                transparent 60%) !important;
+  }
+  .sidebar-header img[alt="Fitness Park"] {
+    transition: transform var(--d-spring-bounce), filter .3s;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, .4));
+  }
+  .sidebar-header img[alt="Fitness Park"]:hover {
+    transform: scale(1.03);
+    filter: drop-shadow(0 4px 12px rgba(212, 160, 23, .35));
+  }
+
+  /* Version badge — pill with subtle inner light */
+  .version-badge {
+    background: linear-gradient(180deg,
+                rgba(212, 160, 23, .22),
+                rgba(212, 160, 23, .1)) !important;
+    border: 1px solid rgba(212, 160, 23, .3) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .1),
+      0 2px 8px rgba(212, 160, 23, .15);
+    letter-spacing: .3px;
+  }
+
+  /* User avatar — bigger tap area + spring */
+  #userAvatar {
+    background: linear-gradient(135deg, var(--accent) 0%, #e6b422 100%) !important;
+    box-shadow:
+      0 3px 12px rgba(212, 160, 23, .35),
+      inset 0 1px 0 rgba(255, 255, 255, .25) !important;
+    transition: transform var(--d-spring-bounce), box-shadow .25s !important;
+    color: #000 !important;
+  }
+  #userAvatar:hover {
+    transform: scale(1.08);
+    box-shadow:
+      0 5px 18px rgba(212, 160, 23, .55),
+      inset 0 1px 0 rgba(255, 255, 255, .35) !important;
+  }
+
+  /* ═════ SEARCH INPUT — elegant focus ring ═════ */
+  .search-wrap input {
+    background: rgba(6, 8, 15, .55) !important;
+    border: 1px solid rgba(71, 85, 115, .35) !important;
+    transition: all var(--d-ease-smooth) !important;
+    backdrop-filter: blur(6px);
+  }
+  .search-wrap input:focus {
+    background: rgba(6, 8, 15, .85) !important;
+    border-color: var(--accent) !important;
+    outline: none !important;
+    box-shadow:
+      0 0 0 3px rgba(212, 160, 23, .18),
+      0 4px 12px rgba(212, 160, 23, .1) !important;
+  }
+  .search-wrap .search-icon svg {
+    transition: stroke var(--d-ease-smooth);
+  }
+  .search-wrap:focus-within .search-icon svg { stroke: var(--accent); }
+
+  /* ═════ TABS — pill-style with smooth ink animation ═════ */
+  .tabs {
+    padding: 8px 14px 0 !important;
+    gap: 2px !important;
+    background: rgba(6, 8, 15, .35);
+    border-bottom: 1px solid rgba(212, 160, 23, .08) !important;
+  }
+  .tab {
+    position: relative;
+    padding: 10px 14px !important;
+    font-size: 10px !important;
+    color: var(--gray) !important;
+    transition: color var(--d-ease-smooth) !important;
+    font-weight: 700 !important;
+    letter-spacing: .7px;
+    border-radius: 8px 8px 0 0;
+  }
+  .tab:hover {
+    color: var(--white) !important;
+    background: rgba(212, 160, 23, .05);
+  }
+  .tab.active {
+    color: var(--accent) !important;
+    background: linear-gradient(180deg,
+                rgba(212, 160, 23, .12) 0%,
+                transparent 100%);
+  }
+  /* Remove old underline, add modern gradient bottom bar */
+  .tab::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    background: linear-gradient(90deg,
+                transparent 0%,
+                var(--accent) 50%,
+                transparent 100%);
+    border-radius: 2px;
+    opacity: 0;
+    transform: scaleX(.3);
+    transition: all var(--d-spring-bounce);
+  }
+  .tab.active::after {
+    opacity: 1;
+    transform: scaleX(1);
+    box-shadow: 0 0 10px rgba(212, 160, 23, .4);
+  }
+
+  /* ═════ CARDS — glassmorphism, hover lift, subtle gradient ═════ */
+  .card {
+    background:
+      linear-gradient(180deg,
+        rgba(30, 41, 59, .65) 0%,
+        rgba(17, 24, 39, .7) 100%) !important;
+    backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(71, 85, 115, .35) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, .05) inset,
+      0 2px 12px rgba(0, 0, 0, .2);
+    transition:
+      transform var(--d-spring-bounce),
+      box-shadow .28s,
+      border-color .28s !important;
+  }
+  .card:hover {
+    border-color: rgba(212, 160, 23, .25) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, .08) inset,
+      var(--d-hover-lift),
+      var(--d-hover-glow);
+  }
+
+  .card-title {
+    background: linear-gradient(90deg, var(--white) 0%, var(--accent) 120%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: .6px;
+  }
+  .card-title .icon {
+    -webkit-text-fill-color: initial;
+    filter: drop-shadow(0 0 8px rgba(212, 160, 23, .35));
+  }
+
+  /* ═════ TOGGLES — bigger, smoother, Apple-style spring ═════ */
+  .toggle {
+    width: 40px !important;
+    height: 22px !important;
+    background: rgba(30, 41, 59, .8) !important;
+    border: 1px solid rgba(71, 85, 115, .4) !important;
+    transition: all var(--d-spring-bounce) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .3);
+  }
+  .toggle::before {
+    width: 16px !important;
+    height: 16px !important;
+    top: 2px !important;
+    left: 2px !important;
+    background: linear-gradient(180deg, #fff 0%, #e5e7eb 100%) !important;
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, .3),
+      inset 0 1px 0 rgba(255, 255, 255, .8) !important;
+    transition: transform var(--d-spring-bounce) !important;
+  }
+  .toggle.on {
+    background: linear-gradient(135deg, var(--accent) 0%, #e6b422 100%) !important;
+    border-color: var(--accent) !important;
+    box-shadow:
+      0 0 14px rgba(212, 160, 23, .4),
+      inset 0 1px 0 rgba(255, 255, 255, .15) !important;
+  }
+  .toggle.on::before { transform: translateX(18px); }
+
+  .layer-label { transition: color var(--d-ease-smooth); }
+  .card:has(.toggle.on) .layer-label { color: var(--white) !important; }
+
+  /* ═════ BUTTONS — gradient + spring + micro-glow ═════ */
+  .btn {
+    background: linear-gradient(135deg,
+                rgba(212, 160, 23, .15) 0%,
+                rgba(212, 160, 23, .05) 100%) !important;
+    border: 1px solid rgba(212, 160, 23, .3) !important;
+    transition: all var(--d-spring-bounce) !important;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .btn:hover {
+    background: linear-gradient(135deg,
+                rgba(212, 160, 23, .25) 0%,
+                rgba(212, 160, 23, .12) 100%) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 4px 14px rgba(212, 160, 23, .2);
+    transform: translateY(-1px);
+  }
+  .btn:active {
+    transform: translateY(0) scale(.98);
+    box-shadow: 0 2px 6px rgba(212, 160, 23, .2);
+  }
+
+  /* ═════ METRIC ROWS — hover row effect ═════ */
+  .metric-row, .detail-row {
+    transition: background var(--d-ease-smooth), padding-left .2s;
+    border-radius: 6px;
+  }
+  .metric-row:hover, .detail-row:hover {
+    background: rgba(212, 160, 23, .04);
+    padding-left: 4px !important;
+  }
+
+  /* ═════ SCROLLBAR — branded ═════ */
+  .sidebar-body::-webkit-scrollbar,
+  .right-panel::-webkit-scrollbar {
+    width: 10px;
+  }
+  .sidebar-body::-webkit-scrollbar-track,
+  .right-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-body::-webkit-scrollbar-thumb,
+  .right-panel::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg,
+                rgba(212, 160, 23, .3) 0%,
+                rgba(212, 160, 23, .15) 100%);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background .2s;
+  }
+  .sidebar-body::-webkit-scrollbar-thumb:hover,
+  .right-panel::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg,
+                rgba(212, 160, 23, .5) 0%,
+                rgba(212, 160, 23, .25) 100%);
+    background-clip: padding-box;
+  }
+
+  /* ═════ MAP OVERLAYS — refined glass ═════ */
+  .map-box {
+    background: rgba(6, 8, 15, .75) !important;
+    backdrop-filter: blur(16px) saturate(160%) !important;
+    border: 1px solid rgba(212, 160, 23, .15) !important;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, .45),
+      inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+    transition: transform var(--d-spring-bounce), box-shadow .25s !important;
+  }
+  .map-box:hover {
+    transform: translateY(-2px);
+    border-color: rgba(212, 160, 23, .3) !important;
+  }
+
+  /* ═════ TILE SELECTOR (bottom-right) — modern ═════ */
+  .tile-selector {
+    background: rgba(6, 8, 15, .7) !important;
+    backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(212, 160, 23, .15) !important;
+    border-radius: 12px !important;
+    padding: 4px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+  }
+  .tile-selector > * {
+    border-radius: 8px !important;
+    transition: all var(--d-spring-bounce) !important;
+  }
+  .tile-selector > *:hover {
+    background: rgba(212, 160, 23, .12) !important;
+    transform: scale(1.05);
+  }
+
+  /* ═════ LEAFLET ZOOM CONTROL — round glass buttons ═════ */
+  .leaflet-control-zoom a {
+    background: rgba(6, 8, 15, .75) !important;
+    backdrop-filter: blur(14px) saturate(160%);
+    color: var(--white) !important;
+    border: 1px solid rgba(212, 160, 23, .15) !important;
+    font-weight: 700 !important;
+    transition: all var(--d-spring-bounce) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3) !important;
+  }
+  .leaflet-control-zoom a:hover {
+    background: rgba(212, 160, 23, .18) !important;
+    color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    transform: scale(1.05);
+  }
+  .leaflet-control-zoom {
+    border-radius: 12px !important;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+  }
+
+  /* ═════ FP TARGET PINS — numbered 1-5 on desktop map ═════ */
+  .fp-target-pin {
+    background: linear-gradient(135deg, #e6b422 0%, var(--accent) 100%) !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    border: 3px solid var(--white) !important;
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, .55),
+      0 0 0 1px rgba(212, 160, 23, .6) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #000 !important;
+    font-weight: 900 !important;
+    font-size: 15px !important;
+    font-family: var(--font) !important;
+    transition: transform var(--d-spring-bounce), box-shadow .25s;
+    cursor: pointer;
+  }
+  .fp-target-pin:hover {
+    transform: scale(1.15);
+    box-shadow:
+      0 6px 18px rgba(212, 160, 23, .6),
+      0 0 0 4px rgba(212, 160, 23, .25) !important;
+  }
+  .fp-target-pin.active {
+    transform: scale(1.18);
+    box-shadow:
+      0 6px 18px rgba(212, 160, 23, .8),
+      0 0 0 4px rgba(212, 160, 23, .35) !important;
+    z-index: 1000 !important;
+    animation: fpPinPulseDesktop 2.2s ease-in-out infinite;
+  }
+  @keyframes fpPinPulseDesktop {
+    0%, 100% {
+      box-shadow:
+        0 6px 18px rgba(212, 160, 23, .8),
+        0 0 0 4px rgba(212, 160, 23, .35);
+    }
+    50% {
+      box-shadow:
+        0 8px 26px rgba(212, 160, 23, .95),
+        0 0 0 14px rgba(212, 160, 23, .05);
+    }
+  }
+  .fp-target-pin.fp-custom-pin {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+    color: white !important;
+  }
+
+  /* ═════ COMPETITOR CLUSTER MARKERS — polish ═════ */
+  .marker-cluster-small div,
+  .marker-cluster-medium div,
+  .marker-cluster-large div {
+    background: linear-gradient(135deg, var(--accent) 0%, #e6b422 100%) !important;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, .4),
+      inset 0 1px 0 rgba(255, 255, 255, .25);
+    border: 2px solid rgba(255, 255, 255, .95);
+  }
+
+  /* ═════ STATUS BAR (bottom-left) — glass ═════ */
+  .map-overlay-status, .status-bar {
+    background: rgba(6, 8, 15, .7) !important;
+    backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(212, 160, 23, .1);
+    border-radius: 10px;
+    padding: 6px 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .3);
+  }
+
+  /* ═════ RIGHT PANEL — glass + border glow ═════ */
+  .right-panel {
+    background:
+      linear-gradient(180deg,
+        rgba(17, 24, 39, .85) 0%,
+        rgba(6, 8, 15, .9) 100%) !important;
+    backdrop-filter: blur(22px) saturate(160%);
+    border-left: 1px solid rgba(212, 160, 23, .15) !important;
+    box-shadow: -8px 0 40px -8px rgba(0, 0, 0, .5);
+  }
+
+  /* ═════ LEGEND — glass pill ═════ */
+  #legend, .legend {
+    background: rgba(6, 8, 15, .72) !important;
+    backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(212, 160, 23, .12);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .35);
+  }
+
+  /* ═════ BOOT ANIMATION — subtle fade-in on app show ═════ */
+  #app {
+    animation: fpDesktopBoot .6s ease-out;
+  }
+  @keyframes fpDesktopBoot {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ═════ CHART CANVAS — subtle radial glow behind ═════ */
+  .chart-wrap {
+    position: relative;
+  }
+  .chart-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center,
+                rgba(212, 160, 23, .04) 0%,
+                transparent 70%);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* ═════ INPUTS GENERAL — consistent focus ═════ */
+  input[type=text]:not([id=fpSearchInput]),
+  input[type=email],
+  input[type=password],
+  input[type=number],
+  select, textarea {
+    transition: border-color var(--d-ease-smooth), box-shadow var(--d-ease-smooth);
+  }
+  input[type=text]:not([id=fpSearchInput]):focus,
+  input[type=email]:focus,
+  input[type=password]:focus,
+  input[type=number]:focus,
+  select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(212, 160, 23, .18);
+  }
+
+  /* ═════ INFO TIPS — smooth scale on hover ═════ */
+  .info-tip {
+    transition: transform var(--d-spring-bounce), color .2s;
+  }
+  .info-tip:hover {
+    transform: scale(1.2);
+    color: var(--accent) !important;
+  }
+
+  /* ═════ REDUCED MOTION ═════ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
+  }
+}
+
+/* ═════ LARGER VIEWPORTS — extra breathing room ═════ */
+@media (min-width: 1280px) {
+  .sidebar { width: auto; }
+  .card { padding: 18px !important; margin-bottom: 12px !important; }
+  .card-title { font-size: 11px !important; }
+}

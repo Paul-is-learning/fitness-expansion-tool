@@ -1,5 +1,53 @@
 # Changelog
 
+## [v5.5-desktop-polish] — 2026-04-18
+
+### Desktop Apple-like art layer
+
+Même traitement polish que mobile, adapté pour grands écrans. Aucun changement fonctionnel ou de data.
+
+**`desktop-polish.css` (nouveau, 15KB, gated `@media (min-width: 769px)`) :**
+
+- **Sidebar glassmorphique** : backdrop-filter blur 20px + saturate 180%, gradient vertical subtil, inner sheen radial gold-tinted
+- **Header** : logo scale-on-hover + drop-shadow dynamique, version badge avec inner light, avatar gradient cuivré + spring scale
+- **Search input** : focus ring 3px gold tint + border accent + glow, icône stroke change au focus
+- **Tabs** : pills au lieu d'underline, gradient bottom bar au lieu d'underline, hover background subtil
+- **Cards** : backdrop-filter blur 12px + saturate 140%, hover lift (-2px) + glow gold + border accent
+- **Card titles** : gradient text (blanc → gold), icône avec drop-shadow gold
+- **Toggles** : plus grands (40×22), gradient gold on state + inner highlight + drop-shadow, spring transition
+- **Boutons** : gradient gold soft, hover lift + glow, active scale .98
+- **Metric rows** : hover background subtil + padding shift (rétroaction)
+- **Scrollbar** : branded gold gradient
+- **Map overlays** : glass + hover lift
+- **Zoom controls** : boutons ronds glass + spring scale
+- **Tile selector** : container glass unifié, items rounded
+- **Legend / status bar** : glass pills
+- **Boot animation** : fade-in 600ms sur #app
+- **Chart canvas** : glow radial gold subtil en fond
+- **Info tips** : spring scale 1.2 + color shift on hover
+- `prefers-reduced-motion` respecté
+
+**Pins numérotés FP sur map desktop :**
+- Les 5 pins numérotés (1-5) sont maintenant visibles sur desktop aussi
+- Même style que mobile : gold gradient, pulse animation sur actif, hover scale
+- Custom sites en pins violet
+- Appellent `activateSite` → sync carousel mobile + analyse desktop
+- Click pin → active site dans le carrousel (et ouvre summary si mobile)
+
+**Competitor clusters polish :**
+- Gradient gold + shadow + inner highlight (au lieu de simple fond gold)
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Mobile inchangé (gated media query)
+
+**Fichiers :**
+- `desktop-polish.css` (nouveau, ~540 lignes)
+- `index.html` : ajout `<link rel="stylesheet" href="desktop-polish.css">`
+- `src/mobile.js` : `initDesktopPins()` pour activer les pins desktop (initialement gated mobile-only)
+
+---
+
 ## [v5.4-autocomplete-caf-pwa] — 2026-04-18
 
 ### 3 demandes post-test Paul
