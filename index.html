@@ -1766,6 +1766,36 @@ function init() {
   initTabs();
   initSearch();
 
+  // Calibrate initial zoom: fitBounds over all TARGETS + padding that accounts
+  // for mobile chrome (top bar 56px, peek sheet 168px) vs desktop sidebar.
+  // This guarantees the 5 sites are always visible without user action.
+  function calibrateInitialView() {
+    try {
+      if (typeof TARGETS === 'undefined' || !TARGETS.length) return;
+      const bounds = L.latLngBounds(TARGETS.map(t => [t.lat, t.lng]));
+      const isMobile = window.innerWidth <= 768;
+      const padTop = isMobile ? 80 : 40;
+      const padBottom = isMobile ? 200 : 40; // extra for bottom sheet
+      const padLR = 40;
+      map.fitBounds(bounds, {
+        paddingTopLeft:     [padLR, padTop],
+        paddingBottomRight: [padLR, padBottom],
+        animate: false,
+        maxZoom: 13
+      });
+    } catch (e) { console.warn('[FP] calibrateInitialView failed:', e); }
+  }
+  calibrateInitialView();
+  // Re-calibrate on resize/orientation change
+  let _calibT;
+  window.addEventListener('resize', () => {
+    clearTimeout(_calibT);
+    _calibT = setTimeout(() => { map.invalidateSize(); calibrateInitialView(); }, 250);
+  });
+  window.addEventListener('orientationchange', () => setTimeout(() => {
+    map.invalidateSize(); calibrateInitialView();
+  }, 300));
+
   map.on('click', function(e) {
     if(addingSite) {
       addingSite = false;
@@ -6693,15 +6723,34 @@ function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').
 
 // simpleHash moved to src/utils.js
 
-// Users with passwords stored in localStorage
-// Session uses sessionStorage (cleared on tab close) — user must log in each visit
-let currentUser = JSON.parse(sessionStorage.getItem('fpCurrentUser')||'null');
+// Auth storage strategy:
+//   Mobile  → localStorage (persistent across sessions — no re-login needed)
+//   Desktop → sessionStorage (cleared on tab close, 10min inactivity timeout)
+// Rationale: on mobile the device itself is locked by biometrics; asking for
+// a password on every visit is pure friction. On desktop (shared/work PC),
+// we keep the tighter policy.
+function _authIsMobile() {
+  return window.innerWidth <= 768
+      || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+function _authStorage() {
+  return _authIsMobile() ? localStorage : sessionStorage;
+}
+
+// Users with passwords stored in localStorage (always)
+// Check localStorage first (mobile remember-me), fallback to sessionStorage
+let currentUser = JSON.parse(
+  localStorage.getItem('fpCurrentUser') ||
+  sessionStorage.getItem('fpCurrentUser') ||
+  'null'
+);
 let userList = JSON.parse(localStorage.getItem('fpUsers')||'[]');
 
-// ── Inactivity timeout: auto-logout after 10 minutes ──
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+// ── Inactivity timeout: auto-logout after 10 minutes (DESKTOP ONLY) ──
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000;
 let _inactivityTimer = null;
 function resetInactivityTimer() {
+  if(_authIsMobile()) return; // no auto-logout on mobile
   if(_inactivityTimer) clearTimeout(_inactivityTimer);
   _inactivityTimer = setTimeout(() => {
     if(currentUser) {
@@ -6746,7 +6795,10 @@ function doLogin() {
 
   // Success
   currentUser = user;
-  sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+  _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
+  // Clear the other storage so we don't double-persist
+  if (_authIsMobile()) sessionStorage.removeItem('fpCurrentUser');
+  else localStorage.removeItem('fpCurrentUser');
   localStorage.setItem('fpLastEmail', user.email);
   resetInactivityTimer();
   document.getElementById('loginPage').style.display='none';
@@ -6773,11 +6825,14 @@ function checkAuth() {
   }
 }
 
-// Logout
+// Logout — clear both storages for safety
 function doLogout() {
   if(currentUser?.email) localStorage.setItem('fpLastEmail', currentUser.email);
   currentUser = null;
   sessionStorage.removeItem('fpCurrentUser');
+  localStorage.removeItem('fpCurrentUser');
+  // also clear session signature (if auth-guard installed it)
+  try { sessionStorage.removeItem('fpCurrentUserSig'); localStorage.removeItem('fpCurrentUserSig'); } catch {}
   if(_inactivityTimer) clearTimeout(_inactivityTimer);
   window.location.reload();
 }
@@ -6791,7 +6846,7 @@ function doLogout() {
       const data = JSON.parse(atob(invite));
       if(data.email && data.role) {
         currentUser = {email:data.email, role:data.role, name:data.email.split('@')[0]};
-        sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+        _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
         // Add to list if not exists
         if(!userList.find(u=>u.email===data.email)) {
           userList.push(currentUser);
@@ -6902,7 +6957,7 @@ function switchUser() {
   const user = userList.find(u=>u.email===email);
   if(user) {
     currentUser = user;
-    sessionStorage.setItem('fpCurrentUser', JSON.stringify(currentUser));
+    _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
     document.getElementById('userPanel').remove();
     applyRole();
     showUserPanel();

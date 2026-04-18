@@ -562,22 +562,25 @@
     }
   }
 
-  // Pre-warm tile cache by briefly touching bounds that cover all target sites.
-  // Leaflet will load tiles in this area, so subsequent setViews feel instant.
+  // Pre-warm tile cache by fitting bounds over all sites WITH the current
+  // calibrated view (no restore — this is our final view).
+  // Called AFTER index.html's calibrateInitialView so we don't undo it.
   function prewarmTiles() {
     if (!window._fpMap || !L) return;
     try {
       const sites = getAllSites();
       if (sites.length === 0) return;
+      // invalidateSize in case the sheet just appeared
+      window._fpMap.invalidateSize();
+      // Ensure bounds still cover all sites (accounts for custom sites added)
       const bounds = L.latLngBounds(sites.map(s => [s.lat, s.lng]));
-      // fitBounds with no animation — triggers tile load without moving the visible view
-      const origCenter = window._fpMap.getCenter();
-      const origZoom = window._fpMap.getZoom();
-      window._fpMap.fitBounds(bounds.pad(0.25), { animate: false, padding: [60, 60] });
-      // Restore the original Bucharest-wide view after a micro-delay
-      setTimeout(() => {
-        window._fpMap.setView(origCenter, origZoom, { animate: false });
-      }, 50);
+      const isMobile = window.innerWidth <= 768;
+      window._fpMap.fitBounds(bounds, {
+        animate: false,
+        paddingTopLeft:     [40, isMobile ? 80 : 40],
+        paddingBottomRight: [40, isMobile ? 200 : 40],
+        maxZoom: 13
+      });
     } catch (e) { console.warn('[FP mobile] prewarm failed:', e); }
   }
 
@@ -1011,8 +1014,8 @@
     const spark = buildSparkline(r.pnl?.base);
 
     return `
-      <!-- Cashflow sparkline -->
-      ${spark}
+      <!-- Cashflow sparkline (CAF annuelle) — wrapped in container for live update -->
+      <div id="fpCafContainer">${spark}</div>
 
       <!-- Rent slider -->
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(135deg,rgba(30,41,59,.8),rgba(17,24,39,.4))">
@@ -1264,8 +1267,22 @@
       updateDetailHero(r, a, { oldMembers, oldIrr, oldNpv });
       // Update P&L scenarios inline
       updatePnLInline(r);
+      // Update CAF annuelle bars inline (live response to rent change)
+      updateCafBarsInline(r);
       // Re-run invariants check (via audit wrapper automatic)
     } catch (e) { console.warn('[FP rent-slider] recompute failed:', e); }
+  }
+
+  // Regenerate the CAF annuelle sparkline card when rent changes
+  function updateCafBarsInline(r) {
+    const container = qs('#fpCafContainer');
+    if (!container) return;
+    const newHtml = buildSparkline(r.pnl?.base);
+    if (!newHtml) return;
+    container.innerHTML = newHtml;
+    // Re-run the bar-grow animation
+    const card = container.querySelector('.card');
+    if (card) animateSparkline(card);
   }
 
   function updateDetailHero(r, a, prev) {
@@ -1456,17 +1473,39 @@
       // On any click in the clone, re-sync visual + dynamic HTML after
       // the click's onclick handlers ran (toggleLayer, toggleBrand, etc.).
       clone.addEventListener('click', (e) => {
-        // Ignore plain form inputs
         if (e.target.closest('input, textarea, select')) return;
-        // Wait for global handlers to mutate state + rebuild desktop DOM
         setTimeout(() => {
           syncToggleStates(clone);
           syncClonedDynamicContent(clone);
-          // Re-sync Mes sites if we're on that tab
           if (qs('.fp-secondary-tab.active')?.dataset.stab === 'mysites') {
             renderMySitesIntoClone(clone);
           }
         }, 40);
+      }, true);
+
+      // Bridge <select data-orig-id=...> changes back to the desktop
+      // DOM so that functions using el('compareA') / el('compareB')
+      // see the user's chosen value. Also invoke their onchange handler.
+      clone.addEventListener('change', (e) => {
+        const sel = e.target.closest('select[data-orig-id]');
+        if (!sel) return;
+        const srcSel = document.getElementById(sel.dataset.origId);
+        if (srcSel) {
+          srcSel.value = sel.value;
+          srcSel.dispatchEvent(new Event('change', { bubbles: true }));
+          // Fallback: directly invoke the inline onchange function if set
+          try {
+            const handler = srcSel.getAttribute('onchange');
+            if (handler) {
+              // Usually "runComparison()" — call it directly after brief delay
+              setTimeout(() => {
+                try { new Function(handler).call(srcSel); } catch {}
+                // Sync result container back to clone
+                syncClonedDynamicContent(clone);
+              }, 20);
+            }
+          } catch {}
+        }
       }, true);
     }
   }
@@ -1691,15 +1730,17 @@
   }
 
   // Copy fresh innerHTML from desktop elements into the cloned equivalents.
-  // Call this after any interaction in the clone that may have mutated
-  // the desktop DOM (toggle layers, brand filters, sector list, etc).
+  // Preserves <select> values and <input> values to avoid wiping user input.
   function syncClonedDynamicContent(cloneRoot) {
     const nodes = cloneRoot.querySelectorAll('[data-orig-id]');
     nodes.forEach(el => {
       const srcEl = document.getElementById(el.dataset.origId);
-      if (srcEl && srcEl !== el) {
-        el.innerHTML = srcEl.innerHTML;
-      }
+      if (!srcEl || srcEl === el) return;
+      // Skip form controls — their value is controlled by user + desktop sync,
+      // and rewriting innerHTML would drop the current selection / typed text.
+      const tag = el.tagName?.toLowerCase();
+      if (tag === 'select' || tag === 'input' || tag === 'textarea') return;
+      el.innerHTML = srcEl.innerHTML;
     });
   }
 

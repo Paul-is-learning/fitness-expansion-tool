@@ -1,5 +1,46 @@
 # Changelog
 
+## [v5.9-session-zoom-caf] — 2026-04-18
+
+### 4 améliorations post-test Paul
+
+**1. Session mobile persistante (plus de re-login)**
+- Mobile détecté via `innerWidth ≤ 768` OR user-agent → `localStorage.fpCurrentUser`
+- Desktop → `sessionStorage.fpCurrentUser` (sécurité préservée — disparaît à la fermeture de l'onglet)
+- **Timer d'inactivité 10min désactivé sur mobile** (biométrie du device suffit), maintenu desktop
+- `doLogout()` clear les DEUX storages pour safety
+- Invite link + switchUser utilisent `_authStorage()` selon device
+- `auth-guard.js` : `_readUser()` lit depuis les 2 storages, sigs écrit dans le bon selon `_storage()`
+
+**2. Fix Dashboard comparaison sites (selects ne rien ne se passait)**
+- Bug : les selects Site A/Site B du clone FAB avaient leurs IDs strippés → `el('compareA').value` retournait le desktop select vide
+- Fix :
+  - `stripAllIds` garde `data-orig-id`
+  - Nouveau handler `change` sur clone : propage la valeur au desktop select + trigger son `onchange` → `runComparison()` s'exécute correctement
+  - `syncClonedDynamicContent` refuse de toucher les `<select>` / `<input>` / `<textarea>` (préserve user input)
+
+**3. Calibration zoom map au boot (plus besoin de dézoomer)**
+- Avant : `zoom:12` hardcoded → recadrage manuel nécessaire selon la taille écran
+- Après : `calibrateInitialView()` = `fitBounds(5 TARGETS)` avec padding adapté :
+  - Desktop : 40px all sides
+  - Mobile : 80px top + 200px bottom (comptable top bar + peek sheet)
+  - `maxZoom: 13` pour ne pas zoomer trop sur un cluster
+- Recalibrage automatique sur `resize` et `orientationchange` (250ms debounce)
+- `prewarmTiles` mobile utilise aussi fitBounds (plus de restore qui cassait le zoom)
+
+**4. CAF annuelle update LIVE avec le slider loyer**
+- Avant : le slider loyer updatait hero metrics + scénarios, mais les barres CAF restaient figées
+- Après : `recomputeCurrentAnalysis` appelle maintenant `updateCafBarsInline(r)` qui :
+  - Regénère le HTML de la sparkline (via `buildSparkline(r.pnl.base)`)
+  - Remplace `#fpCafContainer.innerHTML`
+  - Relance l'animation des barres (stagger 90ms)
+- Exemple : loyer 10.5→20 €/m² → CAF moy. Y2-Y5 passe de 596k€ à 398k€, barres redessinées
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+
+---
+
 ## [v5.8-viz-autocomplete] — 2026-04-18
 
 ### 3 fixes post-test Paul

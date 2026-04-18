@@ -21,6 +21,20 @@
 
   window._fpAuthEvents = [];
 
+  // Match index.html's storage strategy: mobile = localStorage, desktop = sessionStorage
+  function _isMobile() {
+    return window.innerWidth <= 768
+        || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+  function _storage() { return _isMobile() ? localStorage : sessionStorage; }
+  function _readUser() {
+    return localStorage.getItem('fpCurrentUser') || sessionStorage.getItem('fpCurrentUser') || '';
+  }
+  function _clearUser() {
+    try { sessionStorage.removeItem('fpCurrentUser'); } catch {}
+    try { localStorage.removeItem('fpCurrentUser'); } catch {}
+  }
+
   const LOCKOUT_FAILS = 5;
   const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
   const FAIL_WINDOW_MS = 15 * 60 * 1000;      // rolling window for fail count
@@ -103,16 +117,16 @@
   }
   function signSession() {
     try {
-      const sess = sessionStorage.getItem('fpCurrentUser') || '';
+      const sess = _readUser();
       if (!sess) return;
-      sessionStorage.setItem(KEY_SESSIG, sign(sess + '::' + fingerprint()));
+      _storage().setItem(KEY_SESSIG, sign(sess + '::' + fingerprint()));
     } catch {}
   }
   function checkSessionSig() {
     try {
-      const sess = sessionStorage.getItem('fpCurrentUser');
+      const sess = _readUser();
       if (!sess) return 'no-session';
-      const sig = sessionStorage.getItem(KEY_SESSIG);
+      const sig = _storage().getItem(KEY_SESSIG) || sessionStorage.getItem(KEY_SESSIG) || localStorage.getItem(KEY_SESSIG);
       if (!sig) return 'unsigned';
       if (!verify(sess + '::' + fingerprint(), sig)) return 'tampered';
       return 'ok';
@@ -140,9 +154,9 @@
 
       // Capture state before login
       const email = (document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
-      const sessBefore = sessionStorage.getItem('fpCurrentUser');
+      const sessBefore = _readUser();
       try { original.apply(this, arguments); } catch (e) { logEvent('login-error', e.message); throw e; }
-      const sessAfter = sessionStorage.getItem('fpCurrentUser');
+      const sessAfter = _readUser();
 
       if (sessAfter && sessAfter !== sessBefore) {
         // Success
@@ -199,9 +213,10 @@
 
     if (sessStatus === 'tampered') {
       logEvent('session-tampered', { action: 'force-logout' });
+      _clearUser();
       try {
-        sessionStorage.removeItem('fpCurrentUser');
         sessionStorage.removeItem(KEY_SESSIG);
+        localStorage.removeItem(KEY_SESSIG);
       } catch {}
       alert('⚠ Session altérée. Reconnexion requise.');
       setTimeout(() => window.location.reload(), 100);
@@ -237,9 +252,10 @@
       logEvent('session-tamper-detected-runtime', { consecutive: consecutiveTamper });
       if (consecutiveTamper >= 2) {
         // Two checks in a row say tampered — real. Force reconnect.
+        _clearUser();
         try {
-          sessionStorage.removeItem('fpCurrentUser');
           sessionStorage.removeItem(KEY_SESSIG);
+          localStorage.removeItem(KEY_SESSIG);
         } catch {}
         alert('⚠ Session altérée. Reconnexion requise.');
         window.location.reload();
