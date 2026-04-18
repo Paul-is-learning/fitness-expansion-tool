@@ -113,6 +113,15 @@
     text-shadow: 0 2px 8px rgba(0,0,0,.8);
     flex-shrink: 0;
   }
+  .fp-mobile-topbar .fp-logo-img {
+    height: 28px;
+    width: auto;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.65));
+    flex-shrink: 0;
+  }
+  @media (max-width: 360px) {
+    .fp-mobile-topbar .fp-logo-img { height: 24px; }
+  }
   .fp-mobile-topbar .fp-logo em {
     color: var(--accent); font-style: normal;
   }

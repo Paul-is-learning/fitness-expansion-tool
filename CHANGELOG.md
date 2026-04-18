@@ -1,5 +1,35 @@
 # Changelog
 
+## [v5.2-polish-fixes] — 2026-04-18
+
+### 3 fixes demandés par Paul après test sur iPhone
+
+**1. Toggle sync dans le FAB secondary sheet**
+- Bug : cocher/décocher un layer agissait sur la carte mais le toggle visuel ne changeait pas d'état
+- Cause : clone du DOM desktop → IDs dupliqués → `getElementById` retournait le toggle desktop (caché), le clone gardait son état initial
+- Fix : `stripAllIds(clone)` avant d'ajouter au DOM + `syncToggleStates(clone)` qui lit l'état global `layers[name]` et met à jour la classe `.on` après chaque click (event delegation)
+- Résultat : le toggle s'allume/s'éteint visuellement en sync avec l'état réel
+
+**2. Logo Fitness Park**
+- Avant : texte stylisé "FITNESS PARK" en gold
+- Après : vraie image logo (PNG base64 embedded dans index.html desktop, réutilisée dans le topbar mobile)
+- Code : `qs('.sidebar-header img[alt="Fitness Park"]').src` → copié dans `<img class="fp-logo-img">` du topbar
+- CSS : height 28px (24px sur 360px viewport) + drop-shadow
+
+**3. Clarification "761k€ final positif"**
+- Avant : affichage "761k€ | final positif" — ambigu pour l'utilisateur
+- Après : "Profit cumulé | 761k€ | profit net 5 ans" + **info-tip `?` cliquable** expliquant :
+  - Somme flux mensuels (recettes − dépenses − loyer − staff − redevance) après déduction du CAPEX initial (~1.18M€)
+  - Positif = rentable sur 5 ans : CAPEX récupéré + profit
+  - Négatif = encore en train de rembourser le CAPEX
+  - Rappel de ce que signifie "BE Xmo" (breakeven opérationnel)
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Desktop inchangé
+
+---
+
 ## [v5.1-data-storytelling] — 2026-04-18
 
 ### Data visualization + gestures + onboarding (axes 4, 5, 9)

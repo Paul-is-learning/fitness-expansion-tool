@@ -41,10 +41,17 @@
   // ─── TOP BAR ──────────────────────────────────────────────────
   function buildTopBar() {
     if (qs('.fp-mobile-topbar')) return;
+    // Reuse the desktop Fitness Park PNG logo (base64-embedded in index.html)
+    const desktopLogo = qs('.sidebar-header img[alt="Fitness Park"]');
+    const logoSrc = desktopLogo?.src || '';
+    const logoHtml = logoSrc
+      ? `<img class="fp-logo-img" src="${logoSrc}" alt="Fitness Park">`
+      : `<div class="fp-logo">FITNESS <em>PARK</em></div>`;
+
     const tb = document.createElement('div');
     tb.className = 'fp-mobile-topbar';
     tb.innerHTML = `
-      <div class="fp-logo">FITNESS <em>PARK</em></div>
+      ${logoHtml}
       <div class="fp-search-pill" id="fpSearchPill">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <span>Bucarest…</span>
@@ -916,19 +923,30 @@
     const areaD = pathD + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (h - pad) + ' L' + pad + ',' + (h - pad) + ' Z';
 
     const endValue = cum[cum.length - 1];
-    const endSign = endValue >= 0 ? 'positif' : 'négatif';
     const endColor = endValue >= 0 ? '#34d399' : '#f87171';
+    const endLabel = endValue >= 0 ? 'profit net 5 ans' : 'perte nette 5 ans';
+    const capex = pnlBase.capex || 0;
 
     return `
       <div class="card" style="padding:14px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.4),rgba(17,24,39,.2))">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
           <div>
-            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Cashflow cumulé</div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px">
+              Profit cumulé
+              <span class="info-tip" style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:var(--card3);color:var(--gray);align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer">?
+                <div class="tip-content"><strong>Profit cumulé sur 5 ans</strong><br><br>
+                  Somme des flux mensuels (recettes − dépenses − loyer − staff − redevance) <strong>après déduction du CAPEX initial</strong> (~${fmtM(capex)} EUR d'investissement).<br><br>
+                  <b style="color:#34d399">Positif</b> = le club est rentable sur 5 ans : tu récupères ton investissement + tu génères du profit.<br>
+                  <b style="color:#f87171">Négatif</b> = tu es encore en train de rembourser le CAPEX à la fin des 5 ans.<br><br>
+                  <div style="color:var(--gray2);font-size:11px">Le "BE Xmo" sur la ligne indique le mois où le cashflow devient positif (breakeven opérationnel).</div>
+                </div>
+              </span>
+            </div>
             <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">60 mois · Scénario base</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:18px;font-weight:900;color:${endColor};line-height:1">${fmtM(endValue)}</div>
-            <div style="font-size:10px;color:var(--gray2);margin-top:2px">final ${endSign}</div>
+            <div style="font-size:10px;color:var(--gray2);margin-top:2px">${endLabel}</div>
           </div>
         </div>
         <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block">
@@ -1137,7 +1155,6 @@
     qsa('.fp-secondary-tab').forEach(t => t.classList.toggle('active', t.dataset.stab === stab));
     const body = qs('#fpSecondaryBody');
     if (!body) return;
-    // Map our tabs to the desktop tab-panel ids
     const map = {
       layers: 'tab-explore',
       concurrence: 'tab-compete',
@@ -1146,20 +1163,49 @@
     };
     const src = document.getElementById(map[stab]);
     if (src) {
-      // Clone the tab-panel content (so we don't move DOM & break desktop wiring)
+      // Clone the tab-panel content, then STRIP all IDs on children
+      // to avoid getElementById collisions with the (hidden) desktop copy.
       body.innerHTML = '';
       const clone = src.cloneNode(true);
       clone.id = '';
       clone.style.display = 'block';
+      stripAllIds(clone);
       body.appendChild(clone);
-      // Intercept clicks on toggles → route to real toggles on hidden desktop
-      rehookToggles(body, src);
+
+      // Sync visual state from global `layers` to the clone's toggles
+      syncToggleStates(clone);
+
+      // On any click in the clone, re-sync visual state after the click fires
+      clone.addEventListener('click', (e) => {
+        if (e.target.closest('.toggle, .layer-label')) {
+          // Wait for toggleLayer's own logic to run, then reflect state
+          setTimeout(() => syncToggleStates(clone), 10);
+        }
+      }, true);
     }
   }
-  function rehookToggles(cloneRoot, srcRoot) {
-    // Original app uses `toggleLayer(name)` — onclick attributes survive cloning, OK.
-    // Just ensure that when toggled, state synchronizes both UIs.
-    // (clone re-executes the onclick, which toggles the global state)
+
+  function stripAllIds(root) {
+    // Clear any id on children so we don't collide with the desktop sidebar
+    const all = root.querySelectorAll('[id]');
+    all.forEach(el => el.removeAttribute('id'));
+  }
+
+  function syncToggleStates(root) {
+    // The clone's toggles have onclick="toggleLayer('xxx')" — reflect `layers[xxx]`
+    // onto the toggle's 'on' class. Works for any toggle in the panel.
+    if (typeof layers === 'undefined') return;
+    const toggles = root.querySelectorAll('.toggle');
+    toggles.forEach(t => {
+      // Each toggle's onclick is like `toggleLayer('xxxxx')`. Extract the name.
+      const onclickStr = t.getAttribute('onclick') || '';
+      const m = onclickStr.match(/toggleLayer\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+      if (!m) return;
+      const name = m[1];
+      if (name in layers) {
+        t.classList.toggle('on', !!layers[name]);
+      }
+    });
   }
 
   function openSecondarySheet() {
