@@ -1,0 +1,7 @@
+{
+  "Baneasa Shopping City": {"arpu":22.98,"beBase":5,"captifs":283,"comps":4,"destBonus":2689,"irrBase":50.8,"ltv":903,"ltvCac":18.1,"members":8762,"natifs":290,"npvBase":3016682,"pbBase":45,"popTarget":40816,"sazDens":57,"sazFlux":30,"sazYouth":27,"score":68,"verdict":"GO CONDITIONNEL","walkIn":5500},
+  "Grand Arena": {"arpu":27.66,"beBase":20,"captifs":749,"comps":3,"destBonus":0,"irrBase":-9.43,"ltv":960,"ltvCac":19.2,"members":3135,"natifs":1336,"npvBase":-963553,"pbBase":null,"popTarget":119309,"sazDens":61,"sazFlux":15,"sazYouth":22,"score":50.9,"verdict":"WATCH","walkIn":1050},
+  "Hala Laminor": {"arpu":27.27,"beBase":5,"captifs":3228,"comps":19,"destBonus":0,"irrBase":47.95,"ltv":952,"ltvCac":19,"members":7093,"natifs":785,"npvBase":2743651,"pbBase":47,"popTarget":262792,"sazDens":69,"sazFlux":65,"sazYouth":37,"score":68.8,"verdict":"GO CONDITIONNEL","walkIn":3080},
+  "Militari Shopping": {"arpu":27.69,"beBase":13,"captifs":723,"comps":5,"destBonus":0,"irrBase":-3.84,"ltv":963,"ltvCac":19.3,"members":3339,"natifs":1356,"npvBase":-758063,"pbBase":null,"popTarget":100316,"sazDens":70,"sazFlux":22,"sazYouth":42,"score":53.7,"verdict":"WATCH","walkIn":1260},
+  "Unirea Shopping Center": {"arpu":25.96,"beBase":7,"captifs":2119,"comps":17,"destBonus":0,"irrBase":30.99,"ltv":939,"ltvCac":18.8,"members":5810,"natifs":1941,"npvBase":1275546,"pbBase":null,"popTarget":316718,"sazDens":61,"sazFlux":69,"sazYouth":69,"score":68.6,"verdict":"GO CONDITIONNEL","walkIn":1750}
+}

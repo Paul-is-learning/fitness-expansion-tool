@@ -1,0 +1,9 @@
+# Test baseline (committed separately)
+# .baseline.json  ← committed intentionally so test.html can run fresh
+.DS_Store
+*.log
+node_modules/
+.env
+.env.local
+/tmp/
+.claude/local-*

@@ -13,6 +13,17 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- ============================================================ -->
+<!-- APP MODULES — order matters: config → utils → data → inline  -->
+<!-- ============================================================ -->
+<script src="config.js"></script>
+<script src="src/utils.js"></script>
+<script src="data/targets.js"></script>
+<script src="data/clubs.js"></script>
+<script src="data/cartiere.js"></script>
+<script src="data/pois.js"></script>
+<script src="data/users.js"></script>
 <style>
 /* ================================================================
    DESIGN SYSTEM — Dark Premium / Romania accent
@@ -915,22 +926,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
 <script>
 // ================================================================
-// CORE CONFIG
+// CORE CONFIG — see config.js
+// GOOGLE MAPS PLATFORM API — see config.js
 // ================================================================
-const BUCHAREST = [44.4268, 26.1025];
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
-const NOMINATIM = 'https://nominatim.openstreetmap.org';
-
-// ================================================================
-// GOOGLE MAPS PLATFORM API
-// ================================================================
-const GOOGLE_API_KEY = 'AIzaSyDPj1aNT8HICzvPOXHSyQtl1oKf3vSu3so';
-const GOOGLE_PLACES_URL = 'https://places.googleapis.com/v1/places';
-const GOOGLE_GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
-const _googleHasKey = () => GOOGLE_API_KEY && GOOGLE_API_KEY !== 'YOUR_GOOGLE_API_KEY';
-const _googleCache = {}; // in-memory cache for session
-const GOOGLE_CACHE_KEY = 'fp_google_cache';
-const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
+// Constants moved to config.js: BUCHAREST, OVERPASS, NOMINATIM,
+// GOOGLE_API_KEY, GOOGLE_PLACES_URL, GOOGLE_GEOCODE_URL,
+// _googleHasKey, _googleCache, GOOGLE_CACHE_KEY, GOOGLE_CACHE_TTL,
+// MODEL_VERSION.
 
 function loadGoogleCache() {
   try {
@@ -1325,13 +1327,7 @@ function estimateAge(name) {
 }
 
 // Target sites from BP
-const TARGETS = [
-  {name:'Hala Laminor',lat:44.4258,lng:26.1492,phase:1,sector:3,area:'1,300-2,300 m2',rent:'12->14 EUR/m2',status:'Shell securise',opening:'Q2-2027',note:'Remplacement World Class | 86,300m2 GLA mixed-use | Metro Republica | 1.5M hab. dans 30min | 1,325 parkings',capex:1176000},
-  {name:'Unirea Shopping Center',lat:44.4275,lng:26.1019,phase:1,sector:3,area:'~1,400 m2',rent:'A negocier (Colliers)',status:'En discussion',opening:'2027-2028',note:'Centre commercial historique | Metro Unirii (M1+M2+M3) | Restructuration prevue 3 ans | Cible RDC + visibilite rue',capex:1176000},
-  {name:'Militari Shopping',lat:44.4367,lng:25.9827,phase:1,sector:6,area:'~1,400 m2',rent:'11 EUR/m2 (base Brico)',status:'A confirmer',opening:'Q1-2027',note:'Plus grand bassin population peri-urbaine ouest | Militari Residence ~40k hab. | Livraison Q1 2027',capex:1176000},
-  {name:'Grand Arena',lat:44.3742,lng:26.1204,phase:2,sector:4,area:'~1,400 m2',rent:'TBD',status:'Interet proprietaire',opening:'2028',note:'Zone residentielle sud en forte croissance | Position existante Stayfit ou nouvelle cellule RDC+R1',capex:1176000},
-  {name:'Baneasa Shopping City',lat:44.5073,lng:26.0895,phase:2,sector:1,area:'~1,400 m2',rent:'>20 EUR/m2',status:'2 options en discussion',opening:'2028',note:'20M visites/an | 380M€ CA centre | 55k+35k GLA extension | 221ha Baneasa Project mixed-use | Business parks | 4,500 parkings | 350+ marques premium',capex:1176000}
-];
+// TARGETS moved to data/targets.js
 
 // ================================================================
 // VERIFIED CLUBS DATABASE — 92 clubs, geocoded via Nominatim + manual corrections
@@ -1342,119 +1338,7 @@ const TARGETS = [
 //   Premium with pool: 0.85 mbr/m2 | Mid-range: 1.1 mbr/m2 | Low-cost: 1.5 mbr/m2 | Independent: 0.9 mbr/m2
 // Method B (cross-check): Google Reviews x 5-8 (to be added when reviews scraped)
 // 'v' suffix = verified surface from official source | no suffix = estimated from tier average
-const VERIFIED_CLUBS = [
-  // === WORLD CLASS (34 clubs) — Source: worldclass.ro, business-review.eu, fitnet.ro ===
-  // WC avg = 84,000 members / 45 clubs = 1,867 mbr/club. Ratio = 0.93 mbr/m2 (premium with pool)
-  {name:'World Class Charles de Gaulle',lat:44.464661,lng:26.083435,segment:'premium',size:1250,members:1063,tier:'W',sv:true},
-  {name:'World Class Downtown',lat:44.441133,lng:26.094974,segment:'premium',size:2200,members:1870,tier:'Platinum',sv:false},
-  {name:'World Class At The Grand',lat:44.425619,lng:26.076877,segment:'premium',size:2300,members:1955,tier:'Platinum',sv:true},
-  {name:'World Class Atlantis',lat:44.490200,lng:26.096500,segment:'premium',size:2200,members:1870,tier:'Platinum',sv:false},
-  {name:'World Class Caro',lat:44.462500,lng:26.097800,segment:'premium',size:2000,members:1700,tier:'Gold',sv:false},
-  {name:'World Class InCity',lat:44.419762,lng:26.133465,segment:'premium',size:1800,members:1530,tier:'Gold',sv:false},
-  {name:'World Class Upground',lat:44.471500,lng:26.113000,segment:'premium',size:1800,members:1530,tier:'Gold',sv:false},
-  {name:'World Class One Cotroceni',lat:44.425580,lng:26.063884,segment:'premium',size:2700,members:2295,tier:'Gold',sv:true},
-  {name:'World Class Planet',lat:44.486500,lng:26.120000,segment:'premium',size:2000,members:1700,tier:'Gold',sv:false},
-  {name:'World Class Cosmopolis',lat:44.530000,lng:26.115000,segment:'premium',size:2700,members:2295,tier:'Gold',sv:true},
-  {name:'World Class Asmita Gardens',lat:44.406933,lng:26.125157,segment:'premium',size:2000,members:1700,tier:'Silver',sv:true},
-  {name:'World Class Mega Mall',lat:44.438000,lng:26.155000,segment:'premium',size:2000,members:1700,tier:'Silver',sv:false},
-  {name:'World Class Militari Shopping',lat:44.436707,lng:25.982650,segment:'premium',size:1800,members:1530,tier:'Silver',sv:false},
-  {name:'World Class Otopeni',lat:44.549000,lng:26.068000,segment:'premium',size:1500,members:1275,tier:'Silver',sv:false},
-  {name:'World Class Park Lake',lat:44.420665,lng:26.149631,segment:'premium',size:2000,members:1700,tier:'Silver',sv:true},
-  {name:'World Class Titan',lat:44.421288,lng:26.180037,segment:'premium',size:1800,members:1530,tier:'Silver',sv:false},
-  {name:'World Class AFI Cotroceni',lat:44.431500,lng:26.052000,segment:'premium',size:1500,members:1275,tier:'Bronze',sv:false},
-  {name:'World Class AFI Tech',lat:44.418486,lng:26.076583,segment:'premium',size:1300,members:1105,tier:'Bronze',sv:false},
-  {name:'World Class America House',lat:44.452426,lng:26.082141,segment:'premium',size:920,members:782,tier:'Bronze',sv:true},
-  {name:'World Class Bucuresti Mall',lat:44.420584,lng:26.126701,segment:'premium',size:1500,members:1275,tier:'Bronze',sv:false},
-  {name:'World Class Campus 6',lat:44.434945,lng:26.052869,segment:'premium',size:1300,members:1105,tier:'Bronze',sv:false},
-  {name:'World Class Expo Park',lat:44.473385,lng:26.054899,segment:'premium',size:1480,members:1258,tier:'Bronze',sv:true},
-  {name:'World Class Jiului',lat:44.483219,lng:26.043323,segment:'premium',size:1200,members:1020,tier:'Bronze',sv:false},
-  {name:'World Class Jolie Ville',lat:44.492000,lng:26.095000,segment:'premium',size:1500,members:1275,tier:'Bronze',sv:false},
-  {name:'World Class Lujerului',lat:44.433245,lng:26.036784,segment:'premium',size:1500,members:1275,tier:'Bronze',sv:false},
-  {name:'World Class Plaza Romania',lat:44.428482,lng:26.035172,segment:'premium',size:2000,members:1700,tier:'Bronze',sv:true},
-  {name:'World Class Sudului',lat:44.393660,lng:26.119899,segment:'premium',size:1300,members:1105,tier:'Bronze',sv:false},
-  {name:'World Class Titan Park',lat:44.424282,lng:26.161355,segment:'premium',size:3000,members:2550,tier:'Bronze',sv:true},
-  {name:'World Class Sema Park',lat:44.442909,lng:26.048414,segment:'premium',size:1355,members:1152,tier:'Bronze',sv:true},
-  {name:'World Class Veranda',lat:44.452127,lng:26.129041,segment:'premium',size:1500,members:1275,tier:'Bronze',sv:true},
-  {name:'World Class Oregon Park',lat:44.481235,lng:26.105868,segment:'premium',size:1300,members:1105,tier:'Bronze',sv:false},
-  {name:'World Class Eroii Revolutiei',lat:44.401021,lng:26.099529,segment:'premium',size:1300,members:1105,tier:'Bronze',sv:false},
-  {name:'World Class Promenada',lat:44.477523,lng:26.103549,segment:'premium',size:1800,members:1530,tier:'Bronze',sv:false},
-  {name:'World Class Pipera Plaza',lat:44.485959,lng:26.126123,segment:'premium',size:1470,members:1250,tier:'Bronze',sv:true},
-  // === STAY FIT GYM (21 Bucharest) — Source: stayfit.ro, morphosiscapital.com, wall-street.ro ===
-  // SF network: 67 clubs nationally. Avg ~1,000m2 (6k m2 / 6 early clubs). Ratio mid-range: 1.1 mbr/m2
-  {name:'Stay Fit Romana',lat:44.446576,lng:26.098938,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Titulescu',lat:44.452508,lng:26.072874,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Domenii',lat:44.470229,lng:26.055085,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Colosseum',lat:44.491405,lng:26.016470,segment:'mid',size:1500,members:1650,sv:true},
-  {name:'Stay Fit Jiului',lat:44.479129,lng:26.043101,segment:'mid',size:800,members:880},
-  {name:'Stay Fit Dorobanti',lat:44.464092,lng:26.095555,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Crangasi',lat:44.457782,lng:26.040357,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Teiul Doamnei',lat:44.461923,lng:26.126115,segment:'mid',size:800,members:880},
-  {name:'Stay Fit Pantelimon',lat:44.444634,lng:26.159203,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Esplanada',lat:44.437390,lng:26.186588,segment:'mid',size:1200,members:1320},
-  {name:'Stay Fit Pipera',lat:44.484539,lng:26.119650,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Pallady',lat:44.408566,lng:26.188415,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Vitan',lat:44.413189,lng:26.138211,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Cocor',lat:44.434669,lng:26.102972,segment:'mid',size:800,members:880},
-  {name:'Stay Fit Fizicienilor',lat:44.412674,lng:26.150343,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Petre Ispirescu',lat:44.415185,lng:26.061615,segment:'mid',size:800,members:880},
-  {name:'Stay Fit Rahova',lat:44.400013,lng:26.043953,segment:'mid',size:1200,members:1320,sv:true},
-  {name:'Stay Fit Liberty',lat:44.415067,lng:26.080094,segment:'mid',size:1500,members:1650,sv:true},
-  {name:'Stay Fit Grand Arena',lat:44.373852,lng:26.119685,segment:'mid',size:1200,members:1320},
-  {name:'Stay Fit Prosper',lat:44.420032,lng:26.065738,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Ghencea',lat:44.413339,lng:26.036551,segment:'mid',size:2000,members:2200,sv:true},
-  // === 18GYM (6 Bucharest) — Source: 18gym.ro, monitorulcj.ro ===
-  // 18GYM: 15,000 members in Cluj alone (13 clubs) = ~1,150/club. Ratio ~1.0 mbr/m2
-  {name:'18GYM Green Gate',lat:44.419395,lng:26.079521,segment:'mid',size:1200,members:1200},
-  {name:'18GYM Mihai Bravu',lat:44.415195,lng:26.135871,segment:'mid',size:1200,members:1200},
-  {name:'18GYM Pantelimon',lat:44.444800,lng:26.159500,segment:'mid',size:1200,members:1200},
-  {name:'18GYM Chiajna',lat:44.432000,lng:25.968000,segment:'mid',size:1200,members:1200},
-  {name:'18GYM Monaco Towers',lat:44.487247,lng:26.114866,segment:'mid',size:1800,members:1800,sv:true},
-  {name:'18GYM Pipera',lat:44.490000,lng:26.118000,segment:'mid',size:1200,members:1200},
-  // === DOWNTOWN FITNESS (5 clubs) — Source: downtownfitness.ro ===
-  // DF Vitan confirmed 1,800m2. Obor = 2,000m2. Mihalache = 1,000m2. Ratio ~1.1 mbr/m2
-  {name:'Downtown Fitness Vitan',lat:44.4227,lng:26.1241,segment:'mid-premium',size:1800,members:1980,sv:true},
-  {name:'Downtown Fitness Mihai Bravu',lat:44.4175,lng:26.1359,segment:'mid-premium',size:1400,members:1540},
-  {name:'Downtown Fitness Mihalache',lat:44.458420,lng:26.077576,segment:'mid-premium',size:1000,members:1100,sv:true},
-  {name:'Downtown Fitness Matei Basarab',lat:44.4314,lng:26.1288,segment:'mid-premium',size:1500,members:1650},
-  {name:'Downtown Fitness Obor',lat:44.4503,lng:26.1276,segment:'mid-premium',size:2000,members:2200,sv:true},
-  // === NR1 FITNESS (5 clubs, 24/7) — Source: outsourcing-today.ro ===
-  // Nr1: low-cost 24/7 model, small format. Militari confirmed 400m2. Ratio low-cost: 1.5 mbr/m2
-  {name:'Nr1 Fitness Militari',lat:44.434294,lng:26.000327,segment:'mid',size:400,members:600,sv:true},
-  {name:'Nr1 Fitness Pipera',lat:44.487000,lng:26.115000,segment:'mid',size:400,members:600},
-  {name:'Nr1 Fitness Ghencea',lat:44.408701,lng:25.982652,segment:'mid',size:400,members:600},
-  {name:'Nr1 Fitness Pantelimon',lat:44.441127,lng:26.180056,segment:'mid',size:400,members:600},
-  {name:'Nr1 Fitness Titan',lat:44.424248,lng:26.171397,segment:'mid',size:400,members:600},
-  // === CROSSFIT BOXES (5) — typically 200-350m2, 100-250 members ===
-  {name:'CrossFit Columna (Uzina)',lat:44.412172,lng:26.117383,segment:'crossfit',size:350,members:200},
-  {name:'CrossFit Nord BVS',lat:44.494202,lng:26.097007,segment:'crossfit',size:300,members:180},
-  {name:'CrossFit ROA',lat:44.452827,lng:26.079955,segment:'crossfit',size:280,members:150},
-  {name:'Replay CrossFit',lat:44.482106,lng:26.119076,segment:'crossfit',size:300,members:180},
-  {name:'Groove Box',lat:44.419305,lng:26.083442,segment:'crossfit',size:250,members:120},
-  // === ABSOLUTE GYM (3 clubs) — Source: absolutegym.ro (VERIFIED tiny format) ===
-  {name:'Absolute Gym Ghencea',lat:44.415706,lng:26.038957,segment:'independent',size:500,members:450},
-  {name:'Absolute Gym Titan',lat:44.429198,lng:26.150350,segment:'independent',size:200,members:180,sv:true},
-  {name:'Absolute Gym Militari',lat:44.430000,lng:25.995000,segment:'independent',size:185,members:167,sv:true},
-  // === OTHER VERIFIED ===
-  {name:'SalsaFit AFI Cotroceni',lat:44.432069,lng:26.048935,segment:'mid',size:1000,members:900},
-  {name:'WoWGym Fundeni',lat:44.463244,lng:26.153917,segment:'independent',size:1000,members:900},
-  {name:'Sweat Concept Promenada',lat:44.476000,lng:26.104000,segment:'boutique',size:300,members:250},
-  {name:'Best Fitness Gym',lat:44.423755,lng:26.011406,segment:'independent',size:1000,members:900},
-  // === BANLIEUE / ILFOV — Clubs peri-urbains ===
-  // Stay Fit banlieue (7 clubs) — Source: stayfit.ro/cluburi
-  {name:'Stay Fit Otopeni',lat:44.5359,lng:26.0605,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Voluntari',lat:44.4872,lng:26.1824,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Lemon Park',lat:44.4925,lng:26.1509,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Balotesti',lat:44.6044,lng:26.0676,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Popesti Leordeni',lat:44.3603,lng:26.1509,segment:'mid',size:1000,members:1100},
-  {name:'Stay Fit Stefanesti',lat:44.5285,lng:26.1975,segment:'mid',size:900,members:990},
-  {name:'Stay Fit Crevedia',lat:44.6180,lng:25.9132,segment:'mid',size:800,members:880},
-  // World Class banlieue (2 clubs)
-  {name:'World Class Cosmopolis',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,sv:true},
-  {name:'World Class Otopeni',lat:44.5477,lng:26.0746,segment:'premium',size:1500,members:1275},
-];
-
-// Use same as demo — the verified database IS the real data
-const DEMO_COMPS = VERIFIED_CLUBS;
+// VERIFIED_CLUBS + DEMO_COMPS moved to data/clubs.js
 
 // Metro stations (demo)
 const METRO = [
@@ -1526,104 +1410,7 @@ function getINSAgeDistribution(sectorNum) {
   };
 }
 
-const CARTIERE = [
-  // SECTOR 1 (pop 217,367)
-  {name:'Dorobanti',lat:44.4530,lng:26.0900,sector:1,pop:18000,price:2800,young:.42,desc:'Quartier diplomatique premium'},
-  {name:'Primaverii',lat:44.4580,lng:26.0820,sector:1,pop:12000,price:3200,young:.38,desc:'Villas ambassades, CSP++'},
-  {name:'Aviatorilor',lat:44.4620,lng:26.0880,sector:1,pop:10000,price:3000,young:.40,desc:'Proche Herastrau, premium'},
-  {name:'Floreasca',lat:44.4680,lng:26.0950,sector:1,pop:15000,price:2600,young:.45,desc:'Business + residentiel premium'},
-  {name:'Baneasa',lat:44.4950,lng:26.0800,sector:1,pop:28000,price:2500,young:.42,desc:'Baneasa Project 221ha | Shopping 20M vis/an | Business parks | Premium residential'},
-  {name:'Pipera Nord',lat:44.4850,lng:26.1100,sector:1,pop:18000,price:2100,young:.46,desc:'Tech hub, bureaux + residentiel'},
-  {name:'Domenii',lat:44.4680,lng:26.0550,sector:1,pop:16000,price:2000,young:.42,desc:'Residentiel calme classe moyenne+'},
-  {name:'Bucurestii Noi',lat:44.4780,lng:26.0430,sector:1,pop:20000,price:1600,young:.43,desc:'Mixte, en gentrification'},
-  {name:'Victoriei',lat:44.4520,lng:26.0850,sector:1,pop:12000,price:2500,young:.44,desc:'Centre affaires, Piata Victoriei'},
-  {name:'Pajura-Straulesti',lat:44.4880,lng:26.0380,sector:1,pop:15000,price:1500,young:.44,desc:'Peripherie nord-ouest, M4'},
-  {name:'1 Mai-Grivita',lat:44.4600,lng:26.0700,sector:1,pop:18000,price:1700,young:.43,desc:'Densement peuple, commerce'},
-  // SECTOR 2 (pop 291,557)
-  {name:'Floreasca-Barbu Vacarescu',lat:44.4700,lng:26.1050,sector:2,pop:20000,price:2400,young:.45,desc:'CBD secondaire, bureaux premium'},
-  {name:'Stefan cel Mare',lat:44.4530,lng:26.1100,sector:2,pop:22000,price:1800,young:.46,desc:'Axe commercial, metro M2'},
-  {name:'Obor',lat:44.4520,lng:26.1250,sector:2,pop:25000,price:1500,young:.44,desc:'Marche Obor, quartier populaire'},
-  {name:'Tei',lat:44.4630,lng:26.1200,sector:2,pop:18000,price:1600,young:.45,desc:'Lac Tei, gentrification'},
-  {name:'Iancului',lat:44.4380,lng:26.1160,sector:2,pop:20000,price:1650,young:.45,desc:'Residentiel dense, metro M1'},
-  {name:'Colentina',lat:44.4650,lng:26.1400,sector:2,pop:30000,price:1300,young:.44,desc:'Extension nord-est, populaire'},
-  {name:'Pantelimon',lat:44.4400,lng:26.1700,sector:2,pop:35000,price:1200,young:.44,desc:'Grand ensemble est, Mega Mall'},
-  {name:'Vatra Luminoasa',lat:44.4450,lng:26.1350,sector:2,pop:15000,price:1700,young:.43,desc:'Residentiel calme, parc IOR'},
-  {name:'Fundeni',lat:44.4600,lng:26.1550,sector:2,pop:12000,price:1100,young:.43,desc:'Peripherie, hopital'},
-  // SECTOR 3 (pop 374,737)
-  {name:'Titan',lat:44.4130,lng:26.1550,sector:3,pop:65000,price:1400,young:.45,desc:'Plus grand quartier, ParkLake, M1'},
-  {name:'Dristor',lat:44.4200,lng:26.1320,sector:3,pop:30000,price:1500,young:.45,desc:'Carrefour metro M1+M3, commercial'},
-  {name:'Vitan',lat:44.4180,lng:26.1200,sector:3,pop:35000,price:1550,young:.44,desc:'Bucuresti Mall, residentiel dense'},
-  {name:'Dudesti',lat:44.4220,lng:26.1100,sector:3,pop:20000,price:1600,young:.44,desc:'Proche centre, en transformation'},
-  {name:'Centrul Civic-Unirii',lat:44.4280,lng:26.1020,sector:3,pop:15000,price:2000,young:.43,desc:'Piata Unirii, mixte'},
-  {name:'Muncii',lat:44.4350,lng:26.1200,sector:3,pop:25000,price:1500,young:.45,desc:'Piata Muncii, commercial'},
-  {name:'Pallady',lat:44.4080,lng:26.1850,sector:3,pop:30000,price:1100,young:.46,desc:'Extension est, nouveaux immeubles'},
-  {name:'Hala Laminor Zone',lat:44.4260,lng:26.1500,sector:3,pop:15000,price:1400,young:.45,desc:'Zone en regeneration, 86k m2 projet'},
-  // SECTOR 4 (pop 268,018)
-  {name:'Tineretului',lat:44.4100,lng:26.1050,sector:4,pop:25000,price:1800,young:.44,desc:'Parc Tineretului, metro M2'},
-  {name:'Berceni',lat:44.3950,lng:26.1150,sector:4,pop:55000,price:1400,young:.43,desc:'Grand ensemble sud, Sun Plaza'},
-  {name:'Piata Sudului',lat:44.4010,lng:26.1060,sector:4,pop:20000,price:1550,young:.43,desc:'Metro M2, commercial'},
-  {name:'Oltenitei',lat:44.3850,lng:26.1200,sector:4,pop:30000,price:1200,young:.42,desc:'Axe sud, en croissance'},
-  {name:'Giurgiului',lat:44.3800,lng:26.0900,sector:4,pop:25000,price:1100,young:.41,desc:'Sud-ouest, Grand Arena'},
-  {name:'Timpuri Noi',lat:44.4150,lng:26.1130,sector:4,pop:12000,price:1900,young:.45,desc:'Bureaux Timpuri Noi Square'},
-  {name:'Aparatorii Patriei',lat:44.3880,lng:26.1250,sector:4,pop:20000,price:1250,young:.42,desc:'Metro M2, peripherie sud'},
-  // SECTOR 5 (pop 240,288)
-  {name:'Cotroceni',lat:44.4350,lng:26.0650,sector:5,pop:18000,price:2200,young:.44,desc:'Quartier universitaire, CSP+'},
-  {name:'13 Septembrie',lat:44.4250,lng:26.0750,sector:5,pop:20000,price:1900,young:.43,desc:'Proche centre, residentiel+'},
-  {name:'Rahova',lat:44.4050,lng:26.0600,sector:5,pop:40000,price:1100,young:.42,desc:'Quartier populaire dense'},
-  {name:'Ferentari',lat:44.4000,lng:26.0500,sector:5,pop:35000,price:700,young:.40,desc:'Quartier defavorise'},
-  {name:'Dealul Spirii',lat:44.4300,lng:26.0800,sector:5,pop:10000,price:2000,young:.43,desc:'Proche Eroilor, patrimoine'},
-  {name:'Progresul',lat:44.4130,lng:26.0800,sector:5,pop:15000,price:1400,young:.42,desc:'Mixte, Liberty Mall'},
-  // SECTOR 6 (pop 324,994)
-  {name:'Militari',lat:44.4310,lng:25.9900,sector:6,pop:50000,price:1500,young:.44,desc:'Grand ensemble ouest, M1+shopping'},
-  {name:'Drumul Taberei',lat:44.4230,lng:26.0200,sector:6,pop:55000,price:1700,young:.44,desc:'Populaire, metro M5, en hausse'},
-  {name:'Crangasi',lat:44.4550,lng:26.0380,sector:6,pop:25000,price:1500,young:.43,desc:'Proche centre, metro M1'},
-  {name:'Giulesti',lat:44.4600,lng:26.0450,sector:6,pop:22000,price:1400,young:.43,desc:'Nord secteur 6, mixte'},
-  {name:'Ghencea',lat:44.4130,lng:26.0350,sector:6,pop:20000,price:1300,young:.42,desc:'Sud-ouest, stade'},
-  {name:'Grozavesti-Regie',lat:44.4380,lng:26.0560,sector:6,pop:15000,price:1600,young:.46,desc:'Cite universitaire, Politehnica'},
-  {name:'Plaza Romania Zone',lat:44.4280,lng:26.0350,sector:6,pop:18000,price:1550,young:.43,desc:'Centre commercial, dense'},
-  // === QUARTIERS COMPLEMENTAIRES — combler les gaps population vs census ===
-  // SECTOR 1 gap: 41k
-  {name:'Herastrau-Nordului',lat:44.4820,lng:26.0750,sector:1,pop:14000,price:2800,young:.40,desc:'Parc Herastrau, luxe'},
-  {name:'Aviatiei',lat:44.4750,lng:26.0880,sector:1,pop:16000,price:2300,young:.43,desc:'Residentiel recent, bureaux'},
-  {name:'Damaroaia',lat:44.4850,lng:26.0500,sector:1,pop:12000,price:1400,young:.42,desc:'Nord-ouest, mixte'},
-  // SECTOR 2 gap: 95k
-  {name:'Mosilor-Calarasi',lat:44.4380,lng:26.1050,sector:2,pop:18000,price:1600,young:.44,desc:'Proche centre, commercial'},
-  {name:'Baicului',lat:44.4450,lng:26.1200,sector:2,pop:15000,price:1400,young:.44,desc:'Residentiel dense'},
-  {name:'Plumbuita',lat:44.4700,lng:26.1300,sector:2,pop:12000,price:1200,young:.43,desc:'Nord-est, parc'},
-  {name:'Pipera Sud',lat:44.4750,lng:26.1150,sector:2,pop:20000,price:1800,young:.46,desc:'Bureaux + residentiel neuf'},
-  {name:'Andronache',lat:44.4800,lng:26.1400,sector:2,pop:10000,price:1100,young:.43,desc:'Peripherie nord-est'},
-  {name:'Doamna Ghica',lat:44.4650,lng:26.1150,sector:2,pop:20000,price:1500,young:.44,desc:'Residentiel, bd Stefan'},
-  // SECTOR 3 gap: 140k
-  {name:'Lipscani-Old Town',lat:44.4320,lng:26.1000,sector:3,pop:8000,price:2200,young:.43,desc:'Centre historique, nightlife'},
-  {name:'Republica',lat:44.4250,lng:26.1500,sector:3,pop:20000,price:1300,young:.45,desc:'Metro M1, Hala Laminor'},
-  {name:'Ozana',lat:44.4200,lng:26.1700,sector:3,pop:22000,price:1200,young:.44,desc:'Grand ensemble est'},
-  {name:'Balta Alba',lat:44.4250,lng:26.1400,sector:3,pop:25000,price:1350,young:.45,desc:'Parc IOR, residentiel dense'},
-  {name:'1 Decembrie',lat:44.4120,lng:26.1650,sector:3,pop:20000,price:1200,young:.44,desc:'Extension est Titan'},
-  {name:'Splaiul Unirii Est',lat:44.4200,lng:26.1100,sector:3,pop:15000,price:1700,young:.44,desc:'Bureaux + residentiel'},
-  {name:'Calea Calarasilor',lat:44.4300,lng:26.1200,sector:3,pop:15000,price:1500,young:.45,desc:'Axe commercial est'},
-  {name:'Nicolae Teclu',lat:44.4050,lng:26.1700,sector:3,pop:16000,price:1100,young:.44,desc:'Peripherie sud-est'},
-  // SECTOR 4 gap: 81k
-  {name:'Eroii Revolutiei',lat:44.4050,lng:26.1000,sector:4,pop:18000,price:1600,young:.43,desc:'Metro M2, residentiel'},
-  {name:'Vacaresti',lat:44.4050,lng:26.1150,sector:4,pop:15000,price:1500,young:.43,desc:'Parc naturel Vacaresti'},
-  {name:'Progresul',lat:44.3950,lng:26.0900,sector:4,pop:18000,price:1300,young:.42,desc:'Sud-centre, commerce'},
-  {name:'Metalurgiei',lat:44.3750,lng:26.1200,sector:4,pop:15000,price:1100,young:.42,desc:'Grand Arena zone'},
-  {name:'Popesti-Leordeni lim.',lat:44.3700,lng:26.1400,sector:4,pop:16000,price:1200,young:.44,desc:'Limite sud, en expansion'},
-  // SECTOR 5 gap: 102k
-  {name:'Margeanului',lat:44.4100,lng:26.0500,sector:5,pop:18000,price:1000,young:.41,desc:'Ouest S5, populaire'},
-  {name:'Sebastian',lat:44.4200,lng:26.0700,sector:5,pop:20000,price:1400,young:.43,desc:'Proche Eroilor, mixte'},
-  {name:'Pieptanari',lat:44.4050,lng:26.0700,sector:5,pop:15000,price:1200,young:.42,desc:'Residentiel dense'},
-  {name:'Panduri',lat:44.4300,lng:26.0700,sector:5,pop:12000,price:1700,young:.43,desc:'Proche Cotroceni, CSP+'},
-  {name:'Giurgiului Nord',lat:44.3900,lng:26.0800,sector:5,pop:18000,price:900,young:.41,desc:'Quartier populaire'},
-  {name:'Odai-Antiaeriana',lat:44.3850,lng:26.0600,sector:5,pop:20000,price:800,young:.40,desc:'Peripherie sud-ouest'},
-  // SECTOR 6 gap: 120k
-  {name:'Militari Residence',lat:44.4300,lng:25.9600,sector:6,pop:25000,price:1300,young:.46,desc:'Plus grand quartier neuf, 40k hab'},
-  {name:'Pacii-Apusului',lat:44.4320,lng:25.9850,sector:6,pop:18000,price:1200,young:.43,desc:'Metro M1 Pacii, dense'},
-  {name:'Lujerului',lat:44.4340,lng:26.0300,sector:6,pop:20000,price:1500,young:.43,desc:'Metro M1, residentiel'},
-  {name:'Cotroceni-AFI Zone',lat:44.4320,lng:26.0520,sector:6,pop:15000,price:1800,young:.44,desc:'AFI Cotroceni, bureaux Campus6'},
-  {name:'Lacul Morii',lat:44.4400,lng:26.0200,sector:6,pop:12000,price:1300,young:.43,desc:'Lac, residentiel'},
-  {name:'Veteranilor',lat:44.4250,lng:26.0150,sector:6,pop:15000,price:1400,young:.43,desc:'Drumul Taberei sud'},
-  {name:'Gorjului-Razoare',lat:44.4300,lng:26.0100,sector:6,pop:16000,price:1350,young:.43,desc:'Metro M1 Gorjului'},
-];
+// CARTIERE moved to data/cartiere.js
 
 // Custom sites management — use localStorage (persists across sessions)
 let customSites = [];
@@ -1859,49 +1646,7 @@ async function cannibalizeRisk(site1,site2) {
 // POI DATABASE — Universities, Malls, Offices, Residential
 // Sources: Nominatim geocoding, official websites, INS Romania
 // ================================================================
-const POIS = [
-  // UNIVERSITIES (14) — Source: universityguru.com, official uni websites
-  {name:'Universitatea din Bucuresti (UB)',lat:44.435139,lng:26.080362,type:'university',students:33000,icon:'🎓'},
-  {name:'Politehnica Bucuresti (UPB)',lat:44.439368,lng:26.050603,type:'university',students:23000,icon:'🎓'},
-  {name:'ASE Bucuresti',lat:44.447677,lng:26.097152,type:'university',students:22000,icon:'🎓'},
-  {name:'UMF Carol Davila',lat:44.442020,lng:26.101938,type:'university',students:10000,icon:'🎓'},
-  {name:'SNSPA',lat:44.449603,lng:26.094087,type:'university',students:5000,icon:'🎓'},
-  {name:'Ion Mincu (Arhitectura)',lat:44.436173,lng:26.100374,type:'university',students:3000,icon:'🎓'},
-  {name:'USAMV Bucuresti',lat:44.471028,lng:26.066426,type:'university',students:8000,icon:'🎓'},
-  {name:'UNARTE Bucuresti',lat:44.444761,lng:26.087031,type:'university',students:2000,icon:'🎓'},
-  {name:'UNATC (Theatre & Film)',lat:44.437909,lng:26.130389,type:'university',students:1500,icon:'🎓'},
-  {name:'Spiru Haret University',lat:44.433381,lng:26.101018,type:'university',students:15000,icon:'🎓'},
-  {name:'Romanian-American University',lat:44.472984,lng:26.065692,type:'university',students:6000,icon:'🎓'},
-  {name:'Titu Maiorescu University',lat:44.411007,lng:26.115159,type:'university',students:8000,icon:'🎓'},
-  {name:'Hyperion University',lat:44.432737,lng:26.125487,type:'university',students:4000,icon:'🎓'},
-  {name:'Nicolae Titulescu University',lat:44.404416,lng:26.121035,type:'university',students:5000,icon:'🎓'},
-  // MALLS (13) — Source: romania-insider.com, official mall websites
-  {name:'AFI Cotroceni',lat:44.431500,lng:26.052000,type:'mall',gla:90000,icon:'🛒'},
-  {name:'Baneasa Shopping City',lat:44.507259,lng:26.089485,type:'mall',gla:90000,icon:'🛒'},// 55k GLA + 35k extension = 90k total | 20M visits/an
-  {name:'Mega Mall',lat:44.441776,lng:26.152213,type:'mall',gla:75000,icon:'🛒'},
-  {name:'ParkLake Mall',lat:44.420665,lng:26.149631,type:'mall',gla:70000,icon:'🛒'},
-  {name:'Sun Plaza',lat:44.395444,lng:26.123051,type:'mall',gla:81000,icon:'🛒'},
-  {name:'Promenada Mall',lat:44.478191,lng:26.103413,type:'mall',gla:45000,icon:'🛒'},
-  {name:'Bucuresti Mall',lat:44.420262,lng:26.126688,type:'mall',gla:50000,icon:'🛒'},
-  {name:'Plaza Romania',lat:44.428482,lng:26.035172,type:'mall',gla:55000,icon:'🛒'},
-  {name:'Militari Shopping',lat:44.436707,lng:25.982650,type:'mall',gla:54000,icon:'🛒'},
-  {name:'Veranda Mall',lat:44.452127,lng:26.129041,type:'mall',gla:30000,icon:'🛒'},
-  {name:'Grand Arena Mall',lat:44.374227,lng:26.120416,type:'mall',gla:50000,icon:'🛒'},
-  {name:'Unirea Shopping Center',lat:44.427541,lng:26.101922,type:'mall',gla:40000,icon:'🛒'},
-  {name:'Liberty Mall',lat:44.415067,lng:26.080094,type:'mall',gla:25000,icon:'🛒'},
-  // OFFICE DISTRICTS (5) — Source: Cushman & Wakefield, romania-insider.com
-  {name:'Pipera Business District',lat:44.478813,lng:26.112428,type:'office',employees:45000,icon:'🏢'},
-  {name:'Floreasca-Barbu Vacarescu',lat:44.471986,lng:26.108830,type:'office',employees:25000,icon:'🏢'},
-  {name:'Center-West (Cotroceni)',lat:44.433000,lng:26.055000,type:'office',employees:15000,icon:'🏢'},
-  {name:'Timpuri Noi Square',lat:44.411499,lng:26.115091,type:'office',employees:15000,icon:'🏢'},
-  {name:'Sema Parc',lat:44.442909,lng:26.048414,type:'office',employees:10000,icon:'🏢'},
-  {name:'Baneasa Business & Technology Park',lat:44.5050,lng:26.0870,type:'office',employees:12000,icon:'🏢'},// Part of 221ha Baneasa Project mixed-use (PPTX officiel)
-  // MAJOR RESIDENTIAL (4) — Source: romania-insider.com
-  {name:'Militari Residence',lat:44.430000,lng:25.960000,type:'residential',inhabitants:25000,icon:'🏠'},
-  {name:'Cosmopolis',lat:44.530000,lng:26.115000,type:'residential',inhabitants:7500,icon:'🏠'},
-  {name:'Greenfield Baneasa',lat:44.490189,lng:26.084950,type:'residential',inhabitants:5000,icon:'🏠'},
-  {name:'One Herastrau',lat:44.488000,lng:26.078000,type:'residential',inhabitants:3000,icon:'🏠'},
-];
+// POIS moved to data/pois.js
 
 let poiLayer = L.layerGroup();
 
@@ -4829,7 +4574,7 @@ function updatePnLDisplay(pnl, exec) {
 // Store all analyzed sites for comparison
 // Cache-buster: AGGRESSIVE clear on model version change
 // Clears: site analyses, custom site cached data, syncs custom site coords with TARGETS
-const MODEL_VERSION = 'v3.0-users';
+// MODEL_VERSION moved to config.js
 if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   // 1. Clear ranked analyses cache
   localStorage.removeItem('fpSiteAnalyses');
@@ -6869,8 +6614,7 @@ async function googleDistanceMatrix(originLat, originLng, competitors) {
 // UTILITIES
 // ================================================================
 function el(id){return document.getElementById(id)}
-function fmt(n){return n?n.toLocaleString('fr-FR'):'0'}
-function haversine(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+// fmt + haversine moved to src/utils.js
 function showLoad(t,s){el('loaderText').textContent=t||'Chargement...';el('loaderSub').textContent=s||'';el('loader').classList.add('on')}
 function hideLoad(){el('loader').classList.remove('on')}
 function setStatus(s,t){el('statusDot').className='status-dot '+s;el('statusText').textContent=t}
@@ -6881,8 +6625,7 @@ function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').
 // AUTH & USER MANAGEMENT
 // ================================================================
 
-// Password hash (simple but sufficient for client-side)
-function simpleHash(str){let h=0;for(let i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0}return Math.abs(h).toString(36)}
+// simpleHash moved to src/utils.js
 
 // Users with passwords stored in localStorage
 // Session uses sessionStorage (cleared on tab close) — user must log in each visit
@@ -6905,12 +6648,7 @@ function resetInactivityTimer() {
   document.addEventListener(evt, resetInactivityTimer, {passive:true})
 );
 
-// Canonical user list — always ensured (new users added here auto-propagate to existing browsers)
-const CANONICAL_USERS = [
-  {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
-  {email:'ulysse.gaspard0@gmail.com',role:'user',name:'Ulysse Gaspard',pwHash:simpleHash('FP2026')},
-  {email:'tomescumh@yahoo.com',role:'user',name:'Tomescu MH',pwHash:simpleHash('FP2026')},
-];
+// CANONICAL_USERS moved to data/users.js
 // Seed default users if empty
 if(userList.length === 0) {
   userList = CANONICAL_USERS.slice();
