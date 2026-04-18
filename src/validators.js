@@ -72,7 +72,10 @@
   ];
 
   // ─── Dataset validator ──────────────────────────────────────────
-  function validateDataset(name, data, schema) {
+  // opts.dedupOn: optional field name to check for duplicates (default: 'name').
+  //               Pass null to skip duplicate detection entirely (e.g., for users
+  //               where two emails may legitimately share the same display name).
+  function validateDataset(name, data, schema, opts) {
     if (!Array.isArray(data)) {
       recordIssue(name, -1, 'root', 'not an array');
       return { ok: false, count: 0, errors: 1 };
@@ -99,14 +102,16 @@
         }
       }
 
-      // Duplicate-name detection (common data entry bug)
-      if (row.name) {
-        const prev = seen.get(row.name);
+      // Duplicate detection on the configured field (default: 'name').
+      // Opt-out via opts.dedupOn === null (e.g., CANONICAL_USERS where we dedup on email, not name).
+      const dedupField = (opts && 'dedupOn' in opts) ? opts.dedupOn : 'name';
+      if (dedupField && row[dedupField]) {
+        const prev = seen.get(row[dedupField]);
         if (prev !== undefined) {
-          recordIssue(name, i, 'name', `duplicate "${row.name}" (also at index ${prev})`);
+          recordIssue(name, i, dedupField, `duplicate "${row[dedupField]}" (also at index ${prev})`);
           errors++;
         } else {
-          seen.set(row.name, i);
+          seen.set(row[dedupField], i);
         }
       }
     }
@@ -126,7 +131,7 @@
     try { if (typeof VERIFIED_CLUBS !== 'undefined')  results.VERIFIED_CLUBS = validateDataset('VERIFIED_CLUBS', VERIFIED_CLUBS, CLUB_SCHEMA); } catch {}
     try { if (typeof CARTIERE !== 'undefined')        results.CARTIERE       = validateDataset('CARTIERE',       CARTIERE,       CARTIERE_SCHEMA); } catch {}
     try { if (typeof POIS !== 'undefined')            results.POIS           = validateDataset('POIS',           POIS,           POI_SCHEMA); } catch {}
-    try { if (typeof CANONICAL_USERS !== 'undefined') results.CANONICAL_USERS= validateDataset('CANONICAL_USERS',CANONICAL_USERS,USER_SCHEMA); } catch {}
+    try { if (typeof CANONICAL_USERS !== 'undefined') results.CANONICAL_USERS= validateDataset('CANONICAL_USERS',CANONICAL_USERS,USER_SCHEMA,{dedupOn:'email'}); } catch {}
 
     const totalErrors = Object.values(results).reduce((a, r) => a + (r?.errors || 0), 0);
 

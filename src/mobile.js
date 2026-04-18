@@ -1500,12 +1500,13 @@
     clearTimeout(surfaceDebounce);
     surfaceDebounce = setTimeout(() => {
       window._surfaceOverride = { surface: v };
-      // Persist per site
+      // Persist per site (in-memory map + localStorage for cross-session)
       const t = getAllSites()[activeIdx];
       if (t) {
         const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
         window._surfaceOverrides = window._surfaceOverrides || {};
         window._surfaceOverrides[key] = v;
+        window.persistOverrides?.();
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1522,12 +1523,13 @@
     clearTimeout(chargeDebounce);
     chargeDebounce = setTimeout(() => {
       window._chargeOverride = { chargeTotal: v };
-      // Persist per site
+      // Persist per site (in-memory map + localStorage for cross-session)
       const t = getAllSites()[activeIdx];
       if (t) {
         const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
         window._chargeOverrides = window._chargeOverrides || {};
         window._chargeOverrides[key] = v;
+        window.persistOverrides?.();
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1542,12 +1544,14 @@
     updateRentAllInHint();
     clearTimeout(rentDebounce);
     rentDebounce = setTimeout(() => {
-      // Persist per-site so override stays scoped to this site across navigations.
+      // Persist per-site so override stays scoped to this site across navigations
+      // AND across sessions (safeStorage write via persistOverrides).
       const t = getAllSites()[activeIdx];
       if (t) {
         const key = siteKeyFor(t);
         window._rentOverrides = window._rentOverrides || {};
         window._rentOverrides[key] = v;
+        window.persistOverrides?.();
       }
       recomputeCurrentAnalysis(v);
     }, 90);
@@ -1980,10 +1984,19 @@
     });
   }
 
-  // ─── MES SITES: prepend TARGETS + customs to the clone ─────────
+  // ─── MES SITES: native mobile list + "+ Add site" CTA ──────────
+  // Replaces the ugly cloned-desktop form with a clean list + prominent CTA.
+  // The actual add-site flow lives in the dedicated full-screen overlay below.
   function renderMySitesIntoClone(cloneRoot) {
     const sites = getAllSites();
-    if (sites.length === 0) return;
+
+    // Hide the cloned desktop form (address input + list + buttons) — we render our own.
+    Array.from(cloneRoot.children).forEach(child => {
+      if (!child.classList.contains('fp-mysites-list') && !child.classList.contains('fp-addsite-cta-wrap')) {
+        child.style.display = 'none';
+      }
+    });
+
     // Build a fresh list card
     const list = document.createElement('div');
     list.className = 'card fp-mysites-list';
@@ -1992,12 +2005,12 @@
       <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,rgba(212,160,23,.06),transparent)">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:14px">⭐</span>
-          <div style="font-size:12px;font-weight:800;color:var(--accent);letter-spacing:.6px;text-transform:uppercase">Tous les sites (${sites.length})</div>
+          <div style="font-size:12px;font-weight:800;color:var(--accent);letter-spacing:.6px;text-transform:uppercase">${_t('mysites.allHeader').replace('⭐ ','').replace('⭐ ','')} (${sites.length})</div>
         </div>
       </div>
       ${sites.map((s, i) => {
         const isCustom = s._kind === 'custom';
-        const kindLabel = isCustom ? 'Custom' : 'Priorité';
+        const kindLabel = isCustom ? _t('mysites.badgeCustom') : _t('mysites.badgePriority');
         const kindColor = isCustom ? '#a78bfa' : 'var(--accent)';
         return `
           <div class="fp-mysite-row" data-idx="${i}" style="padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid rgba(71,85,115,.2);transition:background .2s">
@@ -2011,12 +2024,24 @@
         `;
       }).join('')}
     `;
-    // Insert at the top of the clone body
-    const body = cloneRoot;
-    // Remove any previous render
-    const existing = body.querySelector('.fp-mysites-list');
-    if (existing) existing.remove();
-    body.insertBefore(list, body.firstChild);
+    // Remove any previous renders
+    cloneRoot.querySelectorAll('.fp-mysites-list, .fp-addsite-cta-wrap').forEach(el => el.remove());
+    cloneRoot.insertBefore(list, cloneRoot.firstChild);
+
+    // Sticky CTA at bottom of the tab body
+    const ctaWrap = document.createElement('div');
+    ctaWrap.className = 'fp-addsite-cta-wrap';
+    ctaWrap.innerHTML = `
+      <button class="fp-addsite-cta" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span>${_t('mysites.addNew')}</span>
+      </button>
+    `;
+    cloneRoot.appendChild(ctaWrap);
+    ctaWrap.querySelector('.fp-addsite-cta').addEventListener('click', () => {
+      haptic(12);
+      openAddSiteOverlay();
+    });
 
     // Wire row clicks → activate site in map/carousel
     qsa('.fp-mysite-row', list).forEach(row => {
@@ -2032,6 +2057,279 @@
       row.addEventListener('touchstart', () => { row.style.background = 'rgba(212,160,23,.08)'; }, { passive: true });
       row.addEventListener('touchend',   () => { row.style.background = ''; });
     });
+  }
+
+  // ─── ADD-SITE: full-screen native mobile overlay ───────────────
+  // Replaces the cramped cloned-desktop form with a polished 3-step flow:
+  //   1. Search (live Google Places autocomplete + Nominatim fallback)
+  //   2. Preview (selected place + editable name + coordinates)
+  //   3. Confirm (add + haptic + toast + auto-activate new site)
+  let _addSiteSession = null;
+  let _addSiteState   = { selected: null }; // { name, addr, lat, lng }
+
+  function buildAddSiteOverlay() {
+    if (qs('.fp-addsite-overlay')) return;
+    const ov = document.createElement('div');
+    ov.className = 'fp-addsite-overlay';
+    ov.innerHTML = `
+      <div class="fp-addsite-header">
+        <div class="fp-addsite-back" id="fpAddSiteBack" role="button" aria-label="${_t('fab.back')}">
+          <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+        </div>
+        <div class="fp-addsite-title">
+          <div class="t">${_t('addsite.title')}</div>
+          <div class="s">${_t('addsite.subtitle')}</div>
+        </div>
+      </div>
+
+      <div class="fp-addsite-input-wrap" id="fpAddSiteInputWrap">
+        <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="fp-addsite-input" id="fpAddSiteInput" type="text"
+               placeholder="${_t('addsite.placeholder')}"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="fp-addsite-clear" id="fpAddSiteClear" type="button" aria-label="clear">✕</button>
+      </div>
+
+      <div class="fp-addsite-results" id="fpAddSiteResults">
+        <div class="fp-addsite-hint">
+          <span class="big">${_t('addsite.hint.bigIcon')}</span>
+          ${_t('addsite.hint.text')}
+        </div>
+      </div>
+
+      <div class="fp-addsite-footer">${_t('addsite.footer')}</div>
+    `;
+    document.body.appendChild(ov);
+
+    qs('#fpAddSiteBack', ov).addEventListener('click', () => { haptic(8); closeAddSiteOverlay(); });
+    qs('#fpAddSiteClear', ov).addEventListener('click', () => {
+      const inp = qs('#fpAddSiteInput', ov);
+      inp.value = ''; inp.focus();
+      qs('#fpAddSiteInputWrap', ov).classList.remove('has-value');
+      resetAddSiteResults();
+    });
+
+    const input = qs('#fpAddSiteInput', ov);
+    let debounceT, reqSeq = 0;
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      qs('#fpAddSiteInputWrap', ov).classList.toggle('has-value', q.length > 0);
+      clearTimeout(debounceT);
+      if (q.length < 2) { resetAddSiteResults(); return; }
+      const mySeq = ++reqSeq;
+      debounceT = setTimeout(() => fetchAddSiteSuggestions(q, mySeq), 220);
+    });
+    input.addEventListener('focus', () => { if (!_addSiteSession) newAddSiteSession(); });
+  }
+
+  function newAddSiteSession() {
+    _addSiteSession = 'fp-add-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    return _addSiteSession;
+  }
+
+  function resetAddSiteResults() {
+    const results = qs('#fpAddSiteResults');
+    if (!results) return;
+    results.innerHTML = `
+      <div class="fp-addsite-hint">
+        <span class="big">${_t('addsite.hint.bigIcon')}</span>
+        ${_t('addsite.hint.text')}
+      </div>
+    `;
+    _addSiteState.selected = null;
+  }
+
+  async function fetchAddSiteSuggestions(query, seq) {
+    const results = qs('#fpAddSiteResults');
+    if (!results) return;
+    results.innerHTML = `<div class="fp-addsite-loading">${_t('addsite.loading')}</div>`;
+
+    if (typeof isOnline === 'function' && !isOnline()) {
+      results.innerHTML = `<div class="fp-addsite-empty">${_t('common.offlineHint')}</div>`;
+      return;
+    }
+
+    try {
+      if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) throw new Error('no-key');
+      const token = _addSiteSession || newAddSiteSession();
+      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY },
+        body: JSON.stringify({
+          input: query, languageCode: window.getLocale?.() || 'fr', regionCode: 'RO',
+          sessionToken: token,
+          locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 40000 } }
+        })
+      });
+      if (!res.ok) throw new Error('api:' + res.status);
+      const data = await res.json();
+      renderAddSiteSuggestions(data.suggestions || [], 'google');
+    } catch (err) {
+      // Nominatim fallback (works on localhost, no key required)
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Bucharest, Romania')}&limit=6`);
+        const data = await r.json();
+        renderAddSiteSuggestions(data.map(d => ({
+          placePrediction: {
+            text: { text: d.display_name },
+            structuredFormat: {
+              mainText: { text: (d.display_name || '').split(',')[0] },
+              secondaryText: { text: (d.display_name || '').split(',').slice(1, 3).join(', ') }
+            },
+            _nominatim: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) }
+          }
+        })), 'nominatim');
+      } catch {
+        results.innerHTML = `<div class="fp-addsite-empty">${_t('addsite.empty')}</div>`;
+      }
+    }
+  }
+
+  function renderAddSiteSuggestions(suggestions, source) {
+    const results = qs('#fpAddSiteResults');
+    if (!results) return;
+    if (!suggestions || suggestions.length === 0) {
+      results.innerHTML = `<div class="fp-addsite-empty">${_t('addsite.empty')}</div>`;
+      return;
+    }
+    results.innerHTML = suggestions.slice(0, 6).map((s, i) => {
+      const p = s.placePrediction || {};
+      const main = p?.structuredFormat?.mainText?.text || p?.text?.text || '';
+      const sec  = p?.structuredFormat?.secondaryText?.text || '';
+      return `
+        <div class="fp-addsite-results-item" data-idx="${i}" role="button">
+          <div class="pin"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
+          <div class="text">
+            <div class="main">${_esc(main)}</div>
+            <div class="sec">${_esc(sec)}</div>
+          </div>
+          <svg class="arrow" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      `;
+    }).join('');
+    qsa('.fp-addsite-results-item', results).forEach((item, i) => {
+      item.addEventListener('click', () => selectAddSiteSuggestion(suggestions[i], source));
+    });
+  }
+
+  async function selectAddSiteSuggestion(sug, source) {
+    haptic(15);
+    const p = sug.placePrediction || {};
+    const name = p?.structuredFormat?.mainText?.text || p?.text?.text || 'Site custom';
+    const addr = p?.text?.text || p?.structuredFormat?.secondaryText?.text || '';
+    let lat, lng;
+
+    const results = qs('#fpAddSiteResults');
+    if (results) results.innerHTML = `<div class="fp-addsite-loading">${_t('addsite.loading')}</div>`;
+
+    if (source === 'nominatim' && p._nominatim) {
+      lat = p._nominatim.lat; lng = p._nominatim.lng;
+    } else if (p.placeId) {
+      const res = await window.safeAsync?.(async () => {
+        const token = _addSiteSession;
+        _addSiteSession = null;
+        const r = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(p.placeId), {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': GOOGLE_API_KEY,
+            'X-Goog-FieldMask': 'displayName,location,formattedAddress',
+            ...(token ? { 'X-Goog-Session-Token': token } : {})
+          }
+        });
+        if (!r.ok) throw new Error('places-detail:' + r.status);
+        return r.json();
+      }, 'addsite.fetchPlaceDetails');
+      if (res?.ok) {
+        lat = res.value.location?.latitude;
+        lng = res.value.location?.longitude;
+      }
+    }
+
+    if (!isFinite(lat) || !isFinite(lng)) {
+      window.showToast?.(_t('addsite.error'), 'error');
+      resetAddSiteResults();
+      return;
+    }
+
+    _addSiteState.selected = { name, addr, lat, lng };
+    renderAddSitePreview();
+  }
+
+  function renderAddSitePreview() {
+    const results = qs('#fpAddSiteResults');
+    const { name, addr, lat, lng } = _addSiteState.selected || {};
+    if (!results || !name) return;
+    results.innerHTML = `
+      <div class="fp-addsite-preview">
+        <div class="label">${_t('addsite.preview.label')}</div>
+        <div class="pname">${_esc(name)}</div>
+        <div class="paddr">${_esc(addr)}</div>
+        <div class="coords">📌 ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+        <label class="namefield" for="fpAddSiteName">${_t('addsite.preview.nameField')}</label>
+        <input class="nameinput" id="fpAddSiteName" type="text" value="${_esc(name)}" maxlength="80">
+        <button class="fp-addsite-confirm" id="fpAddSiteConfirm" type="button">
+          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+          <span>${_t('addsite.confirm')}</span>
+        </button>
+      </div>
+    `;
+    qs('#fpAddSiteConfirm').addEventListener('click', confirmAddSite);
+  }
+
+  function confirmAddSite() {
+    const sel = _addSiteState.selected;
+    if (!sel) return;
+    haptic(22);
+    const nameEl = qs('#fpAddSiteName');
+    const finalName = (nameEl?.value || sel.name).trim().slice(0, 80);
+    const btn = qs('#fpAddSiteConfirm');
+    if (btn) btn.disabled = true;
+
+    const site = (typeof addCustomSite === 'function') ? addCustomSite(sel.lat, sel.lng, finalName, '') : null;
+    if (!site) {
+      if (btn) btn.disabled = false;
+      window.showToast?.(_t('addsite.error'), 'error');
+      return;
+    }
+
+    // Refresh mobile views
+    try { window._fpMobileRefreshSites?.(); } catch {}
+
+    window.showToast?.(_t('addsite.added') + ' — ' + finalName, 'success', { duration: 3000 });
+    closeAddSiteOverlay();
+
+    // Auto-activate the newly added site after a short delay (let the carousel rebuild)
+    setTimeout(() => {
+      const all = getAllSites();
+      const idx = all.findIndex(s => Math.abs(s.lat - sel.lat) < 0.0001 && Math.abs(s.lng - sel.lng) < 0.0001);
+      if (idx >= 0) {
+        closeSecondarySheet();
+        activateSite(idx, true);
+        transitionTo('summary');
+      }
+    }, 320);
+  }
+
+  function openAddSiteOverlay() {
+    buildAddSiteOverlay();
+    const ov = qs('.fp-addsite-overlay');
+    if (!ov) return;
+    _addSiteState.selected = null;
+    resetAddSiteResults();
+    const inp = qs('#fpAddSiteInput');
+    if (inp) { inp.value = ''; }
+    qs('#fpAddSiteInputWrap')?.classList.remove('has-value');
+    // Open immediately (CSS transition handles the animation from opacity 0 → 1).
+    ov.classList.add('open');
+    setTimeout(() => inp?.focus(), 280);
+  }
+
+  function closeAddSiteOverlay() {
+    const ov = qs('.fp-addsite-overlay');
+    if (!ov) return;
+    ov.classList.remove('open');
+    const inp = qs('#fpAddSiteInput');
+    if (inp) inp.blur();
   }
 
   function stripAllIds(root) {
@@ -2508,7 +2806,7 @@
   }, 400));
 
   // Expose debug handles
-  window._fpMobile = { transitionTo, activateSite, ensureAnalysis, isMobile };
+  window._fpMobile = { transitionTo, activateSite, ensureAnalysis, isMobile, openAddSiteOverlay, closeAddSiteOverlay };
 
   // ─── Offline/online UX hint ───────────────────────────────────
   if (typeof onOnlineChange === 'function') {

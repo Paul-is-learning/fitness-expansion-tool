@@ -173,6 +173,21 @@
       'mysites.name': 'Nom du site',
       'mysites.btnAdd': 'Ajouter',
 
+      // ─── Add-site overlay ────────────────────────────────────────
+      'addsite.title': 'Ajouter un site',
+      'addsite.subtitle': 'Bucharest et alentours',
+      'addsite.placeholder': 'Rechercher une adresse…',
+      'addsite.hint.bigIcon': '📍',
+      'addsite.hint.text': 'Tape une adresse, un nom de bâtiment ou un centre commercial',
+      'addsite.loading': 'Recherche en cours…',
+      'addsite.empty': 'Aucun résultat',
+      'addsite.preview.label': 'Site sélectionné',
+      'addsite.preview.nameField': 'Nom affiché',
+      'addsite.confirm': 'Ajouter ce site',
+      'addsite.added': 'Site ajouté — analyse en cours',
+      'addsite.error': 'Impossible d\'ajouter ce site',
+      'addsite.footer': 'Powered by Google Places',
+
       // ─── Competitors ─────────────────────────────────────────────
       'comp.captifs': 'captifs',
       'comp.proximityTitle': 'Proximité concurrentielle',
@@ -345,6 +360,21 @@
       'mysites.address': 'Address',
       'mysites.name': 'Site name',
       'mysites.btnAdd': 'Add',
+
+      // ─── Add-site overlay ────────────────────────────────────────
+      'addsite.title': 'Add a site',
+      'addsite.subtitle': 'Bucharest and surroundings',
+      'addsite.placeholder': 'Search an address…',
+      'addsite.hint.bigIcon': '📍',
+      'addsite.hint.text': 'Type an address, a building name or a shopping mall',
+      'addsite.loading': 'Searching…',
+      'addsite.empty': 'No results',
+      'addsite.preview.label': 'Selected site',
+      'addsite.preview.nameField': 'Display name',
+      'addsite.confirm': 'Add this site',
+      'addsite.added': 'Site added — running analysis',
+      'addsite.error': 'Could not add this site',
+      'addsite.footer': 'Powered by Google Places',
 
       // ─── Competitors ─────────────────────────────────────────────
       'comp.captifs': 'captured',

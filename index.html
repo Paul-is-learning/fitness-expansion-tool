@@ -1539,9 +1539,19 @@ function addCustomSite(lat, lng, name, notes) {
 }
 
 function removeCustomSite(id) {
+  // Find the site before removing so we can clean up its per-site overrides.
+  const site = customSites.find(s => s.id === id);
   customSites = customSites.filter(s => s.id !== id);
   if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
+  // Clean up orphaned overrides for the deleted site.
+  if (site && isFinite(site.lat) && isFinite(site.lng)) {
+    const key = site.lat.toFixed(3) + ',' + site.lng.toFixed(3);
+    if (window._rentOverrides)    delete window._rentOverrides[key];
+    if (window._chargeOverrides)  delete window._chargeOverrides[key];
+    if (window._surfaceOverrides) delete window._surfaceOverrides[key];
+    window.persistOverrides?.();
+  }
   renderCustomSites();
   refreshCustomMarkers();
 }
@@ -4269,11 +4279,23 @@ const PNL_DEFAULTS = {
 // scenario: 'offerInitiale' or 'objectifNego'
 // Rent override system — allows slider to adjust rent in real-time
 window._rentOverride = null;   // {y1: number} — overrides base rent Y1 (scales Y3/Y5 proportionally)
-window._rentOverrides = {};    // per-site: siteKey → y1 rent
 window._chargeOverride = null; // {chargeTotal: number} — overrides (serviceCharge + marketingFee)
-window._chargeOverrides = {};  // per-site: siteKey → chargeTotal €/m²
 window._surfaceOverride = null;// {surface: number} — overrides club surface m² (scales loyer annuel)
-window._surfaceOverrides = {}; // per-site: siteKey → surface m²
+
+// Per-site override maps — PERSISTED in localStorage so slider adjustments
+// survive across sessions (fpRentOverrides / fpChargeOverrides / fpSurfaceOverrides).
+// Keys are "lat.toFixed(3),lng.toFixed(3)".
+window._rentOverrides    = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpRentOverrides', {})    || {}) : {};
+window._chargeOverrides  = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpChargeOverrides', {})  || {}) : {};
+window._surfaceOverrides = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpSurfaceOverrides', {}) || {}) : {};
+
+/** Persist the 3 per-site override maps to localStorage. Cheap (< 1 KB). */
+window.persistOverrides = function persistOverrides() {
+  if (typeof safeStorage === 'undefined') return;
+  safeStorage.set('fpRentOverrides',    window._rentOverrides    || {});
+  safeStorage.set('fpChargeOverrides',  window._chargeOverrides  || {});
+  safeStorage.set('fpSurfaceOverrides', window._surfaceOverrides || {});
+};
 
 function getRentSteps(scenario) {
   const steps = PNL_DEFAULTS.rentSteps[scenario || 'objectifNego'];
@@ -4784,10 +4806,11 @@ function computeExecSummary(r) {
 function onRentSliderChange(val) {
   const y1 = parseFloat(val);
   window._rentOverride = {y1};
-  // Store per-site for persistence
+  // Store per-site for persistence (in-memory map + localStorage cross-session)
   if(window._lastCaptageLocation) {
     const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
     window._rentOverrides[key] = y1;
+    window.persistOverrides?.();
   }
   // Update slider label
   const lbl = document.getElementById('rent-slider-label');
