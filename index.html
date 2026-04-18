@@ -4195,8 +4195,10 @@ const PNL_DEFAULTS = {
 // Get monthly rent (all-in: base rent + service charges + marketing) for a given year
 // scenario: 'offerInitiale' or 'objectifNego'
 // Rent override system — allows slider to adjust rent in real-time
-window._rentOverride = null; // {y1: number} — if set, overrides objectifNego Y1 and scales Y3/Y5 proportionally
-window._rentOverrides = {}; // per-site storage: siteKey → y1 rent
+window._rentOverride = null;   // {y1: number} — overrides base rent Y1 (scales Y3/Y5 proportionally)
+window._rentOverrides = {};    // per-site: siteKey → y1 rent
+window._chargeOverride = null; // {chargeTotal: number} — overrides (serviceCharge + marketingFee)
+window._chargeOverrides = {};  // per-site: siteKey → chargeTotal €/m²
 
 function getRentSteps(scenario) {
   const steps = PNL_DEFAULTS.rentSteps[scenario || 'objectifNego'];
@@ -4210,8 +4212,11 @@ function getRentSteps(scenario) {
 function getSteppedRentMonthly(yearNum, scenario) {
   const steps = getRentSteps(scenario);
   const surface = PNL_DEFAULTS.rentSteps.surface;
-  const sc = PNL_DEFAULTS.rentSteps.serviceCharge;
-  const mf = PNL_DEFAULTS.rentSteps.marketingFee;
+  // Charges (service + marketing) can be overridden per site
+  const defaultCharge = PNL_DEFAULTS.rentSteps.serviceCharge + PNL_DEFAULTS.rentSteps.marketingFee;
+  const charge = (window._chargeOverride && scenario !== 'offerInitiale')
+    ? window._chargeOverride.chargeTotal
+    : defaultCharge;
   // Find applicable rent step
   let rentPerSqm = steps[0].rent;
   for(const step of steps) {
@@ -4219,7 +4224,7 @@ function getSteppedRentMonthly(yearNum, scenario) {
   }
   // HICP indexation from Y2 onwards
   const hicpMult = yearNum > 1 ? Math.pow(1 + PNL_DEFAULTS.rentSteps.indexation, yearNum - 1) : 1.0;
-  return Math.round(surface * (rentPerSqm + sc + mf) * hicpMult);
+  return Math.round(surface * (rentPerSqm + charge) * hicpMult);
 }
 
 // Staff = max(9% du CA mensuel, plancher 4 ETP avec inflation)

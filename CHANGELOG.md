@@ -1,5 +1,22 @@
 # Changelog
 
+## [v6.4-charges-slider] — 2026-04-18
+
+### Slider charges €/m² per-site + live recalc
+
+Ajout d'un deuxième slider dans l'accordion P&L pour ajuster service charges + marketing fee (0-12 €/m², défaut 5.5 €/m²), **per-site persistant** via `window._chargeOverrides[siteKey]`.
+
+`getSteppedRentMonthly` applique l'override des charges si défini. Tous les KPIs (IRR, NPV, CAF, EBITDA, breakeven, payback, IRR Equity) recalculent en live (debounce 90ms).
+
+Total all-in Y1 affiché sous le slider avec annuel prévu :
+```
+Total all-in Y1 : 16.0 €/m² × 1 449 m² = 278k€/an
+```
+
+Tests 197/197 PASS.
+
+---
+
 ## [v6.3-financing-bptemplate] — 2026-04-18
 
 ### Structure de financement + IRR Equity + Onglet didactique BP

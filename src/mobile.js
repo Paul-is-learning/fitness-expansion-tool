@@ -918,11 +918,11 @@
       });
     }, 200);
 
-    // Rent slider live recomputation
+    // Rent + Charges sliders — live recomputation
     const slider = qs('#fpRentSlider');
-    if (slider) {
-      slider.addEventListener('input', (e) => onRentSliderChange(e.target.value));
-    }
+    if (slider) slider.addEventListener('input', (e) => onRentSliderChange(e.target.value));
+    const chargeSlider = qs('#fpChargeSlider');
+    if (chargeSlider) chargeSlider.addEventListener('input', (e) => onChargeSliderChange(e.target.value));
 
     // Animate the hero metrics in from zero on detail open
     setTimeout(() => {
@@ -1036,6 +1036,7 @@
 
     // Sparkline: cumulative cashflow over 60 months for BASE scenario
     const spark = buildSparkline(r.pnl?.base);
+    const currentCharge = window._chargeOverride?.chargeTotal ?? 5.5; // 5 SC + 0.5 MF default
 
     return `
       <!-- Cashflow sparkline (CAF annuelle) — wrapped in container for live update -->
@@ -1043,21 +1044,40 @@
 
       <!-- Rent slider -->
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(135deg,rgba(30,41,59,.8),rgba(17,24,39,.4))">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div>
-            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Loyer Y1</div>
-            <div style="font-size:14px;font-weight:700;color:var(--white)">Simulation en temps réel</div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Loyer base Y1</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">Simulation temps réel</div>
           </div>
           <div style="text-align:right">
-            <div id="fpRentValue" style="font-size:24px;font-weight:900;color:var(--accent);line-height:1">${currentRent.toFixed(1)}<span style="font-size:12px;color:var(--gray)"> €/m²</span></div>
+            <div id="fpRentValue" style="font-size:22px;font-weight:900;color:var(--accent);line-height:1">${currentRent.toFixed(1)}<span style="font-size:11px;color:var(--gray)"> €/m²</span></div>
           </div>
         </div>
         <input type="range" id="fpRentSlider" min="5" max="25" step="0.5" value="${currentRent}"
                style="width:100%;accent-color:var(--accent);margin:0">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray2);margin-top:4px">
-          <span>5 €/m² aggressif</span>
-          <span>Marché 10-14</span>
-          <span>25 €/m² premium</span>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
+          <span>5 €</span><span>Marché 10-14</span><span>25 €</span>
+        </div>
+
+        <!-- Charges slider (service charges + marketing fee) -->
+        <div style="height:1px;background:var(--border);margin:12px 0"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Charges €/m²</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">Service + marketing fee</div>
+          </div>
+          <div style="text-align:right">
+            <div id="fpChargeValue" style="font-size:22px;font-weight:900;color:#60a5fa;line-height:1">${currentCharge.toFixed(1)}<span style="font-size:11px;color:var(--gray)"> €/m²</span></div>
+          </div>
+        </div>
+        <input type="range" id="fpChargeSlider" min="0" max="12" step="0.25" value="${currentCharge}"
+               style="width:100%;accent-color:#60a5fa;margin:0">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
+          <span>0 €</span><span>Standard 5.5</span><span>12 €</span>
+        </div>
+
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(212,160,23,.08);border-radius:6px;font-size:10px;color:var(--gray)">
+          Total all-in Y1 : <b style="color:var(--accent);font-size:12px">${(currentRent + currentCharge).toFixed(1)} €/m²</b> × 1 449 m² = <b style="color:var(--accent)">${fmtM(Math.round(1449 * (currentRent + currentCharge) * 12))}/an</b>
         </div>
       </div>
 
@@ -1389,6 +1409,33 @@
         </svg>
       </div>
     `;
+  }
+
+  // ─── Live charge recalc (service + marketing fee €/m²) ────────
+  let chargeDebounce;
+  function onChargeSliderChange(val) {
+    const v = parseFloat(val);
+    const vEl = qs('#fpChargeValue');
+    if (vEl) vEl.innerHTML = v.toFixed(1) + '<span style="font-size:11px;color:var(--gray)"> €/m²</span>';
+    haptic(4);
+    // Update the all-in total hint
+    const rent = parseFloat(qs('#fpRentSlider')?.value || 10.5);
+    const total = v + rent;
+    const hintEl = qs('#fpCafContainer ~ .card div[style*="Total all-in"]') ||
+      qsa('div', qs('#fpDetail')).find(d => d.textContent?.startsWith('Total all-in'));
+    // (visual hint update handled by recompute rerender)
+    clearTimeout(chargeDebounce);
+    chargeDebounce = setTimeout(() => {
+      window._chargeOverride = { chargeTotal: v };
+      // Persist per site
+      const t = getAllSites()[activeIdx];
+      if (t) {
+        const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
+        window._chargeOverrides = window._chargeOverrides || {};
+        window._chargeOverrides[key] = v;
+      }
+      recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
+    }, 90);
   }
 
   // ─── Live rent recalc (triggered by slider) ────────────────────
