@@ -1186,8 +1186,32 @@
 
   // ─── Auto-trigger on login events ─────────────────────────────
   // The app dispatches `fp:login-success` from doLogin() and checkAuth() (see index.html).
+  //
+  // URL params (convenience, power-user shortcuts):
+  //   ?tour=reset  — reset counter for current user then start the tour
+  //   ?tour=1      — force-start the tour regardless of counter (no write)
+  function handleTourURL(email) {
+    try {
+      const params = new URLSearchParams(location.search);
+      const tourParam = params.get('tour');
+      if (!tourParam) return false;
+      if (tourParam === 'reset') {
+        resetCount(email);
+        // Clean the URL so a refresh doesn't re-trigger
+        const u = new URL(location.href); u.searchParams.delete('tour');
+        history.replaceState({}, '', u.pathname + u.search);
+      }
+      if (tourParam === 'reset' || tourParam === '1' || tourParam === 'start') {
+        setTimeout(() => startOnboardingTour(), 500);
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+
   window.addEventListener('fp:login-success', (ev) => {
-    const email = ev?.detail?.email || ev?.detail?.user?.email;
-    maybeStartOnboardingTour(email || 'anonymous');
+    const email = ev?.detail?.email || ev?.detail?.user?.email || 'anonymous';
+    if (handleTourURL(email)) return;
+    maybeStartOnboardingTour(email);
   });
 })();
