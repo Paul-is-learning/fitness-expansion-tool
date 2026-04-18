@@ -13,7 +13,7 @@ All % of revenue ratios have been calibrated against the **OnAir Montreuil** (TE
 | Poste | BP v5.x | BP v6.0 | OnAir réel | Notes |
 |---|---:|---:|---:|---|
 | Cost of Sales | 5.0% | **2.8%** | 2.77% | Achats marchandises revendues |
-| OPEX ops | 20.0% | **15.0%** | ~12% | Énergie+maint+assu+télécom+marketing local. Calibré OnAir + prudence RO. |
+| OPEX ops (Y5+ steady) | 20.0% flat | **15.0%** + decay | ~10.8% | Time-decay Y1 20% → Y5 15%. Coûts fixes (énergie, sécu, maint, IT, assu) ne scalent pas avec le CA → ratio élevé en ramp-up. OnAir est en Y5 mature. |
 | Fonds publicitaire | 2.0% | **1.0%** | 1.0% | Standard franchise fitness EU |
 | Redevance franchise | 6.0% | **6.0%** | 4.0% | Maintenu 6% car **master-franchise Isseo** (vs franchise classique OnAir) |
 | Staff | 9.0% | **9.0%** | 9.0% | Identique — taux BP FP officiel aligné réel |

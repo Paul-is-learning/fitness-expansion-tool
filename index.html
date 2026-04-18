@@ -4136,13 +4136,22 @@ const PNL_DEFAULTS = {
   // ═══════════════════════════════════════════════════════════════
   // CALIBRATION OnAir Montreuil (TEMATACA, exercice 09/2024-08/2025)
   // CA 2.24M€, EBITDA 44.7%, Résultat net 25.4% — 1 club franchisé
-  // Source: Plaquette TEMATACA (Fiteco expert-comptable)
+  // Source: Plaquette TEMATACA (Fiteco expert-comptable) — c'est un club
+  // en Y5 (cruising mature), donc ses ratios n'incluent PAS l'effet ramp-up.
   // ═══════════════════════════════════════════════════════════════
   // OPEX operations = énergie + maintenance + assurances + sécu + télécom
-  // + marketing local + IT/admin (hors staff, loyer, leasing, franchise, COGS)
-  // OnAir Montreuil réel: ~12% du CA. BP Romania: 15% (marge prudence
-  // pour économies d'échelle + inflation RO énergie). Initialement 20% (trop haut).
-  opexOpsRate: 0.15,         // % du CA Total — calibré OnAir (était 0.20)
+  // + marketing local + IT/admin (hors staff, loyer, leasing, franchise, COGS).
+  //
+  // TIME-DECAY: les coûts fixes (énergie, sécu, maint, assurance, IT) ne
+  // varient pas avec le volume de membres, mais CA oui. En Y1 (ramp-up),
+  // le ratio OPEX/CA est donc mécaniquement plus haut. Reconvergence à
+  // partir de Y5 (cruising).
+  //   OnAir Montreuil Y5 réel      = 10.8% du CA (hors honoraires gestion)
+  //   BP Romania Y5 conservateur   = 15.0%  (pas de décote Romania appliquée
+  //                                          = marge de sécurité +4.2pp vs OnAir)
+  opexOpsRateByYear: [0.20, 0.18, 0.17, 0.16, 0.15], // Y1 → Y5+ (cruising)
+  opexOpsRate: 0.15,         // Legacy — utilisé si pas d'index année
+  //                           Y5+ = valeur "steady state conservateur"
   // Cost of Sales = achats de marchandises revendues (accessoires, protéines,
   // snacks, serviettes). OnAir Montreuil réel: 2.77% du CA (60k / 2.24M).
   // Ventes marchandises OnAir = 8.4% du CA, marge commerciale 68%.
@@ -4237,8 +4246,12 @@ function buildPnL(cohortData, avgQuartierPrice) {
     const rentMonthly = getSteppedRentMonthly(yearNum, 'objectifNego');
     // FP Cloud
     const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx));
-    // OPEX Ops (26% of Total CA)
-    const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+    // OPEX Ops with TIME-DECAY (Y1 20% → Y5+ 15%). Fixed costs like energy,
+    // security, maintenance, insurance don't scale with CA, so ratio is higher
+    // in ramp-up years and normalizes as CA grows. Conservative vs OnAir 10.8%.
+    const opexRateYear = PNL_DEFAULTS.opexOpsRateByYear?.[Math.min(yearIdx, 4)]
+                      ?? PNL_DEFAULTS.opexOpsRate;
+    const opexOps = Math.round(totalCA * opexRateYear);
     // Redevance marque (6% of CA Adherents)
     const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
     // Fonds publicitaire (2% of CA Adherents)

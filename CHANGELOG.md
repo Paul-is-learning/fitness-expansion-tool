@@ -1,5 +1,56 @@
 # Changelog
 
+## [v6.1-opex-timedecay] — 2026-04-18
+
+### Time-decay sur OPEX ops (ramp-up plus réaliste)
+
+**Problème identifié :**
+OnAir Montreuil (ratio 10.8% OPEX ops) est un club en **Y5 mature**, ramp-up terminé. Notre BP appliquait le taux cruising 15% même en Y1 — incohérent car les coûts fixes (énergie, sécu, maintenance, assurance, IT) ne varient pas avec le volume de membres.
+
+**Solution — formule time-decay linéaire :**
+```js
+opexOpsRateByYear: [0.20, 0.18, 0.17, 0.16, 0.15]  // Y1 → Y5+ (cruising)
+```
+
+| Année | OPEX ops | Justification |
+|---|---:|---|
+| Y1 | 20% | Start-up : coûts fixes à pleine charge + marketing grand opening sur CA faible |
+| Y2 | 18% | Ramp-up — CA double vs Y1 mais fixes inchangés |
+| Y3 | 17% | Membres proches cruising, dilution progressive |
+| Y4 | 16% | Mature, économies d'échelle établies |
+| Y5+ | **15%** | **Floor conservateur** — pas de décote Romania appliquée, marge de sécurité +4.2pp vs OnAir réel 10.8% |
+
+**Principe préservé :**
+- Romania charges théoriquement < France, MAIS on **n'applique pas** cette décote → reste **conservateur**
+- Seule la décroissance temporelle est modélisée (incontestable d'un point de vue comptable)
+
+**Impact sur les 5 sites :**
+| Site | IRR v6.0 | IRR v6.1 | Δ |
+|---|---:|---:|---|
+| Baneasa | 60.57% | **58.68%** | −1.9pp |
+| Hala Laminor | 57.57% | **55.78%** | −1.8pp |
+| Unirea | 40.02% | **38.68%** | −1.3pp |
+| Militari | 6.51% | **5.71%** | −0.8pp |
+| Grand Arena | 1.65% | **0.9%** | −0.75pp |
+
+→ NPV moyen −80k€/site (variable selon taille)
+→ Numbers plus **réalistes en phase ramp-up** (Y1-Y2), identiques en cruising (Y5+)
+
+**Template futurs BP:**
+```js
+PNL_DEFAULTS.opexOpsRateByYear = [0.20, 0.18, 0.17, 0.16, 0.15]
+// À utiliser via:
+const opexRate = PNL_DEFAULTS.opexOpsRateByYear[Math.min(yearIdx, 4)];
+```
+
+**Fichiers:**
+- `index.html` : nouveau `opexOpsRateByYear` dans `PNL_DEFAULTS`, `buildPnL` utilise l'index par année
+- `config.js` : `MODEL_VERSION = 'v6.1-opex-timedecay'`
+- `.baseline.json` + `tests/analysis.html` : baseline réalignée → 197/197 PASS
+- `docs/MODEL.md` : section OnAir Calibration mise à jour
+
+---
+
 ## [v6.0-onair-calibrated] — 2026-04-18
 
 ### Recalibration complète du BP — benchmark OnAir Montreuil
