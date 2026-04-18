@@ -1,5 +1,49 @@
 # Changelog
 
+## [v5.4-autocomplete-caf-pwa] — 2026-04-18
+
+### 3 demandes post-test Paul
+
+**1. Google Places Autocomplete**
+- Avant : search classique avec bouton "Geocoder" (Nominatim ou Google Places Text Search, résultats après 3 chars + 400ms)
+- Maintenant : **vrai autocomplete** via `places:autocomplete` (Google Places API New)
+  - Debounce 220ms, déclenche dès 2 chars
+  - Suggestions avec titre principal + sous-titre (structuredFormat Google)
+  - Biased sur Bucarest (lat/lng 44.4268/26.1025, radius 40km)
+  - Session token pour billing optimisé (1 session = autocomplete + détails = 1 charge)
+  - Sur sélection : `places/{placeId}` → lat/lng → flyTo + analyse
+  - Fallback Nominatim si pas de clé Google ou erreur
+- UI : items cards style iOS avec icône pin gold, hover/active feedback, clear button (✕), footer "Powered by Google Places"
+
+**2. Icône PWA officielle Fitness Park**
+- Avant : icône générique "F" sur fond sombre quand ajouté à l'écran d'accueil
+- Maintenant : **logo carré FP + underline gold** généré (Python PIL) :
+  - `favicon.png` (32×32)
+  - `apple-touch-icon.png` (180×180) — iOS home screen
+  - `icon-192.png` + `icon-512.png` — Android PWA
+  - `manifest.json` avec name, short_name, theme_color #d4a017, icons array
+- Meta tags ajoutés : `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style: black-translucent`, `apple-mobile-web-app-title: FP Romania`
+
+**3. CAF annuelle au lieu de "Profit cumulé 5 ans"**
+- Avant : 1 nombre cumulé "761k€ final positif" + sparkline cashflow cumulé
+- Maintenant : **Bar chart CAF par an** (Capacité d'AutoFinancement = EBITDA annuel)
+  - 5 barres verticales Y1→Y5, couleur green si positif, red si négatif
+  - Valeurs inline en labels au-dessus de chaque barre (58k€, 411k€, 535k€, 674k€, 765k€…)
+  - Drop-shadow coloré sur chaque barre
+  - Animation entry : barres grandissent depuis la baseline (stagger 90ms)
+  - **Hero chiffre** : `596k€/an CAF moy. Y2-Y5` (moyenne des années matures, exclut ramp-up Y1)
+- Info-tip (?) explique la distinction Y1 (ramp-up) vs Y2-Y5 (structurel)
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Desktop inchangé
+
+**Fichiers ajoutés :**
+- `favicon.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`
+- `manifest.json`
+
+---
+
 ## [v5.3-fluid-nav] — 2026-04-18
 
 ### 3 demandes après test iPhone

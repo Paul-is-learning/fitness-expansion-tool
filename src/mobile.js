@@ -112,26 +112,183 @@
             <path d="m15 18-6-6 6-6"/>
           </svg>
         </div>
-        <input type="text" id="fpSearchInput" placeholder="Rechercher une adresse à Bucarest…" autocomplete="off">
+        <input type="text" id="fpSearchInput" placeholder="Ex: Bd. Iuliu Maniu 100, Bucarest" autocomplete="off" autocapitalize="off" autocorrect="off">
+        <div class="fp-search-clear" id="fpSearchClear" title="Effacer">✕</div>
       </div>
       <div class="results" id="fpSearchResults"></div>
+      <div class="fp-search-footer">Powered by Google Places</div>
     `;
     document.body.appendChild(ov);
 
     qs('#fpSearchBack').addEventListener('click', closeSearchOverlay);
+    qs('#fpSearchClear').addEventListener('click', () => {
+      qs('#fpSearchInput').value = '';
+      qs('#fpSearchResults').innerHTML = '';
+      qs('#fpSearchInput').focus();
+    });
+
+    wireAutocomplete();
+  }
+
+  // Session token for Google Places autocomplete (billing optimisation: 1 session = autocomplete→details = 1 charge)
+  let _autocompleteSession = null;
+  function newSessionToken() {
+    _autocompleteSession = 'fp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+    return _autocompleteSession;
+  }
+
+  function wireAutocomplete() {
     const input = qs('#fpSearchInput');
-    const realInput = qs('#searchInput');
-    if (realInput) {
-      input.addEventListener('input', (e) => {
-        realInput.value = e.target.value;
-        realInput.dispatchEvent(new Event('input', { bubbles: true }));
-        setTimeout(() => {
-          const src = qs('#searchResults');
-          const dst = qs('#fpSearchResults');
-          if (src && dst) dst.innerHTML = src.innerHTML;
-        }, 350);
+    if (!input || input.__autoWired) return;
+    input.__autoWired = true;
+    let debounceT;
+    let reqSeq = 0;
+
+    input.addEventListener('input', (e) => {
+      clearTimeout(debounceT);
+      const q = e.target.value.trim();
+      if (q.length < 2) {
+        qs('#fpSearchResults').innerHTML = '';
+        return;
+      }
+      // 220ms debounce — strikes balance between responsiveness and quota
+      debounceT = setTimeout(() => fetchAutocomplete(q, ++reqSeq), 220);
+    });
+
+    // First focus starts a new billing session
+    input.addEventListener('focus', () => { if (!_autocompleteSession) newSessionToken(); });
+  }
+
+  async function fetchAutocomplete(query, seq) {
+    const results = qs('#fpSearchResults');
+    if (!results) return;
+    // Inline loading hint
+    results.innerHTML = `<div class="fp-search-loading">Recherche…</div>`;
+
+    try {
+      if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) {
+        throw new Error('no-key');
+      }
+      const token = _autocompleteSession || newSessionToken();
+      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_API_KEY
+        },
+        body: JSON.stringify({
+          input: query,
+          languageCode: 'fr',
+          regionCode: 'RO',
+          sessionToken: token,
+          locationBias: {
+            circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 40000 }
+          }
+        })
       });
-      qs('#fpSearchResults').addEventListener('click', () => setTimeout(closeSearchOverlay, 150));
+      // Stale-response guard: only show latest sequence
+      if (seq !== undefined && seq !== (+results.dataset.lastSeq || 0) && seq > 0) {
+        results.dataset.lastSeq = seq;
+      }
+      if (!res.ok) throw new Error('api:' + res.status);
+      const data = await res.json();
+      renderAutocompleteResults(data.suggestions || []);
+    } catch (e) {
+      console.warn('[FP autocomplete]', e.message);
+      // Fallback to Nominatim
+      await fetchNominatimFallback(query);
+    }
+  }
+
+  function renderAutocompleteResults(suggestions) {
+    const results = qs('#fpSearchResults');
+    if (!results) return;
+    if (suggestions.length === 0) {
+      results.innerHTML = `<div class="fp-search-empty">Aucun résultat</div>`;
+      return;
+    }
+    results.innerHTML = suggestions.map(s => {
+      const p = s.placePrediction;
+      if (!p) return '';
+      const main = p.structuredFormat?.mainText?.text || p.text?.text || '';
+      const sec  = p.structuredFormat?.secondaryText?.text || '';
+      return `
+        <div class="fp-search-item" data-placeid="${p.placeId}">
+          <svg class="fp-search-item-icon" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+          <div class="fp-search-item-text">
+            <div class="main">${main}</div>
+            <div class="sec">${sec}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    qsa('.fp-search-item', results).forEach(item => {
+      item.addEventListener('click', async () => {
+        haptic(12);
+        const placeId = item.dataset.placeid;
+        if (!placeId) return;
+        await selectAutocompleteResult(placeId);
+      });
+    });
+  }
+
+  async function selectAutocompleteResult(placeId) {
+    try {
+      const token = _autocompleteSession;
+      _autocompleteSession = null; // session closes on selection (billing)
+      const res = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(placeId), {
+        method: 'GET',
+        headers: {
+          'X-Goog-Api-Key': GOOGLE_API_KEY,
+          'X-Goog-FieldMask': 'displayName,location,formattedAddress',
+          ...(token ? { 'X-Goog-Session-Token': token } : {})
+        }
+      });
+      const p = await res.json();
+      const lat = p.location?.latitude;
+      const lng = p.location?.longitude;
+      if (!isFinite(lat) || !isFinite(lng)) throw new Error('no-coords');
+      closeSearchOverlay();
+      if (window._fpMap) window._fpMap.flyTo([lat, lng], 15, { duration: .7 });
+      if (typeof window.onMapClick === 'function') {
+        setTimeout(() => window.onMapClick({ latlng: { lat, lng } }), 400);
+      }
+    } catch (e) {
+      console.warn('[FP autocomplete select]', e);
+    }
+  }
+
+  async function fetchNominatimFallback(query) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Bucharest, Romania')}&limit=5&addressdetails=1`);
+      const data = await r.json();
+      const results = qs('#fpSearchResults');
+      if (!results) return;
+      results.innerHTML = data.length === 0
+        ? '<div class="fp-search-empty">Aucun résultat</div>'
+        : data.map(d => `
+          <div class="fp-search-item" data-lat="${d.lat}" data-lng="${d.lon}">
+            <svg class="fp-search-item-icon" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            <div class="fp-search-item-text">
+              <div class="main">${(d.display_name||'').split(',')[0]}</div>
+              <div class="sec">${(d.display_name||'').split(',').slice(1,3).join(', ')}</div>
+            </div>
+          </div>`).join('');
+      qsa('.fp-search-item', results).forEach(item => {
+        item.addEventListener('click', () => {
+          const lat = parseFloat(item.dataset.lat), lng = parseFloat(item.dataset.lng);
+          if (!isFinite(lat) || !isFinite(lng)) return;
+          closeSearchOverlay();
+          if (window._fpMap) window._fpMap.flyTo([lat, lng], 15, { duration: .7 });
+          if (typeof window.onMapClick === 'function') {
+            setTimeout(() => window.onMapClick({ latlng: { lat, lng } }), 400);
+          }
+        });
+      });
+    } catch (e) {
+      const results = qs('#fpSearchResults');
+      if (results) results.innerHTML = '<div class="fp-search-empty">Erreur de recherche</div>';
     }
   }
   function openSearchOverlay() {
@@ -978,86 +1135,81 @@
   }
   function pad(v) { return v; } // used above in mini-map
 
-  // ─── SPARKLINE: cumulative cashflow over 60 months ─────────────
+  // ─── CAF ANNUELLE (Capacité d'AutoFinancement par an) ──────────
+  // Shows year-by-year EBITDA bars (proxy for CAF since no debt/tax in model)
+  // Plus the average over Y2-Y5 (skipping ramp-up Y1) as the hero metric.
   function buildSparkline(pnlBase) {
-    if (!pnlBase || !Array.isArray(pnlBase.monthly) || pnlBase.monthly.length < 2) return '';
-    // Use pre-computed cumulCashFlow per monthly entry (from buildPnL)
-    const cum = pnlBase.monthly.map(m => m.cumulCashFlow || 0);
+    if (!pnlBase || !Array.isArray(pnlBase.annualEBITDA) || pnlBase.annualEBITDA.length === 0) return '';
+    const caf = pnlBase.annualEBITDA.slice(0, 5); // Y1..Y5
+    const n = caf.length;
 
-    const w = 300, h = 100, pad = 10;
-    const minV = Math.min(...cum, 0);
-    const maxV = Math.max(...cum, 0);
-    const range = maxV - minV || 1;
-    const xs = cum.length;
+    // Hero: average CAF over mature years (Y2-Y5) — excludes ramp-up effect
+    const matureYears = caf.slice(1);
+    const avgMature = matureYears.length ? matureYears.reduce((a,b)=>a+b,0) / matureYears.length : (caf[0] || 0);
+    const endColor = avgMature >= 0 ? '#34d399' : '#f87171';
+    const endLabel = avgMature >= 0 ? 'CAF moy. Y2-Y5' : 'CAF moy. (déficit Y2-Y5)';
 
-    // Zero line y
-    const zeroY = h - pad - ((0 - minV) / range) * (h - 2 * pad);
+    // Chart sizing
+    const w = 300, h = 110, padX = 14, padTop = 14, padBot = 22;
+    const maxAbs = Math.max(...caf.map(v => Math.abs(v)), 1);
+    const barW = (w - padX * 2) / n * 0.6;
+    const gap  = (w - padX * 2) / n * 0.4;
+    const zeroY = h - padBot;
 
-    // Build path points
-    const pts = cum.map((v, i) => {
-      const x = pad + (i / (xs - 1)) * (w - 2 * pad);
-      const y = h - pad - ((v - minV) / range) * (h - 2 * pad);
-      return [x, y];
-    });
-    const pathD = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    // Scale: map each value to a y position (zero line is at zeroY, max = padTop)
+    const scale = (v) => {
+      const ratio = v / maxAbs;                 // -1..1
+      const usable = zeroY - padTop;            // available height above zero
+      return zeroY - ratio * usable;
+    };
 
-    // Find breakeven: first index where cum crosses 0 upward
-    let beMonth = pnlBase.breakevenMonth || null;
-    let beX = null;
-    if (beMonth && beMonth < xs) {
-      beX = pad + (beMonth / (xs - 1)) * (w - 2 * pad);
+    let bars = '';
+    for (let i = 0; i < n; i++) {
+      const v = caf[i];
+      const y = Math.min(scale(v), zeroY);
+      const barH = Math.abs(zeroY - scale(v));
+      const x = padX + i * ((w - padX * 2) / n) + gap / 2;
+      const color = v >= 0 ? '#34d399' : '#f87171';
+      const valLbl = fmtM(v);
+      const lblY = v >= 0 ? y - 4 : y + barH + 11;
+      bars += `
+        <rect class="fp-caf-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}"
+              rx="3" fill="${color}" fill-opacity=".85"
+              style="filter:drop-shadow(0 2px 4px ${color}55)"/>
+        <text x="${(x + barW/2).toFixed(1)}" y="${lblY.toFixed(1)}"
+              fill="${color}" font-size="9" font-weight="700" text-anchor="middle">${valLbl}</text>
+        <text x="${(x + barW/2).toFixed(1)}" y="${(h - 4).toFixed(1)}"
+              fill="rgba(148,163,184,.6)" font-size="9" text-anchor="middle">Y${i+1}</text>
+      `;
     }
-
-    // Fill area below line (subtle)
-    const areaD = pathD + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (h - pad) + ' L' + pad + ',' + (h - pad) + ' Z';
-
-    const endValue = cum[cum.length - 1];
-    const endColor = endValue >= 0 ? '#34d399' : '#f87171';
-    const endLabel = endValue >= 0 ? 'profit net 5 ans' : 'perte nette 5 ans';
-    const capex = pnlBase.capex || 0;
 
     return `
       <div class="card" style="padding:14px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.4),rgba(17,24,39,.2))">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
           <div>
             <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px">
-              Profit cumulé
+              CAF annuelle
               <span class="info-tip" style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:var(--card3);color:var(--gray);align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer">?
-                <div class="tip-content"><strong>Profit cumulé sur 5 ans</strong><br><br>
-                  Somme des flux mensuels (recettes − dépenses − loyer − staff − redevance) <strong>après déduction du CAPEX initial</strong> (~${fmtM(capex)} EUR d'investissement).<br><br>
-                  <b style="color:#34d399">Positif</b> = le club est rentable sur 5 ans : tu récupères ton investissement + tu génères du profit.<br>
-                  <b style="color:#f87171">Négatif</b> = tu es encore en train de rembourser le CAPEX à la fin des 5 ans.<br><br>
-                  <div style="color:var(--gray2);font-size:11px">Le "BE Xmo" sur la ligne indique le mois où le cashflow devient positif (breakeven opérationnel).</div>
+                <div class="tip-content"><strong>CAF — Capacité d'AutoFinancement</strong><br><br>
+                  Trésorerie générée par l'activité chaque année (EBITDA ≈ CAF dans ce modèle : pas de dette ni impôt modélisé).<br><br>
+                  <b>Y1</b> = ramp-up (membres en croissance, souvent + bas)<br>
+                  <b>Y2-Y5</b> = cruising speed, stabilité<br><br>
+                  La <b style="color:#34d399">moyenne Y2-Y5</b> est le meilleur indicateur de la rentabilité structurelle — elle seule permet de juger si le club tient sur la durée.
                 </div>
               </span>
             </div>
-            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">60 mois · Scénario base</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">Évolution sur 5 ans · Base</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:18px;font-weight:900;color:${endColor};line-height:1">${fmtM(endValue)}</div>
+            <div style="font-size:18px;font-weight:900;color:${endColor};line-height:1">${fmtM(avgMature)}<span style="font-size:11px;color:var(--gray2);font-weight:500">/an</span></div>
             <div style="font-size:10px;color:var(--gray2);margin-top:2px">${endLabel}</div>
           </div>
         </div>
         <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block">
-          <defs>
-            <linearGradient id="fpSparkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%"  stop-color="${endColor}" stop-opacity=".35"/>
-              <stop offset="100%" stop-color="${endColor}" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
           <!-- Zero baseline -->
-          <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${w - pad}" y2="${zeroY.toFixed(1)}"
-                stroke="rgba(148,163,184,.3)" stroke-width="1" stroke-dasharray="2 3"/>
-          <!-- Breakeven vertical line -->
-          ${beX !== null ? `<line x1="${beX.toFixed(1)}" y1="${pad}" x2="${beX.toFixed(1)}" y2="${h - pad}"
-                stroke="${endColor}" stroke-width="1" stroke-dasharray="3 2" opacity=".5"/>
-                <text x="${beX.toFixed(1)}" y="${pad + 10}" fill="${endColor}" font-size="9" text-anchor="middle" opacity=".8">BE ${beMonth}mo</text>` : ''}
-          <!-- Filled area -->
-          <path d="${areaD}" fill="url(#fpSparkGrad)" opacity=".6"/>
-          <!-- The line -->
-          <path class="fp-sparkline-path" d="${pathD}" fill="none" stroke="${endColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 4px ${endColor}66)"/>
-          <!-- End point dot -->
-          <circle cx="${pts[pts.length - 1][0].toFixed(1)}" cy="${pts[pts.length - 1][1].toFixed(1)}" r="3" fill="${endColor}"/>
+          <line x1="${padX}" y1="${zeroY}" x2="${w - padX}" y2="${zeroY}"
+                stroke="rgba(148,163,184,.35)" stroke-width="1"/>
+          ${bars}
         </svg>
       </div>
     `;
@@ -1160,17 +1312,22 @@
     }
   }
 
-  // ─── SPARKLINE: animate stroke reveal ──────────────────────────
+  // ─── CAF BARS: animate height from 0 ───────────────────────────
   function animateSparkline(container) {
-    const paths = qsa('.fp-sparkline-path', container);
-    paths.forEach(path => {
-      const len = path.getTotalLength?.() || 0;
-      path.style.strokeDasharray = len;
-      path.style.strokeDashoffset = len;
-      // Force reflow
-      path.getBoundingClientRect();
-      path.style.transition = 'stroke-dashoffset 1.2s cubic-bezier(.22,.9,.3,1)';
-      path.style.strokeDashoffset = 0;
+    const bars = qsa('.fp-caf-bar', container);
+    bars.forEach((bar, i) => {
+      const origY = parseFloat(bar.getAttribute('y'));
+      const origH = parseFloat(bar.getAttribute('height'));
+      if (!isFinite(origY) || !isFinite(origH)) return;
+      const isNegative = origH > 0 && origY > parseFloat(bar.closest('svg')?.getAttribute('height') || 110) / 2;
+      // Start collapsed at baseline
+      bar.setAttribute('y', isNegative ? origY : origY + origH);
+      bar.setAttribute('height', 0);
+      bar.style.transition = 'y .6s cubic-bezier(.22,.9,.3,1), height .6s cubic-bezier(.22,.9,.3,1)';
+      setTimeout(() => {
+        bar.setAttribute('y', origY);
+        bar.setAttribute('height', origH);
+      }, 80 + i * 90);
     });
   }
 

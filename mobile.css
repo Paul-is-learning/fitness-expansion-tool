@@ -702,6 +702,75 @@
   .fp-mobile-search-overlay .results {
     margin-top: 12px; overflow-y: auto; flex: 1;
   }
+  .fp-search-clear {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--card2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gray);
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .fp-search-clear:active { background: var(--card3); color: var(--white); }
+
+  /* Autocomplete result items (iOS-like list) */
+  .fp-search-item {
+    display: flex; align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(30,41,59,.3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background .18s, transform .12s;
+  }
+  .fp-search-item:active {
+    background: rgba(212,160,23,.12);
+    transform: scale(.98);
+  }
+  .fp-search-item-icon {
+    width: 20px; height: 20px;
+    fill: var(--accent);
+    flex-shrink: 0;
+    margin-top: 2px;
+    filter: drop-shadow(0 0 4px rgba(212,160,23,.4));
+  }
+  .fp-search-item-text { flex: 1; min-width: 0; }
+  .fp-search-item-text .main {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .fp-search-item-text .sec {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .fp-search-loading, .fp-search-empty {
+    padding: 14px; text-align: center;
+    font-size: 12px; color: var(--gray2);
+    font-style: italic;
+  }
+  .fp-search-loading::after {
+    content: '…';
+    display: inline-block;
+    animation: fpDots 1.2s steps(3, end) infinite;
+  }
+  @keyframes fpDots {
+    0% { content: '.'; } 33% { content: '..'; } 66%, 100% { content: '…'; }
+  }
+  .fp-search-footer {
+    padding-top: 10px;
+    text-align: center;
+    font-size: 9px;
+    color: var(--gray2);
+    letter-spacing: .5px;
+  }
 
   /* ═════ ONBOARDING TOUR (spotlight) ═════ */
   .fp-tour-overlay {
