@@ -1421,20 +1421,102 @@
       // Sync visual state from global `layers` to the clone's toggles
       syncToggleStates(clone);
 
-      // On any click in the clone, re-sync visual state after the click fires
+      // Render target sites into "Mes sites" clone body if applicable
+      if (stab === 'mysites') renderMySitesIntoClone(clone);
+
+      // On any click in the clone, re-sync visual + dynamic HTML after
+      // the click's onclick handlers ran (toggleLayer, toggleBrand, etc.).
       clone.addEventListener('click', (e) => {
-        if (e.target.closest('.toggle, .layer-label')) {
-          // Wait for toggleLayer's own logic to run, then reflect state
-          setTimeout(() => syncToggleStates(clone), 10);
-        }
+        // Ignore plain form inputs
+        if (e.target.closest('input, textarea, select')) return;
+        // Wait for global handlers to mutate state + rebuild desktop DOM
+        setTimeout(() => {
+          syncToggleStates(clone);
+          syncClonedDynamicContent(clone);
+          // Re-sync Mes sites if we're on that tab
+          if (qs('.fp-secondary-tab.active')?.dataset.stab === 'mysites') {
+            renderMySitesIntoClone(clone);
+          }
+        }, 40);
       }, true);
     }
   }
 
+  // ─── MES SITES: prepend TARGETS + customs to the clone ─────────
+  function renderMySitesIntoClone(cloneRoot) {
+    const sites = getAllSites();
+    if (sites.length === 0) return;
+    // Build a fresh list card
+    const list = document.createElement('div');
+    list.className = 'card fp-mysites-list';
+    list.style.cssText = 'padding:0;margin-bottom:12px;overflow:hidden';
+    list.innerHTML = `
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,rgba(212,160,23,.06),transparent)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:14px">⭐</span>
+          <div style="font-size:12px;font-weight:800;color:var(--accent);letter-spacing:.6px;text-transform:uppercase">Tous les sites (${sites.length})</div>
+        </div>
+      </div>
+      ${sites.map((s, i) => {
+        const isCustom = s._kind === 'custom';
+        const kindLabel = isCustom ? 'Custom' : 'Priorité';
+        const kindColor = isCustom ? '#a78bfa' : 'var(--accent)';
+        return `
+          <div class="fp-mysite-row" data-idx="${i}" style="padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid rgba(71,85,115,.2);transition:background .2s">
+            <div style="width:32px;height:32px;border-radius:50%;background:${kindColor};display:flex;align-items:center;justify-content:center;color:#000;font-weight:900;font-size:13px;flex-shrink:0">${i + 1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
+              <div style="font-size:10px;color:var(--gray2);margin-top:2px">Secteur ${s.sector} · ${s.opening || s.status || '—'}</div>
+            </div>
+            <div style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:${isCustom ? 'rgba(139,92,246,.15)' : 'rgba(212,160,23,.12)'};color:${kindColor};flex-shrink:0">${kindLabel}</div>
+          </div>
+        `;
+      }).join('')}
+    `;
+    // Insert at the top of the clone body
+    const body = cloneRoot;
+    // Remove any previous render
+    const existing = body.querySelector('.fp-mysites-list');
+    if (existing) existing.remove();
+    body.insertBefore(list, body.firstChild);
+
+    // Wire row clicks → activate site in map/carousel
+    qsa('.fp-mysite-row', list).forEach(row => {
+      row.addEventListener('click', () => {
+        const i = parseInt(row.dataset.idx);
+        haptic(12);
+        closeSecondarySheet();
+        setTimeout(() => {
+          activateSite(i, true);
+          transitionTo('summary');
+        }, 250);
+      });
+      row.addEventListener('touchstart', () => { row.style.background = 'rgba(212,160,23,.08)'; }, { passive: true });
+      row.addEventListener('touchend',   () => { row.style.background = ''; });
+    });
+  }
+
   function stripAllIds(root) {
-    // Clear any id on children so we don't collide with the desktop sidebar
+    // Clear any id on children so we don't collide with the desktop sidebar.
+    // Preserve original ID as data-orig-id so we can re-sync from source later.
     const all = root.querySelectorAll('[id]');
-    all.forEach(el => el.removeAttribute('id'));
+    all.forEach(el => {
+      el.dataset.origId = el.id;
+      el.removeAttribute('id');
+    });
+  }
+
+  // Copy fresh innerHTML from desktop elements into the cloned equivalents.
+  // Call this after any interaction in the clone that may have mutated
+  // the desktop DOM (toggle layers, brand filters, sector list, etc).
+  function syncClonedDynamicContent(cloneRoot) {
+    const nodes = cloneRoot.querySelectorAll('[data-orig-id]');
+    nodes.forEach(el => {
+      const srcEl = document.getElementById(el.dataset.origId);
+      if (srcEl && srcEl !== el) {
+        el.innerHTML = srcEl.innerHTML;
+      }
+    });
   }
 
   function syncToggleStates(root) {

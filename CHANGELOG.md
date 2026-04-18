@@ -1,5 +1,36 @@
 # Changelog
 
+## [v5.7-fab-fixes] — 2026-04-18
+
+### 3 fixes post-test Paul
+
+**1. Bug filter concurrents — toggles impossibles à réactiver**
+- Symptôme : cliquer "World Class" dans le FAB mobile → vignette barrée (strike-through). Click suivant → aucune réaction visuelle, état figé.
+- Cause : le clone du tab-compete avait ses IDs strippés. Quand `toggleBrand('World Class')` fire, il update le global `brandVisibility` + rebuild les conteneurs desktop `#brandFilters` et `#brandFiltersExplorer`. Le clone dans le FAB reste stale → pas de repaint → user confus.
+- Fix : `stripAllIds()` préserve l'ID original en `data-orig-id`. Nouvelle fonction `syncClonedDynamicContent(clone)` qui recopie le innerHTML depuis le desktop après chaque click. Hooké sur tout click dans le clone (40ms delay pour laisser les handlers finir).
+- Résultat : toggles, filters, compteurs tous en sync visuel instant.
+
+**2. "Mes sites" vide — section invisible sur mobile**
+- Symptôme : onglet "Mes sites" du FAB montrait seulement le formulaire d'ajout, pas la liste des sites existants.
+- Fix : `renderMySitesIntoClone(cloneRoot)` insère en tête du clone une card "⭐ TOUS LES SITES (N)" avec les TARGETS + customSites, chacun avec :
+  - Badge numéroté (gold pour TARGETS, violet pour customs)
+  - Nom + secteur + ouverture
+  - Badge "Priorité" ou "Custom"
+  - Click → ferme le FAB + fly-to map + snap summary
+- Résultat : l'user voit ses 5 sites priorisés + ses customs directement.
+
+**3. Icône PWA = vrai logo horizontal Fitness Park**
+- Avant : icône carrée générée "FP + underline" (stylisée mais pas le vrai logo)
+- Après : PNG base64 officiel du logo horizontal de `index.html` extrait + redimensionné (82% de l'icône) + centré sur fond `#06080f`
+- Tagline "SE DÉPASSER - SE SURPASSER" visible sur les grandes tailles (180, 192, 512)
+- Tous les assets régénérés : favicon, apple-touch-icon, icon-192, icon-512
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Desktop inchangé
+
+---
+
 ## [v5.6-clean-sectors] — 2026-04-18
 
 ### Secteurs Bucharest : pinwheel non-overlapping + default OFF
