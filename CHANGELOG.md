@@ -1,5 +1,40 @@
 # Changelog
 
+## [v5.8-viz-autocomplete] — 2026-04-18
+
+### 3 fixes post-test Paul
+
+**1. Dashboard Site A / Site B dropdowns vides**
+- Symptôme : dans FAB → Dashboard, les selects "Site A" / "Site B" n'avaient aucune option → impossible de comparer deux sites.
+- Cause : `updateCompareSelects()` n'était appelée qu'à `addZone()` (click map analyzé). Au boot, les selects desktop étaient vides → clone FAB vide.
+- Fix : dans `switchSecondaryTab('dash')`, appel explicite de `updateCompareSelects()` avant `syncClonedDynamicContent`. Les 5 TARGETS + customs apparaissent immédiatement.
+
+**2. Mini-map concurrents illisible → nouvelle viz claire**
+- Avant : radar SVG avec dots minuscules, pratiquement invisibles
+- Après : **2 cards empilées** :
+  - **Proximité concurrentielle** — 3 barres horizontales par tranche de distance :
+    - 0-1 km (PROCHE) : X clubs / Y captifs (couleur rouge)
+    - 1-2 km (MOYEN) : X clubs / Y captifs (couleur orange)
+    - 2-3 km (ÉLOIGNÉ) : X clubs / Y captifs (couleur jaune)
+    - Chaque barre montre count + captifs à droite
+  - **Top marques — captifs potentiels** : top 5 brands avec barres proportionnelles aux captifs (World Class, Downtown, Stay Fit…)
+- Animation `width` 800ms cubic-bezier smooth
+- Typographie hiérarchique, lisible
+
+**3. Autocomplete Google Places pour ajouter un site custom**
+- Avant : input "Adresse" + bouton "Geocoder" (Nominatim basic)
+- Après : **autocomplete live** directement dans le champ
+  - Debounce 220ms, suggestions dès 2 chars
+  - Session token + placeId resolution (comme la search principale)
+  - Fallback Nominatim si Google indispo
+  - Sur sélection : appel direct `addCustomSite(lat, lng, name)` → fermeture FAB → flyTo + snap summary
+  - Le site ajouté apparaît dans carrousel + pins + Mes sites immédiatement via `_fpMobileRefreshSites`
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+
+---
+
 ## [v5.7-fab-fixes] — 2026-04-18
 
 ### 3 fixes post-test Paul

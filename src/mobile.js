@@ -1056,84 +1056,101 @@
     `;
   }
 
-  // ─── COMPS MINI-MAP: SVG radar showing comp density around site ──
+  // ─── COMPETITOR DISTRIBUTION: distance buckets + segments ──────
+  // Readable infographic replacing the unreadable radar mini-map.
+  // Shows two stacked views:
+  //   1. Distribution by distance band (0-1km, 1-2km, 2-3km) — proximité
+  //   2. Capture par marque (top brands that feed FP's captifs)
   function buildCompsMiniMap(comps, target) {
-    if (!comps || comps.length === 0 || !target) return '';
-    const size = 240;
-    const cx = size / 2, cy = size / 2;
-    const maxDistKm = 3; // viz within 3km radius (scale up to fit)
-    const pxPerKm = (size / 2 - 20) / maxDistKm;
+    if (!comps || comps.length === 0) return '';
 
-    // Site at center + radius circles
-    const ringLabels = [1, 2, 3]; // 1km, 2km, 3km
+    // ─── Distance buckets ───
+    const bands = [
+      { label: '0 – 1 km', min: 0,    max: 1000, color: '#ef4444', subtitle: 'proche' },
+      { label: '1 – 2 km', min: 1000, max: 2000, color: '#f97316', subtitle: 'moyen' },
+      { label: '2 – 3 km', min: 2000, max: 3000, color: '#eab308', subtitle: 'éloigné' }
+    ];
+    bands.forEach(b => {
+      const inBand = comps.filter(c => c.dist >= b.min && c.dist < b.max);
+      b.count   = inBand.length;
+      b.captifs = inBand.reduce((a, c) => a + (c.captured || 0), 0);
+      b.avgRate = inBand.length > 0 ? inBand.reduce((a, c) => a + (c.effectiveRate || 0), 0) / inBand.length : 0;
+    });
+    const maxBand = Math.max(...bands.map(b => b.count), 1);
+    const totalCaptifs = comps.reduce((a, c) => a + (c.captured || 0), 0);
 
-    // Comps as circles — size = captured, color = segment color
-    const dots = comps.slice(0, 40).map((c, idx) => {
-      const distKm = c.dist / 1000;
-      if (distKm > maxDistKm) return ''; // cap
-      // Project (lat,lng) difference onto the canvas preserving relative bearing
-      const dLat = c.lat - target.lat;
-      const dLng = (c.lng - target.lng) * Math.cos(target.lat * Math.PI / 180);
-      const bearing = Math.atan2(dLng, dLat); // radians, 0 = north
-      const r = distKm * pxPerKm;
-      const x = cx + r * Math.sin(bearing);
-      const y = cy - r * Math.cos(bearing);
-      const dotR = Math.max(3, Math.min(10, 3 + Math.sqrt(c.captured / 20)));
-      return `<circle class="fp-minimap-dot" data-idx="${idx}"
-                cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}"
-                fill="${c.color}" fill-opacity=".85"
-                stroke="rgba(0,0,0,.4)" stroke-width="1"
-                style="filter:drop-shadow(0 0 4px ${c.color}66);transition:transform .3s"/>`;
-    }).join('');
+    const distanceBars = bands.map(b => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(71,85,115,.2)">
+        <div style="flex:0 0 78px">
+          <div style="font-size:12px;font-weight:700;color:var(--white)">${b.label}</div>
+          <div style="font-size:9px;color:var(--gray2);text-transform:uppercase;letter-spacing:.4px">${b.subtitle}</div>
+        </div>
+        <div style="flex:1;min-width:0;position:relative;height:24px;background:var(--card3);border-radius:12px;overflow:hidden">
+          <div class="fp-band-fill" style="height:100%;width:${(b.count / maxBand * 100).toFixed(0)}%;background:linear-gradient(90deg,${b.color}aa,${b.color});border-radius:12px;transition:width .8s cubic-bezier(.22,.9,.3,1)"></div>
+          <div style="position:absolute;left:10px;top:0;bottom:0;display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--white);text-shadow:0 1px 2px rgba(0,0,0,.6)">${b.count} club${b.count > 1 ? 's' : ''}</div>
+        </div>
+        <div style="flex:0 0 auto;text-align:right;min-width:60px">
+          <div style="font-size:14px;font-weight:800;color:${b.color};line-height:1">${fmtNum(b.captifs)}</div>
+          <div style="font-size:9px;color:var(--gray2);margin-top:2px">captifs</div>
+        </div>
+      </div>
+    `).join('');
+
+    // ─── Brand / segment distribution ───
+    const brands = {};
+    comps.forEach(c => {
+      const brand = (c.name || 'Autres').split(' ').slice(0, 2).join(' '); // "World Class", "Stay Fit"...
+      if (!brands[brand]) brands[brand] = { count: 0, captifs: 0, color: c.color };
+      brands[brand].count += 1;
+      brands[brand].captifs += (c.captured || 0);
+    });
+    const brandList = Object.entries(brands)
+      .sort((a, b) => b[1].captifs - a[1].captifs)
+      .slice(0, 5);
+    const maxBrand = brandList[0]?.[1]?.captifs || 1;
+
+    const brandBars = brandList.map(([name, d]) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+        <div style="flex:0 0 96px;display:flex;align-items:center;gap:6px;min-width:0">
+          <div style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0;box-shadow:0 0 6px ${d.color}66"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        </div>
+        <div style="flex:1;min-width:0;height:10px;background:var(--card3);border-radius:5px;overflow:hidden">
+          <div class="fp-brand-fill" style="height:100%;width:${(d.captifs / maxBrand * 100).toFixed(0)}%;background:${d.color};border-radius:5px;transition:width 1s cubic-bezier(.22,.9,.3,1)"></div>
+        </div>
+        <div style="flex:0 0 auto;text-align:right;min-width:52px">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);line-height:1">${fmtNum(d.captifs)}</div>
+          <div style="font-size:8px;color:var(--gray2)">${d.count} club${d.count > 1 ? 's' : ''}</div>
+        </div>
+      </div>
+    `).join('');
 
     return `
-      <div class="card" style="padding:14px 14px 4px;background:linear-gradient(180deg,rgba(30,41,59,.4),rgba(17,24,39,.1))">
+      <!-- Distance distribution -->
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
           <div>
-            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Densité concurrentielle</div>
-            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">Rayon 3 km</div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Proximité concurrentielle</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">${comps.length} concurrents dans 3 km</div>
           </div>
-          <div style="font-size:11px;color:var(--gray)">taille = captifs</div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:900;color:var(--accent);line-height:1">${fmtNum(totalCaptifs)}</div>
+            <div style="font-size:9px;color:var(--gray2);margin-top:2px">captifs total</div>
+          </div>
         </div>
-        <svg width="100%" viewBox="0 0 ${size} ${size}" style="display:block;max-width:${size}px;margin:0 auto">
-          <defs>
-            <radialGradient id="fpMinimapBg" cx="50%" cy="50%">
-              <stop offset="0%"  stop-color="rgba(212,160,23,.15)"/>
-              <stop offset="100%" stop-color="rgba(6,8,15,0)"/>
-            </radialGradient>
-          </defs>
-          <!-- Background glow at center -->
-          <circle cx="${cx}" cy="${cy}" r="${size/2 - 10}" fill="url(#fpMinimapBg)"/>
+        ${distanceBars}
+      </div>
 
-          <!-- Distance rings -->
-          ${ringLabels.map(km => `
-            <circle cx="${cx}" cy="${cy}" r="${km * pxPerKm}"
-                    fill="none" stroke="rgba(148,163,184,.2)" stroke-width="1" stroke-dasharray="2 3"/>
-            <text x="${cx + km * pxPerKm - 3}" y="${cy - 2}" fill="rgba(148,163,184,.5)" font-size="8" text-anchor="end">${km}km</text>
-          `).join('')}
-
-          <!-- Axis lines -->
-          <line x1="${pad(10)}" y1="${cy}" x2="${size - 10}" y2="${cy}" stroke="rgba(148,163,184,.15)" stroke-width="1"/>
-          <line x1="${cx}" y1="10" x2="${cx}" y2="${size - 10}" stroke="rgba(148,163,184,.15)" stroke-width="1"/>
-
-          <!-- Competitor dots -->
-          ${dots}
-
-          <!-- FP site marker at center -->
-          <circle cx="${cx}" cy="${cy}" r="14" fill="rgba(212,160,23,.3)"/>
-          <circle cx="${cx}" cy="${cy}" r="10" fill="var(--accent)" stroke="white" stroke-width="2"
-                  style="filter:drop-shadow(0 0 8px rgba(212,160,23,.6))">
-            <animate attributeName="r" values="10;12;10" dur="2s" repeatCount="indefinite"/>
-          </circle>
-          <text x="${cx}" y="${cy + 4}" fill="#000" font-size="12" font-weight="900" text-anchor="middle">FP</text>
-
-          <!-- N/S/E/W compass hints -->
-          <text x="${cx}" y="14" fill="rgba(148,163,184,.4)" font-size="9" text-anchor="middle" font-weight="600">N</text>
-        </svg>
+      <!-- Brand distribution (top 5 sources of captifs) -->
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Top marques — captifs potentiels</div>
+          <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">D'où viennent nos ${fmtNum(totalCaptifs)} captifs</div>
+        </div>
+        ${brandBars}
       </div>
     `;
   }
-  function pad(v) { return v; } // used above in mini-map
 
   // ─── CAF ANNUELLE (Capacité d'AutoFinancement par an) ──────────
   // Shows year-by-year EBITDA bars (proxy for CAF since no debt/tax in model)
@@ -1422,7 +1439,19 @@
       syncToggleStates(clone);
 
       // Render target sites into "Mes sites" clone body if applicable
-      if (stab === 'mysites') renderMySitesIntoClone(clone);
+      if (stab === 'mysites') {
+        renderMySitesIntoClone(clone);
+        setTimeout(() => enhanceAddSiteAutocomplete(clone), 100);
+      }
+
+      // Populate Dashboard compare dropdowns (desktop selects + sync)
+      if (stab === 'dash') {
+        try {
+          if (typeof updateCompareSelects === 'function') updateCompareSelects();
+        } catch {}
+        // Re-sync dynamic HTML so the clone's selects reflect the now-populated source
+        setTimeout(() => syncClonedDynamicContent(clone), 30);
+      }
 
       // On any click in the clone, re-sync visual + dynamic HTML after
       // the click's onclick handlers ran (toggleLayer, toggleBrand, etc.).
@@ -1440,6 +1469,161 @@
         }, 40);
       }, true);
     }
+  }
+
+  // ─── ADD-SITE autocomplete (Google Places) inside "Mes sites" ──
+  // Replaces the default "Adresse + Geocoder" form with live suggestions.
+  function enhanceAddSiteAutocomplete(cloneRoot) {
+    const input = cloneRoot.querySelector('[data-orig-id="newSiteAddr"]');
+    if (!input || input.__autoWired) return;
+    input.__autoWired = true;
+    input.setAttribute('placeholder', 'Ex: Bd. Iuliu Maniu 100');
+    input.setAttribute('autocomplete', 'off');
+
+    // Container for suggestions (inserted after the input's parent row)
+    const row = input.closest('div');
+    const parent = row?.parentElement;
+    if (!parent) return;
+
+    const sugBox = document.createElement('div');
+    sugBox.className = 'fp-addsite-sug';
+    sugBox.style.cssText = 'display:none;margin-top:8px;max-height:280px;overflow-y:auto;border-radius:10px;border:1px solid var(--border);background:var(--card2)';
+    parent.appendChild(sugBox);
+
+    let debounceT, seq = 0, lastSession = null;
+    const newSession = () => { lastSession = 'fp-add-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8); return lastSession; };
+
+    input.addEventListener('input', (e) => {
+      clearTimeout(debounceT);
+      const q = e.target.value.trim();
+      if (q.length < 2) { sugBox.style.display = 'none'; sugBox.innerHTML = ''; return; }
+      const mySeq = ++seq;
+      debounceT = setTimeout(async () => {
+        sugBox.style.display = 'block';
+        sugBox.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--gray2);text-align:center">Recherche…</div>';
+        try {
+          if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) throw 'no-key';
+          const token = lastSession || newSession();
+          const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY },
+            body: JSON.stringify({
+              input: q, languageCode: 'fr', regionCode: 'RO', sessionToken: token,
+              locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 40000 } }
+            })
+          });
+          if (mySeq !== seq) return; // stale
+          if (!res.ok) throw 'api-err';
+          const data = await res.json();
+          renderSug(data.suggestions || [], 'google');
+        } catch {
+          // Nominatim fallback
+          try {
+            const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', Bucharest, Romania')}&limit=5`);
+            const data = await r.json();
+            if (mySeq !== seq) return;
+            renderSug(data.map(d => ({
+              placePrediction: {
+                text: { text: d.display_name },
+                structuredFormat: {
+                  mainText: { text: (d.display_name || '').split(',')[0] },
+                  secondaryText: { text: (d.display_name || '').split(',').slice(1, 3).join(', ') }
+                },
+                _nominatim: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) }
+              }
+            })), 'nominatim');
+          } catch {
+            sugBox.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--gray2);text-align:center">Aucun résultat</div>';
+          }
+        }
+      }, 220);
+    });
+
+    function renderSug(suggestions, source) {
+      if (!suggestions || suggestions.length === 0) {
+        sugBox.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--gray2);text-align:center">Aucun résultat</div>';
+        return;
+      }
+      sugBox.innerHTML = suggestions.slice(0, 6).map((s, i) => {
+        const p = s.placePrediction;
+        const main = p?.structuredFormat?.mainText?.text || p?.text?.text || '';
+        const sec  = p?.structuredFormat?.secondaryText?.text || '';
+        return `
+          <div class="fp-addsite-sug-item" data-idx="${i}" style="padding:10px 12px;border-bottom:1px solid rgba(71,85,115,.2);cursor:pointer;display:flex;align-items:center;gap:10px">
+            <svg width="18" height="18" viewBox="0 0 24 24" style="fill:var(--accent);flex-shrink:0"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${main}</div>
+              <div style="font-size:10px;color:var(--gray);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sec}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      qsa('.fp-addsite-sug-item', sugBox).forEach((item, i) => {
+        item.addEventListener('click', () => selectAddSug(suggestions[i], source));
+      });
+    }
+
+    async function selectAddSug(sug, source) {
+      haptic(15);
+      const p = sug.placePrediction;
+      const name = p?.structuredFormat?.mainText?.text || p?.text?.text || 'Site custom';
+      let lat, lng;
+      if (source === 'nominatim') {
+        lat = p._nominatim.lat; lng = p._nominatim.lng;
+      } else if (p.placeId) {
+        try {
+          const token = lastSession;
+          lastSession = null;
+          const res = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(p.placeId), {
+            method: 'GET',
+            headers: {
+              'X-Goog-Api-Key': GOOGLE_API_KEY,
+              'X-Goog-FieldMask': 'displayName,location,formattedAddress',
+              ...(token ? { 'X-Goog-Session-Token': token } : {})
+            }
+          });
+          const detail = await res.json();
+          lat = detail.location?.latitude;
+          lng = detail.location?.longitude;
+        } catch { alert('Impossible de récupérer les coordonnées'); return; }
+      }
+      if (!isFinite(lat) || !isFinite(lng)) { alert('Coordonnées invalides'); return; }
+      if (typeof addCustomSite !== 'function') { alert('Fonction addCustomSite manquante'); return; }
+
+      // Add to customSites + refresh views
+      try {
+        addCustomSite(lat, lng, name, '');
+      } catch (e) { console.warn('addCustomSite failed:', e); }
+
+      // Clean up UI
+      input.value = '';
+      sugBox.style.display = 'none';
+      sugBox.innerHTML = '';
+
+      // Refresh mobile pins + carousel + mes sites list
+      try { window._fpMobileRefreshSites?.(); } catch {}
+
+      // Close FAB + fly to new site + open summary
+      closeSecondarySheet();
+      if (window._fpMap) window._fpMap.flyTo([lat, lng], 15, { duration: .7 });
+      setTimeout(() => {
+        if (typeof window.onMapClick === 'function') window.onMapClick({ latlng: { lat, lng } });
+        // Activate the new site (it's at the end of getAllSites)
+        const all = getAllSites();
+        const idx = all.findIndex(s => Math.abs(s.lat - lat) < 0.0001 && Math.abs(s.lng - lng) < 0.0001);
+        if (idx >= 0) {
+          activeIdx = idx;
+          transitionTo('summary');
+        }
+      }, 450);
+    }
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (ev) => {
+      if (!sugBox.contains(ev.target) && ev.target !== input) {
+        sugBox.style.display = 'none';
+      }
+    });
   }
 
   // ─── MES SITES: prepend TARGETS + customs to the clone ─────────
