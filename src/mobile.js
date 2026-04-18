@@ -1789,6 +1789,13 @@
         setTimeout(() => syncClonedDynamicContent(clone), 30);
       }
 
+      // Rebuild Chart.js instances onto cloned canvases (Dashboard + Competition tabs).
+      // Desktop owns the live Chart; cloned canvases are empty until we bind fresh ones.
+      if (stab === 'dash' || stab === 'concurrence') {
+        // Defer so layout is settled (chart-wrap height is 160-240px, needs DOM attach).
+        setTimeout(() => rebuildClonedCharts(clone), 50);
+      }
+
       // On any click in the clone, re-sync visual + dynamic HTML after
       // the click's onclick handlers ran (toggleLayer, toggleBrand, etc.).
       clone.addEventListener('click', (e) => {
@@ -2361,8 +2368,62 @@
       }
       // <input>/<textarea>: skip — user's typed text must not be wiped.
       if (tag === 'input' || tag === 'textarea') return;
+      // <canvas>: innerHTML has no effect, and Chart.js draws into the 2D context.
+      // Clones are re-bound to their own Chart instance via rebuildClonedCharts().
+      if (tag === 'canvas') return;
       el.innerHTML = srcEl.innerHTML;
     });
+  }
+
+  // Deep-clone a Chart.js config while preserving functions (tooltip.callbacks, etc.).
+  // structuredClone would strip functions; JSON.parse(JSON.stringify) would too.
+  function cloneChartConfig(obj, seen = new WeakSet()) {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (seen.has(obj)) return obj;
+    seen.add(obj);
+    if (Array.isArray(obj)) return obj.map(x => cloneChartConfig(x, seen));
+    const out = {};
+    for (const k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) {
+        out[k] = cloneChartConfig(obj[k], seen);
+      }
+    }
+    return out;
+  }
+
+  // Rebuild Chart.js instances on canvases inside a cloned tab-panel.
+  // Desktop canvases own the live Chart instance; cloned canvases are empty until
+  // we bind fresh Chart instances to them, using the desktop config as source of truth.
+  let _clonedCharts = [];
+  function rebuildClonedCharts(cloneRoot) {
+    _clonedCharts.forEach(c => { try { c.destroy(); } catch {} });
+    _clonedCharts = [];
+    if (typeof Chart === 'undefined' || !cloneRoot) return;
+    cloneRoot.querySelectorAll('canvas[data-orig-id]').forEach(canvas => {
+      const origId = canvas.dataset.origId;
+      const origCanvas = document.getElementById(origId);
+      if (!origCanvas) return;
+      const origChart = Chart.getChart(origCanvas);
+      if (!origChart) return;
+      try {
+        const newChart = new Chart(canvas, {
+          type: origChart.config.type,
+          data: cloneChartConfig(origChart.config.data),
+          options: cloneChartConfig(origChart.config.options || {})
+        });
+        _clonedCharts.push(newChart);
+      } catch (e) {
+        console.warn('[fp] rebuildClonedCharts failed for', origId, e);
+      }
+    });
+  }
+
+  // Public: allow desktop update functions to re-sync the mobile clone's charts
+  // after updateSegChart/updateGapChart mutate the original datasets.
+  function refreshClonedCharts() {
+    const body = qs('#fpSecondaryBody');
+    if (!body || !qs('.fp-secondary-sheet')?.classList.contains('open')) return;
+    rebuildClonedCharts(body);
   }
 
   function syncToggleStates(root) {
@@ -2814,7 +2875,7 @@
   }, 400));
 
   // Expose debug handles
-  window._fpMobile = { transitionTo, activateSite, ensureAnalysis, isMobile, openAddSiteOverlay, closeAddSiteOverlay };
+  window._fpMobile = { transitionTo, activateSite, ensureAnalysis, isMobile, openAddSiteOverlay, closeAddSiteOverlay, refreshClonedCharts };
 
   // ─── Offline/online UX hint ───────────────────────────────────
   if (typeof onOnlineChange === 'function') {

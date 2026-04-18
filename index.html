@@ -2910,6 +2910,7 @@ function updateSegChart(comps) {
   const x=comps.filter(c=>['crossfit','boutique'].includes(c.segment)).length;
   segChart.data.datasets[0].data=[p,m,l,i,x];
   segChart.update();
+  try { window._fpMobile?.refreshClonedCharts?.(); } catch {}
 }
 
 function updateGapChart(counts) {
@@ -2919,6 +2920,7 @@ function updateGapChart(counts) {
     return counts[i]>0?Math.round(popK/counts[i]):popK;
   });
   gapChrt.update();
+  try { window._fpMobile?.refreshClonedCharts?.(); } catch {}
 }
 
 // ================================================================

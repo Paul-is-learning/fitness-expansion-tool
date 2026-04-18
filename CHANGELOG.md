@@ -1,5 +1,24 @@
 # Changelog
 
+## [v6.9-mobile-charts] — 2026-04-18
+
+### Fix : charts vides dans le FAB secondary sheet mobile
+
+**Bug reporté** : "Pricing benchmark non actif sur mobile" — la card apparaissait avec son titre mais le canvas était totalement vide. Même symptôme sur `finChart` (Trajectoire financière réseau), `segmentChart` (Répartition par segment) et `gapChart` (Gap Analysis).
+
+**Cause racine** : le FAB secondary sheet mobile clone le `<div class="tab-panel">` desktop via `cloneNode(true)` puis `stripAllIds()`. Le canvas cloné perd son ID et n'est plus connu de Chart.js — le Chart original continue de dessiner dans le canvas desktop (caché), le clone reste vide. `syncClonedDynamicContent()` copiait aussi `innerHTML` sur les canvas (inopérant et trompeur).
+
+**Fix** (`src/mobile.js`) :
+- Nouvelle fonction `rebuildClonedCharts(cloneRoot)` : pour chaque `canvas[data-orig-id]`, récupère l'instance originale via `Chart.getChart(origCanvas)`, clone en profondeur `config.data` + `config.options` (en préservant les fonctions type `tooltip.callbacks.label`), et crée une nouvelle instance Chart.js sur le canvas cloné.
+- Branchée dans `switchSecondaryTab` pour `stab in {dash, concurrence}` (50ms de délai pour laisser le DOM se stabiliser).
+- Destruction propre des charts clones précédents à chaque rebuild pour éviter les fuites mémoire.
+- `syncClonedDynamicContent` : skip explicite des `<canvas>` (innerHTML n'avait aucun effet utile et risquait de perturber Chart.js).
+- Exposé `window._fpMobile.refreshClonedCharts()` + hooks dans `updateSegChart` et `updateGapChart` (index.html) pour re-render le clone dès que les datasets originaux changent (load concurrents Overpass).
+
+**Tests** : 197/197 PASS (aucun impact modèle).
+
+---
+
 ## [v6.8-reliability] — 2026-04-18
 
 ### Reliability + code quality upgrade (target note ≥ 8/10)
