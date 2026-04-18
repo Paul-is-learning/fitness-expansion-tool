@@ -31,8 +31,10 @@
   let pinLayer = null;
   let pinMarkers = [];
 
-  const qs  = (s, ctx = document) => ctx.querySelector(s);
-  const qsa = (s, ctx = document) => Array.from(ctx.querySelectorAll(s));
+  // Null-safe DOM queries: if ctx is null/undefined (element not yet in DOM,
+  // or already removed), fall back to empty results rather than throwing.
+  const qs  = (s, ctx) => (ctx || document).querySelector?.(s) || null;
+  const qsa = (s, ctx) => Array.from((ctx || document).querySelectorAll?.(s) || []);
 
   // ─── ALL SITES = TARGETS + custom sites ────────────────────────
   // Merges the canonical 5 TARGETS with user-added custom sites so both
