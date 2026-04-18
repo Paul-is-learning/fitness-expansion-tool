@@ -18,6 +18,11 @@
   const MOBILE_BP = 768;
   const isMobile = () => window.innerWidth <= MOBILE_BP;
 
+  // i18n helper — local alias so we don't shadow `t` used as a target-site variable
+  const _t = (k, p) => (typeof window.t === 'function' ? window.t(k, p) : k);
+  // HTML escape alias — use for any user-provided string (custom site names, notes).
+  const _esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(s) : String(s == null ? '' : s));
+
   // State machine: peek | summary | detail
   let state = 'peek';
   let sheet = null;
@@ -86,8 +91,9 @@
       ${logoHtml}
       <div class="fp-search-pill" id="fpSearchPill">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <span>Bucarest…</span>
+        <span data-i18n="topbar.search.placeholder">${window.t ? window.t('topbar.search.placeholder') : 'Bucarest…'}</span>
       </div>
+      <button class="fp-locale-pill" id="fpLocalePill" type="button" title="${window.t ? window.t('topbar.locale.title') : ''}" aria-label="Toggle language">${window.t ? window.t('topbar.locale.label') : 'EN'}</button>
       <div class="fp-avatar" id="fpAvatar">P</div>
     `;
     document.body.appendChild(tb);
@@ -98,6 +104,12 @@
       if (typeof window.showUserPanel === 'function') window.showUserPanel();
     });
     qs('#fpSearchPill').addEventListener('click', openSearchOverlay);
+    qs('#fpLocalePill').addEventListener('click', () => {
+      if (typeof window.toggleLocale === 'function') {
+        window.toggleLocale();
+        haptic(8);
+      }
+    });
   }
 
   // ─── SEARCH OVERLAY ───────────────────────────────────────────
@@ -137,6 +149,12 @@
     return _autocompleteSession;
   }
 
+  // Rate-limit autocomplete to protect Google Places quota.
+  // 30 requests / 60s is conservative for a single user typing.
+  const _acRateLimited = (typeof rateLimit === 'function')
+    ? rateLimit((q, seq) => fetchAutocomplete(q, seq), 30, 60000)
+    : (q, seq) => fetchAutocomplete(q, seq);
+
   function wireAutocomplete() {
     const input = qs('#fpSearchInput');
     if (!input || input.__autoWired) return;
@@ -151,8 +169,13 @@
         qs('#fpSearchResults').innerHTML = '';
         return;
       }
+      // Offline short-circuit: no Google call, hint user.
+      if (typeof isOnline === 'function' && !isOnline()) {
+        qs('#fpSearchResults').innerHTML = `<div class="fp-search-empty">${_t('common.offlineHint') || 'Hors ligne — recherche désactivée'}</div>`;
+        return;
+      }
       // 220ms debounce — strikes balance between responsiveness and quota
-      debounceT = setTimeout(() => fetchAutocomplete(q, ++reqSeq), 220);
+      debounceT = setTimeout(() => _acRateLimited(q, ++reqSeq), 220);
     });
 
     // First focus starts a new billing session
@@ -352,23 +375,23 @@
       <div class="fp-site-card ${i === activeIdx ? 'active' : ''}" data-idx="${i}">
         <div class="fp-site-head">
           <div>
-            <div class="fp-site-num">SITE ${i + 1}</div>
-            <div class="fp-site-name">${t.name}</div>
+            <div class="fp-site-num">${_t('card.site')} ${i + 1}</div>
+            <div class="fp-site-name">${_esc(t.name)}</div>
           </div>
           <span class="${verClass}">${verLabel}</span>
         </div>
         <div class="fp-site-meta">
-          <span>Secteur <b>${t.sector}</b></span>
-          <span>Phase <b>${t.phase}</b></span>
-          <span>${t.opening || ''}</span>
+          <span>${_t('card.sector')} <b>${_esc(t.sector)}</b></span>
+          <span>${_t('card.phase')} <b>${_esc(t.phase)}</b></span>
+          <span>${_esc(t.opening) || ''}</span>
         </div>
         <div class="fp-mini-metrics">
-          <div class="fp-mini-metric"><div class="v">${members}</div><div class="l">Membres</div></div>
+          <div class="fp-mini-metric"><div class="v">${members}</div><div class="l">${_t('card.members')}</div></div>
           <div class="fp-mini-metric ${irrClass}"><div class="v">${irr}</div><div class="l">IRR</div></div>
           <div class="fp-mini-metric"><div class="v">${npv}</div><div class="l">NPV</div></div>
         </div>
         <button class="fp-detail-cta" data-cta="detail">
-          Voir l'analyse complète
+          ${_t('card.ctaViewAnalysis')}
           <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </div>
@@ -595,6 +618,13 @@
     if (!sites[i]) return;
     activeIdx = i;
 
+    // Restore per-site rent/charge/surface overrides (or reset to null)
+    const t = sites[i];
+    const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
+    window._rentOverride    = window._rentOverrides?.[key]    ? { y1: window._rentOverrides[key] }                  : null;
+    window._chargeOverride  = window._chargeOverrides?.[key]  ? { chargeTotal: window._chargeOverrides[key] }       : null;
+    window._surfaceOverride = window._surfaceOverrides?.[key] ? { surface: window._surfaceOverrides[key] }          : null;
+
     updatePinHighlight();
     updateActiveCardUI();
 
@@ -696,25 +726,27 @@
     const prevIdx = (activeIdx - 1 + totalSites) % totalSites;
     const nextIdx = (activeIdx + 1) % totalSites;
 
+    const pbSuffix = a.beBase ? ' ' + a.beBase + ' ' + _t('detail.hero.paybackMonths') : ' ' + _t('detail.hero.paybackNA');
+
     det.innerHTML = `
       <div class="fp-detail-header">
-        <div class="fp-detail-back" id="fpDetailBack" aria-label="Retour">
+        <div class="fp-detail-back" id="fpDetailBack" aria-label="${_t('fab.back')}">
           <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
         </div>
         <div class="fp-detail-title">
-          <div class="t">${t.name}</div>
-          <div class="s">Secteur ${t.sector} · Phase ${t.phase} · ${activeIdx + 1} / ${totalSites}</div>
+          <div class="t">${_esc(t.name)}</div>
+          <div class="s">${_t('card.sector')} ${_esc(t.sector)} · ${_t('card.phase')} ${_esc(t.phase)} · ${activeIdx + 1} / ${totalSites}</div>
         </div>
-        <span class="fp-verdict ${verClass}" style="font-size:10px">${String(a.verdict).replace('GO CONDITIONNEL', 'GO COND')}</span>
+        <span class="fp-verdict ${verClass}" style="font-size:10px">${_esc(String(a.verdict).replace('GO CONDITIONNEL', 'GO COND'))}</span>
       </div>
       <div class="fp-detail-nav">
-        <button class="fp-detail-nav-btn" data-dir="prev" aria-label="Site précédent">
+        <button class="fp-detail-nav-btn" data-dir="prev" aria-label="${_t('detail.prevSite')}">
           <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
-          <span class="fp-nav-label">${sites[prevIdx].name}</span>
+          <span class="fp-nav-label">${_esc(sites[prevIdx].name)}</span>
         </button>
         <div class="fp-detail-nav-sep"></div>
-        <button class="fp-detail-nav-btn next" data-dir="next" aria-label="Site suivant">
-          <span class="fp-nav-label">${sites[nextIdx].name}</span>
+        <button class="fp-detail-nav-btn next" data-dir="next" aria-label="${_t('detail.nextSite')}">
+          <span class="fp-nav-label">${_esc(sites[nextIdx].name)}</span>
           <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
         </button>
       </div>
@@ -722,24 +754,24 @@
       <!-- KEY METRICS HERO -->
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Membres cibles</div>
+          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.members')}</div>
           <div style="font-size:26px;font-weight:900;color:var(--white);line-height:1.1;margin-top:4px">${fmtNum(a.members)}</div>
           <div style="font-size:10px;color:var(--gray);margin-top:2px">${fmtNum(r.pessimiste)} – ${fmtNum(r.optimiste)}</div>
         </div>
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">IRR base</div>
+          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.irrBase')}</div>
           <div style="font-size:26px;font-weight:900;color:${a.irrBase > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtPct(a.irrBase)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">Payback ${a.beBase ? a.beBase+' mois' : '—'}</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.payback')}${pbSuffix}</div>
         </div>
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">NPV 5 ans</div>
+          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.npv5yr')}</div>
           <div style="font-size:22px;font-weight:900;color:${a.npvBase > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtM(a.npvBase)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">Scénario base</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.scenarioBase')}</div>
         </div>
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Score SAZ</div>
+          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.sazScore')}</div>
           <div style="font-size:26px;font-weight:900;color:var(--accent);line-height:1.1;margin-top:4px">${Math.round(score)}<span style="font-size:13px;color:var(--gray2);font-weight:600">/100</span></div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">Attractivité zone</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.zoneAttractiveness')}</div>
         </div>
       </div>
 
@@ -748,26 +780,26 @@
         <div class="fp-accordion-item open" data-sec="loc">
           <div class="fp-accordion-head">
             <div class="icon">📍</div>
-            <div class="lbl">Localisation</div>
+            <div class="lbl">${_t('acc.location')}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
             <div class="card">
-              <div class="metric-row"><span class="metric-label">Coordonnées</span><span class="metric-value">${t.lat.toFixed(4)}, ${t.lng.toFixed(4)}</span></div>
-              <div class="metric-row"><span class="metric-label">Secteur</span><span class="metric-value">Secteur ${t.sector}</span></div>
-              <div class="metric-row"><span class="metric-label">Surface</span><span class="metric-value">${t.area}</span></div>
-              <div class="metric-row"><span class="metric-label">Statut</span><span class="metric-value" style="font-size:11px">${t.status}</span></div>
-              <div class="metric-row"><span class="metric-label">Loyer cible</span><span class="metric-value">${t.rent}</span></div>
-              <div class="metric-row"><span class="metric-label">Ouverture</span><span class="metric-value">${t.opening || '—'}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.coords')}</span><span class="metric-value">${t.lat.toFixed(4)}, ${t.lng.toFixed(4)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.sector')}</span><span class="metric-value">${_t('card.sector')} ${_esc(t.sector)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.surface')}</span><span class="metric-value">${_esc(t.area)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.status')}</span><span class="metric-value" style="font-size:11px">${_esc(t.status)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.targetRent')}</span><span class="metric-value">${_esc(t.rent)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('loc.opening')}</span><span class="metric-value">${_esc(t.opening) || '—'}</span></div>
             </div>
-            ${t.note ? `<div class="card" style="padding:10px;font-size:11px;color:var(--gray);line-height:1.5">${t.note}</div>` : ''}
+            ${t.note ? `<div class="card" style="padding:10px;font-size:11px;color:var(--gray);line-height:1.5">${_esc(t.note)}</div>` : ''}
           </div>
         </div>
 
         <div class="fp-accordion-item" data-sec="saz">
           <div class="fp-accordion-head">
             <div class="icon">🎯</div>
-            <div class="lbl">Score attractivité (SAZ)</div>
+            <div class="lbl">${_t('acc.sazScore')}</div>
             <div class="hint">${Math.round(score)}/100</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
@@ -779,18 +811,18 @@
         <div class="fp-accordion-item" data-sec="demo">
           <div class="fp-accordion-head">
             <div class="icon">👥</div>
-            <div class="lbl">Démographie & marché</div>
-            <div class="hint">${fmtNum(r.popTarget)} cible</div>
+            <div class="lbl">${_t('acc.demographics')}</div>
+            <div class="hint">${fmtNum(r.popTarget)} ${_t('demo.popTargetHint')}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
             <div class="card">
-              <div class="metric-row"><span class="metric-label">Pop. cible 15-45</span><span class="metric-value">${fmtNum(r.popTarget)}</span></div>
-              <div class="metric-row"><span class="metric-label">ARPU blended</span><span class="metric-value">${r.arpu?.toFixed(2)} €/mo</span></div>
-              <div class="metric-row"><span class="metric-label">Churn Y1</span><span class="metric-value">${(r.churnY1*100).toFixed(1)}%</span></div>
-              <div class="metric-row"><span class="metric-label">Churn Y2+</span><span class="metric-value">${(r.churnRate*100).toFixed(1)}%</span></div>
-              <div class="metric-row"><span class="metric-label">LTV</span><span class="metric-value">${fmtNum(r.ltv)} €</span></div>
-              <div class="metric-row"><span class="metric-label">LTV / CAC</span><span class="metric-value" style="color:${r.ltvCacRatio > 3 ? '#34d399' : '#f87171'}">${r.ltvCacRatio}×</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.popTarget')}</span><span class="metric-value">${fmtNum(r.popTarget)}</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.arpu')}</span><span class="metric-value">${r.arpu?.toFixed(2)} €/mo</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.churnY1')}</span><span class="metric-value">${(r.churnY1*100).toFixed(1)}%</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.churnY2')}</span><span class="metric-value">${(r.churnRate*100).toFixed(1)}%</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.ltv')}</span><span class="metric-value">${fmtNum(r.ltv)} €</span></div>
+              <div class="metric-row"><span class="metric-label">${_t('demo.ltvCac')}</span><span class="metric-value" style="color:${r.ltvCacRatio > 3 ? '#34d399' : '#f87171'}">${r.ltvCacRatio}×</span></div>
             </div>
           </div>
         </div>
@@ -798,16 +830,16 @@
         <div class="fp-accordion-item" data-sec="sources">
           <div class="fp-accordion-head">
             <div class="icon">🔀</div>
-            <div class="lbl">Sources de membres</div>
-            <div class="hint">${fmtNum(a.members)} total</div>
+            <div class="lbl">${_t('acc.memberSources')}</div>
+            <div class="hint">${fmtNum(a.members)} ${_t('src.total')}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
             <div class="card">
-              ${sourceBar('Captifs (concurrents)',    r.totalCaptifs,                     a.members, '#f97316')}
-              ${sourceBar('Natifs (nouvelle demande)', r.native?.captured || 0,           a.members, '#22c55e')}
-              ${sourceBar('Walk-in (mall)',           r.walkIn?.walkInMembers || 0,       a.members, '#06b6d4')}
-              ${(r.destinationBonus?.bonusMembers || 0) > 0 ? sourceBar('Destination (10km)', r.destinationBonus.bonusMembers, a.members, '#a78bfa') : ''}
+              ${sourceBar(_t('src.captured'),    r.totalCaptifs,                     a.members, '#f97316')}
+              ${sourceBar(_t('src.native'),      r.native?.captured || 0,           a.members, '#22c55e')}
+              ${sourceBar(_t('src.walkIn'),      r.walkIn?.walkInMembers || 0,       a.members, '#06b6d4')}
+              ${(r.destinationBonus?.bonusMembers || 0) > 0 ? sourceBar(_t('src.destination'), r.destinationBonus.bonusMembers, a.members, '#a78bfa') : ''}
             </div>
           </div>
         </div>
@@ -815,7 +847,7 @@
         <div class="fp-accordion-item" data-sec="pnl">
           <div class="fp-accordion-head">
             <div class="icon">💰</div>
-            <div class="lbl">P&L – 3 scénarios</div>
+            <div class="lbl">${_t('acc.pnl3scenarios')}</div>
             <div class="hint">${fmtPct(a.irrBase)}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
@@ -827,7 +859,7 @@
         <div class="fp-accordion-item" data-sec="financing">
           <div class="fp-accordion-head">
             <div class="icon">🏦</div>
-            <div class="lbl">Financement & IRR equity</div>
+            <div class="lbl">${_t('acc.financingEquity')}</div>
             <div class="hint">${fmtPct(r.pnl?.base?.irrEquity)}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
@@ -839,7 +871,7 @@
         <div class="fp-accordion-item" data-sec="bptemplate">
           <div class="fp-accordion-head">
             <div class="icon">📚</div>
-            <div class="lbl">Structure coûts BP (type)</div>
+            <div class="lbl">${_t('acc.bpTemplate')}</div>
             <div class="hint">Template Romania</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
@@ -851,8 +883,8 @@
         <div class="fp-accordion-item" data-sec="comps">
           <div class="fp-accordion-head">
             <div class="icon">🥊</div>
-            <div class="lbl">Concurrents (${r.comps.length})</div>
-            <div class="hint">${fmtNum(r.totalCaptifs)} captifs</div>
+            <div class="lbl">${_t('acc.competitors')} (${r.comps.length})</div>
+            <div class="hint">${fmtNum(r.totalCaptifs)} ${_t('comp.captifs')}</div>
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
@@ -862,8 +894,8 @@
                 <div style="padding:10px 12px;border-bottom:1px solid rgba(71,85,115,.2);display:flex;align-items:center;gap:10px">
                   <div style="width:6px;height:34px;background:${c.color};border-radius:2px"></div>
                   <div style="flex:1;min-width:0">
-                    <div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
-                    <div style="font-size:10px;color:var(--gray2)">${c.segment} · ${(c.dist/1000).toFixed(1)}km · ${c.effectiveRate}% capt.</div>
+                    <div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(c.name)}</div>
+                    <div style="font-size:10px;color:var(--gray2)">${_esc(c.segment)} · ${(c.dist/1000).toFixed(1)}km · ${c.effectiveRate}% capt.</div>
                   </div>
                   <div style="text-align:right;flex-shrink:0">
                     <div style="font-size:13px;font-weight:700;color:var(--accent)">${c.captured}</div>
@@ -918,11 +950,13 @@
       });
     }, 200);
 
-    // Rent + Charges sliders — live recomputation
+    // Rent + Charges + Surface sliders — live recomputation
     const slider = qs('#fpRentSlider');
     if (slider) slider.addEventListener('input', (e) => onRentSliderChange(e.target.value));
     const chargeSlider = qs('#fpChargeSlider');
     if (chargeSlider) chargeSlider.addEventListener('input', (e) => onChargeSliderChange(e.target.value));
+    const surfaceSlider = qs('#fpSurfaceSlider');
+    if (surfaceSlider) surfaceSlider.addEventListener('input', (e) => onSurfaceSliderChange(e.target.value));
 
     // Animate the hero metrics in from zero on detail open
     setTimeout(() => {
@@ -1027,9 +1061,9 @@
   }
   function pnlCard(r) {
     const scenarios = [
-      { key: 'conservateur', label: 'Conservateur', color: '#f87171' },
-      { key: 'base',         label: 'Base',         color: 'var(--accent)' },
-      { key: 'optimiste',    label: 'Optimiste',    color: '#34d399' }
+      { key: 'conservateur', label: _t('pnl.scenario.conservative'), color: '#f87171' },
+      { key: 'base',         label: _t('pnl.scenario.base'),          color: 'var(--accent)' },
+      { key: 'optimiste',    label: _t('pnl.scenario.optimistic'),    color: '#34d399' }
     ];
     // Rent slider UI — recomputes everything on input
     const currentRent = window._rentOverride?.y1 ?? 10.5;
@@ -1037,6 +1071,8 @@
     // Sparkline: cumulative cashflow over 60 months for BASE scenario
     const spark = buildSparkline(r.pnl?.base);
     const currentCharge = window._chargeOverride?.chargeTotal ?? 5.5; // 5 SC + 0.5 MF default
+    const defaultSurface = (typeof PNL_DEFAULTS !== 'undefined' && PNL_DEFAULTS?.rentSteps?.surface) || 1449;
+    const currentSurface = window._surfaceOverride?.surface ?? defaultSurface;
 
     return `
       <!-- Cashflow sparkline (CAF annuelle) — wrapped in container for live update -->
@@ -1046,8 +1082,8 @@
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(135deg,rgba(30,41,59,.8),rgba(17,24,39,.4))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div>
-            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Loyer base Y1</div>
-            <div style="font-size:13px;font-weight:700;color:var(--white)">Simulation temps réel</div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('slider.rent.label')}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">${_t('slider.rent.sub')}</div>
           </div>
           <div style="text-align:right">
             <div id="fpRentValue" style="font-size:22px;font-weight:900;color:var(--accent);line-height:1">${currentRent.toFixed(1)}<span style="font-size:11px;color:var(--gray)"> €/m²</span></div>
@@ -1056,15 +1092,15 @@
         <input type="range" id="fpRentSlider" min="5" max="25" step="0.5" value="${currentRent}"
                style="width:100%;accent-color:var(--accent);margin:0">
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
-          <span>5 €</span><span>Marché 10-14</span><span>25 €</span>
+          <span>5 €</span><span>${_t('slider.rent.marketHint')}</span><span>25 €</span>
         </div>
 
         <!-- Charges slider (service charges + marketing fee) -->
         <div style="height:1px;background:var(--border);margin:12px 0"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div>
-            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Charges €/m²</div>
-            <div style="font-size:13px;font-weight:700;color:var(--white)">Service + marketing fee</div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('slider.charge.label')}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">${_t('slider.charge.sub')}</div>
           </div>
           <div style="text-align:right">
             <div id="fpChargeValue" style="font-size:22px;font-weight:900;color:#60a5fa;line-height:1">${currentCharge.toFixed(1)}<span style="font-size:11px;color:var(--gray)"> €/m²</span></div>
@@ -1073,11 +1109,28 @@
         <input type="range" id="fpChargeSlider" min="0" max="12" step="0.25" value="${currentCharge}"
                style="width:100%;accent-color:#60a5fa;margin:0">
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
-          <span>0 €</span><span>Standard 5.5</span><span>12 €</span>
+          <span>0 €</span><span>${_t('slider.charge.standardHint')}</span><span>12 €</span>
         </div>
 
-        <div style="margin-top:10px;padding:8px 10px;background:rgba(212,160,23,.08);border-radius:6px;font-size:10px;color:var(--gray)">
-          Total all-in Y1 : <b style="color:var(--accent);font-size:12px">${(currentRent + currentCharge).toFixed(1)} €/m²</b> × 1 449 m² = <b style="color:var(--accent)">${fmtM(Math.round(1449 * (currentRent + currentCharge) * 12))}/an</b>
+        <!-- Surface slider (m²) -->
+        <div style="height:1px;background:var(--border);margin:12px 0"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('slider.surface.label')}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">${_t('slider.surface.sub')}</div>
+          </div>
+          <div style="text-align:right">
+            <div id="fpSurfaceValue" style="font-size:22px;font-weight:900;color:#a78bfa;line-height:1">${fmtNum(currentSurface)}<span style="font-size:11px;color:var(--gray)"> m²</span></div>
+          </div>
+        </div>
+        <input type="range" id="fpSurfaceSlider" min="500" max="3000" step="50" value="${currentSurface}"
+               style="width:100%;accent-color:#a78bfa;margin:0">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
+          <span>500 m²</span><span>${_t('slider.surface.refHint')}</span><span>3 000 m²</span>
+        </div>
+
+        <div id="fpRentAllInHint" style="margin-top:10px;padding:8px 10px;background:rgba(212,160,23,.08);border-radius:6px;font-size:10px;color:var(--gray)">
+          ${_t('slider.allInY1.prefix')}<b style="color:var(--accent);font-size:12px">${(currentRent + currentCharge).toFixed(1)} €/m²</b> × ${fmtNum(currentSurface)} m² = <b style="color:var(--accent)">${fmtM(Math.round(currentSurface * (currentRent + currentCharge) * 12))}${_t('slider.allInY1.perYear')}</b>
         </div>
       </div>
 
@@ -1092,9 +1145,9 @@
                 <div class="fp-scenario-irr" data-key="${s.key}" style="font-size:18px;font-weight:900;color:${p.irr > 0 ? '#34d399' : '#f87171'}">${fmtPct(p.irr)}</div>
               </div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
-                <div><div style="color:var(--gray2)">NPV</div><div class="fp-scenario-npv" data-key="${s.key}" style="font-weight:700;color:var(--white)">${fmtM(p.npv)}</div></div>
-                <div><div style="color:var(--gray2)">Breakeven</div><div class="fp-scenario-be" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.breakevenMonth ? p.breakevenMonth + ' mo' : '—'}</div></div>
-                <div><div style="color:var(--gray2)">Payback</div><div class="fp-scenario-pb" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.paybackMonth ? p.paybackMonth + ' mo' : '—'}</div></div>
+                <div><div style="color:var(--gray2)">${_t('pnl.npv')}</div><div class="fp-scenario-npv" data-key="${s.key}" style="font-weight:700;color:var(--white)">${fmtM(p.npv)}</div></div>
+                <div><div style="color:var(--gray2)">${_t('pnl.breakeven')}</div><div class="fp-scenario-be" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.breakevenMonth ? p.breakevenMonth + ' ' + _t('pnl.moShort') : '—'}</div></div>
+                <div><div style="color:var(--gray2)">${_t('pnl.payback')}</div><div class="fp-scenario-pb" data-key="${s.key}" style="font-weight:700;color:var(--white)">${p.paybackMonth ? p.paybackMonth + ' ' + _t('pnl.moShort') : '—'}</div></div>
               </div>
             </div>
           `;
@@ -1212,23 +1265,23 @@
 
     return `
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Structure financement CAPEX</div>
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${_t('fin.structure')}</div>
         <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">
-          <div style="flex:${(fin.equityRatio || 0.3) * 100};background:linear-gradient(90deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:800">Equity ${Math.round((fin.equityRatio || 0.3) * 100)}%</div>
-          <div style="flex:${(fin.loanRatio || 0.7) * 100};background:linear-gradient(90deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">Emprunt ${Math.round((fin.loanRatio || 0.7) * 100)}%</div>
+          <div style="flex:${(fin.equityRatio || 0.3) * 100};background:linear-gradient(90deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:800">${_t('fin.equityShort')} ${Math.round((fin.equityRatio || 0.3) * 100)}%</div>
+          <div style="flex:${(fin.loanRatio || 0.7) * 100};background:linear-gradient(90deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">${_t('fin.loanShort')} ${Math.round((fin.loanRatio || 0.7) * 100)}%</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px">
-          <div><div style="color:var(--gray2)">Apport associés</div><div style="color:#34d399;font-weight:800;font-size:14px">${fmtM(equity)}</div></div>
-          <div><div style="color:var(--gray2)">Emprunt bancaire</div><div style="color:#60a5fa;font-weight:800;font-size:14px">${fmtM(loan)}</div></div>
-          <div><div style="color:var(--gray2)">Taux annuel</div><div style="color:var(--white);font-weight:700">${((fin.loanRate || 0.065) * 100).toFixed(1)}%</div></div>
-          <div><div style="color:var(--gray2)">Durée</div><div style="color:var(--white);font-weight:700">${fin.loanTermYears || 7} ans</div></div>
-          <div><div style="color:var(--gray2)">Échéance mensuelle</div><div style="color:var(--white);font-weight:700">${fmtNum(monthlyPmt)} €</div></div>
-          <div><div style="color:var(--gray2)">Intérêts cumulés 7 ans</div><div style="color:#f87171;font-weight:700">${fmtM(totalInt)}</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.equity')}</div><div style="color:#34d399;font-weight:800;font-size:14px">${fmtM(equity)}</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.loan')}</div><div style="color:#60a5fa;font-weight:800;font-size:14px">${fmtM(loan)}</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.rate')}</div><div style="color:var(--white);font-weight:700">${((fin.loanRate || 0.065) * 100).toFixed(1)}%</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.term')}</div><div style="color:var(--white);font-weight:700">${fin.loanTermYears || 7} ${_t('fin.years')}</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.monthlyPmt')}</div><div style="color:var(--white);font-weight:700">${fmtNum(monthlyPmt)} €</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.totalInterest')}</div><div style="color:#f87171;font-weight:700">${fmtM(totalInt)}</div></div>
         </div>
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">IRR Projet vs IRR Equity
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${_t('fin.irrProject')} vs ${_t('fin.irrEquity')}
           <span class="info-tip" style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:var(--card3);color:var(--gray);align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px">?
             <div class="tip-content"><strong>IRR Projet (unlevered)</strong> = rentabilité opérationnelle du club, peu importe comment il est financé. Base de décision go/no-go.<br><br>
             <strong>IRR Equity (levered)</strong> = rentabilité pour les associés après service de dette. Inclut l'effet de levier de l'emprunt → généralement plus élevé que l'IRR Projet quand le IRR Projet > taux d'emprunt.<br><br>
@@ -1237,14 +1290,14 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="padding:12px;background:rgba(30,41,59,.45);border-radius:8px">
-            <div style="font-size:10px;color:var(--gray2);text-transform:uppercase">IRR Projet</div>
+            <div style="font-size:10px;color:var(--gray2);text-transform:uppercase">${_t('fin.irrProject')}</div>
             <div style="font-size:22px;font-weight:900;color:${irrProj > 0 ? '#34d399' : '#f87171'};margin-top:4px">${fmtPct(irrProj)}</div>
-            <div style="font-size:9px;color:var(--gray2);margin-top:2px">Unlevered (perf. op.)</div>
+            <div style="font-size:9px;color:var(--gray2);margin-top:2px">${_t('fin.irrLabelUnlevered')}</div>
           </div>
           <div style="padding:12px;background:rgba(30,41,59,.45);border-radius:8px;border:1px solid rgba(212,160,23,.3)">
-            <div style="font-size:10px;color:var(--accent);text-transform:uppercase;font-weight:700">IRR Equity ⭐</div>
+            <div style="font-size:10px;color:var(--accent);text-transform:uppercase;font-weight:700">${_t('fin.irrEquity')} ⭐</div>
             <div style="font-size:22px;font-weight:900;color:${irrEq > 0 ? '#34d399' : '#f87171'};margin-top:4px">${fmtPct(irrEq)}</div>
-            <div style="font-size:9px;color:var(--gray2);margin-top:2px">Pour les associés</div>
+            <div style="font-size:9px;color:var(--gray2);margin-top:2px">${_t('fin.irrLabelLevered')}</div>
           </div>
         </div>
       </div>
@@ -1270,62 +1323,65 @@
 
     return `
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Revenus</div>
-        ${row('FP Base TTC', (P.priceBaseTTC || 28) + ' €/mo', '#34d399', 'Abonnement standard HT ~23 €')}
-        ${row('FP Premium TTC', (P.pricePremiumTTC || 40) + ' €/mo', '#34d399', 'Couple / accès multi-clubs')}
-        ${row('FP Ultimate TTC', (P.priceUltimateTTC || 50) + ' €/mo', '#34d399', 'Sports collectifs + coaching')}
-        ${row('Cible membres maturité', fmtNum(P.targetMembers || 4000), 'var(--accent)', 'A3 (BP V17 C34)')}
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.revenues')}</div>
+        ${row('FP Base TTC', (P.priceBaseTTC || 28) + ' €/mo', '#34d399', '')}
+        ${row('FP Premium TTC', (P.pricePremiumTTC || 40) + ' €/mo', '#34d399', '')}
+        ${row('FP Ultimate TTC', (P.priceUltimateTTC || 50) + ' €/mo', '#34d399', '')}
+        ${row(_t('bp.targetMembersMaturity'), fmtNum(P.targetMembers || 4000), 'var(--accent)', 'A3 (BP V17 C34)')}
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Coûts — Taux appliqués</div>
-        ${row('Staff (salaires + charges)', '9.0% du CA', '#f87171', 'Plancher 65 k€/an (4 ETP) + 3%/an inflation. BP officiel FP aligné OnAir.')}
-        ${row('Cost of Sales (marchandises)', ((P.costOfSalesRate || 0.028) * 100).toFixed(1) + '% du CA', '#f87171', 'Calibré OnAir 2.77% (achats revendus hors abo)')}
-        ${row('OPEX ops Y1 (ramp-up)', (opexCurve[0] * 100).toFixed(0) + '% du CA', '#f87171', 'Coûts fixes à pleine charge sur CA faible')}
-        ${row('OPEX ops Y5+ (cruising)', (opexCurve[4] * 100).toFixed(0) + '% du CA', '#f87171', 'Décote Romania appliquée. +1.2pp vs OnAir 10.8% réel France.')}
-        ${row('Redevance franchise', ((P.redevanceRate || 0.06) * 100).toFixed(0) + '% CA adh.', '#f87171', 'Master-franchise Isseo (vs 4% franchise classique)')}
-        ${row('Fonds publicitaire', ((P.fondsPubRate || 0.01) * 100).toFixed(0) + '% CA adh.', '#f87171', 'Standard franchise fitness EU')}
-        ${row('FP Cloud SaaS', (P.fpCloudMonthly || 600) + ' €/mois', '#f87171', '+1%/an inflation logicielle')}
-        ${row('Leasing équipement', fmtNum((P.leasingAnnual || 100800) / 12) + ' €/mo', '#f87171', 'Financement 60% matériel, 5 ans')}
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.costRates')}</div>
+        ${row(_t('bp.staff'), '9.0% ' + _t('bp.perCA'), '#f87171', '')}
+        ${row(_t('bp.costOfSales'), ((P.costOfSalesRate || 0.028) * 100).toFixed(1) + '% ' + _t('bp.perCA'), '#f87171', '')}
+        ${row(_t('bp.opexY1'), (opexCurve[0] * 100).toFixed(0) + '% ' + _t('bp.perCA'), '#f87171', '')}
+        ${row(_t('bp.opexY5'), (opexCurve[4] * 100).toFixed(0) + '% ' + _t('bp.perCA'), '#f87171', '')}
+        ${row(_t('bp.franchiseRoyalty'), ((P.redevanceRate || 0.06) * 100).toFixed(0) + '% ' + _t('bp.perCAAdh'), '#f87171', '')}
+        ${row(_t('bp.adFund'), ((P.fondsPubRate || 0.01) * 100).toFixed(0) + '% ' + _t('bp.perCAAdh'), '#f87171', '')}
+        ${row(_t('bp.fpCloud'), (P.fpCloudMonthly || 600) + ' ' + _t('bp.perMonth'), '#f87171', '')}
+        ${row(_t('bp.leasing'), fmtNum((typeof getScaledLeasingAnnual === 'function' ? getScaledLeasingAnnual() : (P.leasingAnnual || 100800)) / 12) + ' ' + _t('bp.perMonth'), '#f87171', '')}
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Loyer stepped (Hala Laminor — objectif négo)</div>
-        ${row('Y1-Y2', '10.5 €/m² base → 16 €/m² all-in', 'var(--accent)', '+ service charges 5€ + marketing fee 0.5€')}
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.rentStepped')}</div>
+        ${row('Y1-Y2', '10.5 €/m² → 16 €/m² all-in', 'var(--accent)', '')}
         ${row('Y3-Y4', '11.5 €/m² → 17 €/m² all-in', 'var(--accent)', '')}
         ${row('Y5+', '13 €/m² → 18.5 €/m² all-in', 'var(--accent)', '')}
-        ${row('Indexation HICP', '3%/an à partir de Y2', 'var(--gray)', 'Eurostat HICP 27 EU moyenne')}
-        ${row('Surface type', '1 449 m²', 'var(--accent)', 'Hala Laminor G-28 First Floor')}
+        ${row(_t('bp.indexation'), _t('bp.indexationVal'), 'var(--gray)', '')}
+        ${row(_t('bp.surfaceType'), '1 449 m²', 'var(--accent)', 'Hala Laminor G-28 First Floor')}
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">CAPEX & Financement</div>
-        ${row('CAPEX total', fmtM(P.capex || 1176000), 'var(--accent)', 'Travaux 840k + Equip 336k (BP V17 C79)')}
-        ${row('Apport associés', ((fin.equityRatio || 0.3) * 100).toFixed(0) + '% = ' + fmtM((P.capex || 1176000) * (fin.equityRatio || 0.3)), '#34d399', '')}
-        ${row('Emprunt bancaire', ((fin.loanRatio || 0.7) * 100).toFixed(0) + '% = ' + fmtM((P.capex || 1176000) * (fin.loanRatio || 0.7)), '#60a5fa', '')}
-        ${row('Taux emprunt', ((fin.loanRate || 0.065) * 100).toFixed(1) + '%', 'var(--white)', 'RO SME 2026 (BNR + spread 0.75%)')}
-        ${row('Durée emprunt', (fin.loanTermYears || 7) + ' ans', 'var(--white)', 'Standard franchise loan')}
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.capexFinancing')}</div>
+        ${(() => {
+          const scaledCapex = typeof getScaledCapex === 'function' ? getScaledCapex() : (P.capex || 1176000);
+          const ref = P.rentSteps?.surface || 1449;
+          const surf = window._surfaceOverride?.surface || ref;
+          const scaleHint = surf === ref ? 'Travaux 840k + Equip 336k (BP V17 C79)' : `${_t('bp.scaledSurface')} ${Math.round(surf)} m² / ${ref} m² ${_t('bp.refHala')}`;
+          return `
+            ${row(_t('bp.capexTotal'), fmtM(scaledCapex), 'var(--accent)', scaleHint)}
+            ${row(_t('fin.equity'), ((fin.equityRatio || 0.3) * 100).toFixed(0) + '% = ' + fmtM(scaledCapex * (fin.equityRatio || 0.3)), '#34d399', '')}
+            ${row(_t('fin.loan'), ((fin.loanRatio || 0.7) * 100).toFixed(0) + '% = ' + fmtM(scaledCapex * (fin.loanRatio || 0.7)), '#60a5fa', '')}
+          `;
+        })()}
+        ${row(_t('bp.loanRate'), ((fin.loanRate || 0.065) * 100).toFixed(1) + '%', 'var(--white)', 'RO SME 2026')}
+        ${row(_t('bp.loanTerm'), (fin.loanTermYears || 7) + ' ' + _t('fin.years'), 'var(--white)', '')}
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Paramètres financiers & sortie</div>
-        ${row('WACC (actualisation)', ((P.discountRate || 0.12) * 100).toFixed(0) + '%', 'var(--accent)', 'BP V17 C112')}
-        ${row('CIT Roumanie', ((P.citRate || 0.16) * 100).toFixed(0) + '%', 'var(--gray)', 'Non utilisé (EBITDA brut)')}
-        ${row('Exit multiple EV/EBITDA', (P.exitMultiple || 6) + '×', 'var(--accent)', 'Standard franchise fitness EU, Y5')}
-        ${row('Horizon P&L', '60 mois (5 ans)', 'var(--gray)', '')}
-        ${row('Croissance A4-A6', '+5%/an', 'var(--gray)', 'Post-maturité')}
-        ${row('Croissance A7+', '+2%/an', 'var(--gray)', 'Long terme (= inflation)')}
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.financialParams')}</div>
+        ${row(_t('bp.wacc'), ((P.discountRate || 0.12) * 100).toFixed(0) + '%', 'var(--accent)', 'BP V17 C112')}
+        ${row(_t('bp.cit'), ((P.citRate || 0.16) * 100).toFixed(0) + '%', 'var(--gray)', '')}
+        ${row(_t('bp.exitMultiple'), (P.exitMultiple || 6) + '×', 'var(--accent)', '')}
+        ${row(_t('bp.pnlHorizon'), _t('bp.pnlHorizonVal'), 'var(--gray)', '')}
+        ${row(_t('bp.growthA4A6'), '+5%/an', 'var(--gray)', _t('bp.postMaturity'))}
+        ${row(_t('bp.growthA7'), '+2%/an', 'var(--gray)', _t('bp.longTerm'))}
       </div>
 
       <div class="card" style="padding:14px 16px;background:linear-gradient(135deg,rgba(212,160,23,.08),transparent);border:1px solid rgba(212,160,23,.2)">
-        <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px">📊 Benchmark OnAir Montreuil (référence)</div>
+        <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px">${_t('bp.onairBenchmark')}</div>
         <div style="font-size:12px;color:var(--white);line-height:1.55">
-          Franchise fitness 1 club en <b>Y5 cruising</b> — exercice 09/2024-08/2025 (certifié Fiteco).<br>
-          • CA: <b>2.24 M€</b> — EBITDA <b>44.7%</b> — Résultat net <b>25.4%</b><br>
-          • Staff <b>9.0%</b> — Loyer all-in <b>12.4%</b> — OPEX ops <b>10.8%</b><br>
-          • Royalties <b>4%</b> + fonds pub <b>1%</b>
-          <br><br>
-          <span style="color:var(--gray2);font-size:11px">Notre BP Romania: conservateur sur redevance (6% master-franchise) et OPEX ops (12% cruising), agressif sur CA cible (4000 mbr A3).</span>
+          <b>2.24 M€</b> · EBITDA <b>44.7%</b> · Staff <b>9.0%</b> · Loyer <b>12.4%</b> · OPEX <b>10.8%</b> · Royalties <b>4%</b>
         </div>
       </div>
     `;
@@ -1411,6 +1467,40 @@
     `;
   }
 
+  // ─── Live hint (Total all-in Y1) — reads current slider values ─
+  function updateRentAllInHint() {
+    const rent = parseFloat(qs('#fpRentSlider')?.value || 10.5);
+    const charge = parseFloat(qs('#fpChargeSlider')?.value || 5.5);
+    const surface = parseInt(qs('#fpSurfaceSlider')?.value || 1449, 10);
+    const hint = qs('#fpRentAllInHint');
+    if (!hint) return;
+    const totalPerSqm = (rent + charge).toFixed(1);
+    const annual = Math.round(surface * (rent + charge) * 12);
+    hint.innerHTML = `${_t('slider.allInY1.prefix')}<b style="color:var(--accent);font-size:12px">${totalPerSqm} €/m²</b> × ${fmtNum(surface)} m² = <b style="color:var(--accent)">${fmtM(annual)}${_t('slider.allInY1.perYear')}</b>`;
+  }
+
+  // ─── Live surface recalc (m²) ──────────────────────────────────
+  let surfaceDebounce;
+  function onSurfaceSliderChange(val) {
+    const v = parseInt(val, 10);
+    const vEl = qs('#fpSurfaceValue');
+    if (vEl) vEl.innerHTML = fmtNum(v) + '<span style="font-size:11px;color:var(--gray)"> m²</span>';
+    haptic(4);
+    updateRentAllInHint();
+    clearTimeout(surfaceDebounce);
+    surfaceDebounce = setTimeout(() => {
+      window._surfaceOverride = { surface: v };
+      // Persist per site
+      const t = getAllSites()[activeIdx];
+      if (t) {
+        const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
+        window._surfaceOverrides = window._surfaceOverrides || {};
+        window._surfaceOverrides[key] = v;
+      }
+      recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
+    }, 90);
+  }
+
   // ─── Live charge recalc (service + marketing fee €/m²) ────────
   let chargeDebounce;
   function onChargeSliderChange(val) {
@@ -1418,12 +1508,7 @@
     const vEl = qs('#fpChargeValue');
     if (vEl) vEl.innerHTML = v.toFixed(1) + '<span style="font-size:11px;color:var(--gray)"> €/m²</span>';
     haptic(4);
-    // Update the all-in total hint
-    const rent = parseFloat(qs('#fpRentSlider')?.value || 10.5);
-    const total = v + rent;
-    const hintEl = qs('#fpCafContainer ~ .card div[style*="Total all-in"]') ||
-      qsa('div', qs('#fpDetail')).find(d => d.textContent?.startsWith('Total all-in'));
-    // (visual hint update handled by recompute rerender)
+    updateRentAllInHint();
     clearTimeout(chargeDebounce);
     chargeDebounce = setTimeout(() => {
       window._chargeOverride = { chargeTotal: v };
@@ -1444,13 +1529,16 @@
     const v = parseFloat(val);
     qs('#fpRentValue').innerHTML = v.toFixed(1) + '<span style="font-size:12px;color:var(--gray)"> €/m²</span>';
     haptic(4); // subtle tick per step
+    updateRentAllInHint();
     clearTimeout(rentDebounce);
     rentDebounce = setTimeout(() => recomputeCurrentAnalysis(v), 90);
   }
   function recomputeCurrentAnalysis(rentY1) {
     try {
       window._rentOverride = { y1: rentY1 };
-      const t = TARGETS[activeIdx];
+      // Bugfix v6.8: was TARGETS[activeIdx] — broke slider for custom sites.
+      const t = getAllSites()[activeIdx];
+      if (!t) return;
       const r = runCaptageAnalysis(t.lat, t.lng, 3000);
       const exec = computeExecSummary(r);
       const a = analyses[activeIdx];
@@ -1470,6 +1558,11 @@
       updateDetailHero(r, a, { oldMembers, oldIrr, oldNpv });
       // Update P&L scenarios inline
       updatePnLInline(r);
+      // Update Financement + BP Template accordion bodies (CAPEX + leasing scalent surface)
+      const finBody = qs('.fp-accordion-item[data-sec="financing"] .fp-accordion-body');
+      if (finBody) finBody.innerHTML = financingCard(r.pnl?.base);
+      const bpBody = qs('.fp-accordion-item[data-sec="bptemplate"] .fp-accordion-body');
+      if (bpBody) bpBody.innerHTML = bpTemplateCard();
       // Update CAF annuelle bars inline (live response to rent change)
       updateCafBarsInline(r);
       // Re-run invariants check (via audit wrapper automatic)
@@ -1511,7 +1604,7 @@
       if (sNode) sNode.textContent = Math.round(a.score);
       // Also update Payback hint
       const pbHint = heroCards[1].querySelector('div[style*="font-size:10px"][style*="color:var(--gray)"]');
-      if (pbHint) pbHint.textContent = 'Payback ' + (a.beBase ? a.beBase + ' mois' : '—');
+      if (pbHint) pbHint.textContent = _t('detail.hero.payback') + ' ' + (a.beBase ? a.beBase + ' ' + _t('detail.hero.paybackMonths') : _t('detail.hero.paybackNA'));
     }
   }
 
@@ -1614,14 +1707,14 @@
     sh.className = 'fp-secondary-sheet';
     sh.innerHTML = `
       <div class="head">
-        <div class="title">Outils & couches</div>
+        <div class="title">${_t('fab.layers').replace('🗺️ ','') + ' & ' + _t('fab.competitors').replace('👥 ','')}</div>
         <div class="close-btn" id="fpSecondaryClose">&times;</div>
       </div>
       <div class="fp-secondary-tabs" id="fpSecondaryTabs">
-        <div class="fp-secondary-tab active" data-stab="layers">🗺️ Couches</div>
-        <div class="fp-secondary-tab" data-stab="concurrence">🏋️ Concurrence</div>
-        <div class="fp-secondary-tab" data-stab="mysites">📌 Mes sites</div>
-        <div class="fp-secondary-tab" data-stab="dash">📊 Dashboard</div>
+        <div class="fp-secondary-tab active" data-stab="layers">${_t('fab.layers')}</div>
+        <div class="fp-secondary-tab" data-stab="concurrence">${_t('fab.competitors')}</div>
+        <div class="fp-secondary-tab" data-stab="mysites">${_t('fab.mySites')}</div>
+        <div class="fp-secondary-tab" data-stab="dash">${_t('fab.dashboard')}</div>
       </div>
       <div class="body" id="fpSecondaryBody"></div>
     `;
@@ -1891,8 +1984,8 @@
           <div class="fp-mysite-row" data-idx="${i}" style="padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid rgba(71,85,115,.2);transition:background .2s">
             <div style="width:32px;height:32px;border-radius:50%;background:${kindColor};display:flex;align-items:center;justify-content:center;color:#000;font-weight:900;font-size:13px;flex-shrink:0">${i + 1}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
-              <div style="font-size:10px;color:var(--gray2);margin-top:2px">Secteur ${s.sector} · ${s.opening || s.status || '—'}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(s.name)}</div>
+              <div style="font-size:10px;color:var(--gray2);margin-top:2px">${_t('card.sector')} ${_esc(s.sector)} · ${_esc(s.opening) || _esc(s.status) || '—'}</div>
             </div>
             <div style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:${isCustom ? 'rgba(139,92,246,.15)' : 'rgba(212,160,23,.12)'};color:${kindColor};flex-shrink:0">${kindLabel}</div>
           </div>
@@ -2391,4 +2484,56 @@
 
   // Expose debug handles
   window._fpMobile = { transitionTo, activateSite, ensureAnalysis, isMobile };
+
+  // ─── Offline/online UX hint ───────────────────────────────────
+  if (typeof onOnlineChange === 'function') {
+    onOnlineChange((online) => {
+      const msg = online ? _t('common.onlineBack') : _t('common.offlineBanner');
+      const lvl = online ? 'success' : 'warn';
+      try { window.showToast?.(msg, lvl, { duration: online ? 2500 : 6000 }); } catch {}
+    });
+    // Show banner at boot if already offline
+    if (typeof isOnline === 'function' && !isOnline()) {
+      try { window.showToast?.(_t('common.offlineBanner'), 'warn', { duration: 6000 }); } catch {}
+    }
+  }
+
+  // ─── Re-render on locale change ───────────────────────────────
+  // i18n strings are baked into rendered HTML, so we regenerate the
+  // carousel + active detail view on toggle. Layers/FAB rebuild on next open.
+  window.addEventListener('fp:locale-changed', () => {
+    try {
+      // Update topbar locale pill label + search placeholder
+      const pill = qs('#fpLocalePill');
+      if (pill) pill.textContent = _t('topbar.locale.label');
+      const pillEl = qs('#fpLocalePill');
+      if (pillEl) pillEl.setAttribute('title', _t('topbar.locale.title'));
+      const searchSpan = qs('#fpSearchPill span');
+      if (searchSpan) searchSpan.textContent = _t('topbar.search.placeholder');
+      const searchInput = qs('#fpSearchInput');
+      if (searchInput) searchInput.setAttribute('placeholder', _t('topbar.search.input'));
+
+      // Rebuild carousel cards
+      const sites = getAllSites();
+      const car = qs('#fpCarousel');
+      if (car) {
+        car.innerHTML = sites.map((s, i) => renderCard(s, i, analyses[i])).join('');
+        qsa('.fp-site-card', car).forEach((card, i) => {
+          card.addEventListener('click', () => {
+            if (i === activeIdx && state === 'peek') transitionTo('summary');
+            else activateSite(i, true);
+          });
+        });
+      }
+
+      // Rebuild detail if open
+      if (state === 'detail') buildDetail();
+
+      // Close FAB sheet so it rebuilds with new locale on next open
+      if (typeof closeSecondarySheet === 'function') {
+        const bd = qs('.fp-secondary-backdrop');
+        if (bd) closeSecondarySheet();
+      }
+    } catch (e) { console.warn('[FP i18n] re-render failed:', e); }
+  });
 })();

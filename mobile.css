@@ -158,6 +158,22 @@
     flex-shrink: 0;
     cursor: pointer;
   }
+  .fp-locale-pill {
+    width: 44px; height: 40px;
+    border-radius: 20px;
+    background: rgba(17,24,39,.95);
+    backdrop-filter: blur(14px) saturate(180%);
+    border: 1px solid rgba(212,160,23,.3);
+    color: var(--accent);
+    font-weight: 800; font-size: 11px;
+    letter-spacing: .5px;
+    box-shadow: var(--shadow-card);
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 0;
+    transition: transform var(--spring-bounce), background-color .2s, border-color .2s;
+  }
+  .fp-locale-pill:active { transform: scale(.9); background: rgba(212,160,23,.12); border-color: rgba(212,160,23,.6); }
 
   /* ═════ FAB (Floating Action Button) bottom-right ═════ */
   .fp-mobile-fab {

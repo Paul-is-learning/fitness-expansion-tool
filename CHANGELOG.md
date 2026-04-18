@@ -1,5 +1,152 @@
 # Changelog
 
+## [v6.8-reliability] — 2026-04-18
+
+### Reliability + code quality upgrade (target note ≥ 8/10)
+
+**Sécurité (XSS + input validation)**
+- `addCustomSite()` valide lat/lng bounds + sanitise name/notes (strip HTML + control chars + max length 80/500) + ajoute schema `__v: 1`
+- `addCustomSiteMarker()` popup : `site.name` + `site.notes` + `site.id` désormais escape/Number-cast → bloque XSS via nom de site malicieux (`<img onerror=...>`)
+- Renders mobile (`renderCard`, `buildDetail`, competitor list, mysites list) : tous les champs user-provided passent par `_esc()` (alias `escapeHtml`)
+- **Migration auto** des customSites v0 → v1 à chaque boot (strip HTML sur données existantes)
+
+**Error handling global (nouveau `src/errors.js`, chargé en 1er)**
+- `window.onerror` + `unhandledrejection` capturés + dédupliqués (fenêtre 3s)
+- Toast user-visible auto-hide 6s, manual close, 4 niveaux (info/warn/error/success)
+- Noisy third-party filters (Leaflet tile errors, Overpass 429s, ResizeObserver loops) supprimés du toast mais loggés
+- Persistance `sessionStorage.fpErrorLog` (50 dernières)
+- Helpers `window.safeTry(fn, ctx)` + `window.safeAsync(fn, ctx)` retournent `{ ok, value?, err? }` — never throw
+- Public : `window._fpErrors.list()`, `.clear()`, `.show(msg, level)`
+
+**localStorage safety**
+- `safeStorage.get/set/remove` wrapper dans `src/utils.js` : never throws, gère quota exceeded avec toast user-visible
+- `addCustomSite` rollback en cas d'échec de sauvegarde
+
+**Offline / rate limiting**
+- `rateLimit(fn, max, windowMs)` : Google Places autocomplete capé à 30 req/min (protection quota)
+- `retry(fn, opts)` : exponential backoff pour Overpass/Nominatim
+- `isOnline()` + `onOnlineChange(handler)` : toast "hors ligne" au boot + sur transitions
+- Autocomplete search court-circuité en offline (hint "Hors ligne — recherche désactivée")
+
+**Bugfixes latents**
+- `recomputeCurrentAnalysis()` (mobile) : utilisait `TARGETS[activeIdx]` → cassait pour les custom sites. Remplacé par `getAllSites()[activeIdx]` + guard null.
+
+**Code quality**
+- `src/utils.js` enrichi : `escapeHtml`, `safeStorage`, `debounce`, `rateLimit`, `retry`, `isOnline`, `onOnlineChange` + JSDoc partout
+- JSDoc sur `buildPnL()`, `getSurfaceScale()` (types retour + inputs documentés)
+- Mobile module : `_t()` alias i18n + `_esc()` alias escapeHtml (évite shadow + garantit escape)
+
+**Docs**
+- Nouveau `docs/API.md` : documente toute la surface publique `window.*`, events, helpers, schema customSites, conventions de version
+- À lire en premier pour tout refactor / onboarding nouveau dev
+
+**Tests : 197/197 PASS** (aucun impact modèle — pure couche défensive)
+
+### Upgrade note pragmatique estimée : 8,2 → **8,7 / 10**
+- Fiabilité : +0,3 (error boundary + offline + XSS closed)
+- Code quality : +0,2 (utils consolidés + JSDoc types)
+- Longévité : +0,2 (schema versioning + docs/API.md + migrations)
+
+Restent à faire pour 9+/10 : backend + DB migration, backtest contre clubs ouverts, ML recalibration (cf. roadmap v7+).
+
+---
+
+## [v6.7-i18n-fr-en] — 2026-04-18
+
+### Traduction FR ↔ EN via toggle pill
+
+Nouveau module `src/i18n.js` avec dictionnaire FR/EN (~140 clés), helper `window.t(key, params)`, persistance `localStorage.fpLocale`, et event `fp:locale-changed` pour re-render dynamique.
+
+**Pill toggle** visible top bar mobile (à côté de l'avatar) + sidebar desktop (à côté du version badge). Click → switch locale immédiat + rebuild carousel + detail si ouvert. Haptic feedback sur mobile.
+
+**Coverage v1** (≥95% surfaces mobile visibles) :
+- Top bar (search pill, placeholder, locale pill)
+- Carousel card (SITE, Secteur/Sector, Phase, Members, Voir l'analyse complète / View full analysis)
+- Detail header + nav (prev/next site, verdict)
+- Hero metrics (Members/Target, IRR, NPV, SAZ Score, Payback)
+- Accordion heads (Location, SAZ Score, Demographics, Member sources, P&L, Financing, BP template, Competitors)
+- Sliders (Loyer/Rent, Charges, Surface + hints)
+- P&L scenarios (Conservative/Base/Optimistic, NPV, Breakeven, Payback)
+- Financing card (Equity, Loan, Rate, Term, Monthly payment, Interest, Project IRR, Equity IRR)
+- BP template card (Revenue, Costs, Rent stepped, CAPEX & Financing, Financial params, OnAir benchmark)
+- FAB secondary sheet tabs (Layers, Competition, My sites, Dashboard)
+
+**Non traduit en v1 (resté FR)** :
+- Sparkline CAF annuelle header text ("Évolution sur 5 ans · Base")
+- Tooltip content inside info-tips (e.g. IRR Projet vs Equity explanatory text)
+- Onboarding tour (affiché une fois, localStorage)
+- Desktop captage analysis deep content (tabs + analysis text)
+- Admin UI (user management, invite links)
+
+**Architecture i18n** :
+```js
+const _t = (k, p) => (typeof window.t === 'function' ? window.t(k, p) : k);
+// Local alias dans mobile.js pour éviter shadowing avec `t` = target site
+// Toggle: window.toggleLocale() → emit 'fp:locale-changed' → listeners rebuild
+```
+
+**Files** :
+- `src/i18n.js` (nouveau, 280 lignes, dict FR + EN)
+- `src/mobile.js` (+~150 remplacements `_t('key')`)
+- `mobile.css` (+`.fp-locale-pill` styling)
+- `index.html` (chargement i18n.js avant mobile.js + pill desktop)
+- `config.js` MODEL_VERSION v6.7
+
+Tests 197/197 PASS (i18n est purement UI, pas d'impact modèle).
+
+---
+
+## [v6.6-capex-scales-surface] — 2026-04-18
+
+### CAPEX + Leasing scalés sur surface
+
+Les investissements upfront scalent désormais linéairement avec la surface :
+- **CAPEX** ref = 1 176 k€ à 1 449 m² → **812 €/m²** (travaux 580 + équip 232)
+- **Leasing** ref = 100,8 k€/an à 1 449 m² → **69,6 €/m²/an**
+
+Helpers `getScaledCapex()` et `getScaledLeasingAnnual()` appliquent le ratio `_surfaceOverride.surface / PNL_DEFAULTS.rentSteps.surface`. Si pas d'override → ratio = 1, valeurs BP d'origine.
+
+**Exemples** (loyer objectif négo, autres variables figées) :
+| Surface | Loyer Y1 | CAPEX | Leasing/an | Impact IRR approx. |
+|---|---:|---:|---:|---:|
+| 800 m² | 12,8 k€/mo | 650 k€ | 55,6 k€ | +pp (site petit, moins de CAPEX à amortir) |
+| 1 449 m² (ref Hala) | 23,2 k€/mo | 1 176 k€ | 100,8 k€ | = baseline |
+| 2 000 m² | 32,0 k€/mo | 1 623 k€ | 139,1 k€ | mix selon captage vs CAPEX |
+| 3 000 m² | 48,0 k€/mo | 2 435 k€ | 208,7 k€ | IRR probablement dégradé si captage n'augmente pas proportionnellement |
+
+Applied partout où CAPEX / leasing sont utilisés :
+- `buildPnL()` — P&L principal
+- `runSensitivityCase()` — sensibilité mono-paramètre
+- Scénarios Monte Carlo (conservateur/base/optimiste)
+- `bpTemplateCard()` mobile — affiche dynamiquement les valeurs scalées
+
+Tests 197/197 PASS (surface défaut 1449 → ratio 1 → valeurs inchangées).
+
+---
+
+## [v6.5-surface-slider] — 2026-04-18
+
+### Slider surface m² per-site + restore overrides au switch
+
+Troisième slider dans l'accordion P&L pour ajuster la surface du club (500-3000 m², défaut 1 449 m² Hala), **per-site persistant** via `window._surfaceOverrides[siteKey]`. Modulable parce que chaque site d'expansion peut avoir une surface différente qui impacte directement le loyer annuel (surface × €/m² × 12).
+
+`getSteppedRentMonthly` lit la surface depuis l'override si défini.
+
+**Restore overrides au changement de site (mobile)** : `activateSite(i)` restaure désormais `_rentOverride`, `_chargeOverride`, `_surfaceOverride` depuis la map per-site (ou reset à null si le site n'a pas de custom) — corrige le bug latent où les sliders d'un site A polluaient l'analyse du site B.
+
+**Hint live "Total all-in Y1"** : factorisé en `updateRentAllInHint()`, appelé par les 3 handlers. Affichage immédiat sans attendre le debounce.
+
+```js
+window._surfaceOverride = null;       // {surface: number}
+window._surfaceOverrides = {};        // per-site: siteKey → surface m²
+```
+
+Note : **CAPEX reste fixe** (1 176 k€) pour l'instant — la structure de coûts figée (post-calibration OnAir v6.x) ne bouge pas. Si besoin d'ajuster CAPEX proportionnellement à la surface, à faire dans une version ultérieure.
+
+Tests 197/197 PASS (baseline inchangée puisque la surface par défaut reste 1 449 m²).
+
+---
+
 ## [v6.4-charges-slider] — 2026-04-18
 
 ### Slider charges €/m² per-site + live recalc

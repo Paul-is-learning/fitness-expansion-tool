@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.4-charges-slider (voir CHANGELOG.md pour détail)
+- **Versions actuelle** : v6.8-reliability (voir CHANGELOG.md pour détail)
 
 ## Stack & structure
 ```
@@ -127,15 +127,18 @@ window._fpMobile.transitionTo('summary'|'detail'|'peek')
 window._fpMobile.activateSite(idx, true)
 window._rentOverride = {y1: 12}         // override loyer base
 window._chargeOverride = {chargeTotal: 7}  // override charges
+window._surfaceOverride = {surface: 2000}  // override surface m²
 ```
 
 ## Patterns de code importants
 
-### Rent & charges override per-site
+### Rent / charges / surface override per-site
 ```js
-window._rentOverrides[siteKey]    // {siteKey: rentY1}
-window._chargeOverrides[siteKey]  // {siteKey: chargeTotal}
-// Sont appliqués via window._rentOverride / _chargeOverride (singulier) à chaque render
+window._rentOverrides[siteKey]     // {siteKey: rentY1}
+window._chargeOverrides[siteKey]   // {siteKey: chargeTotal}
+window._surfaceOverrides[siteKey]  // {siteKey: surface m²}
+// Sont appliqués via window._rentOverride / _chargeOverride / _surfaceOverride (singulier)
+// Restore auto : activateSite(i) mobile + renderCaptageAnalysis desktop
 ```
 
 ### Mobile clone strategy (FAB secondary sheet)

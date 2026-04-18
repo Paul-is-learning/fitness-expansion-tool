@@ -29,6 +29,7 @@
 
 const CANONICAL_USERS = [
   {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
+  {email:'pbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
   {email:'ulysse.gaspard0@gmail.com',role:'user',name:'Ulysse Gaspard',pwHash:simpleHash('FP2026')},
   {email:'tomescumh@yahoo.com',role:'user',name:'Tomescu MH',pwHash:simpleHash('FP2026')},
 ];
