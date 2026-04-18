@@ -1,5 +1,43 @@
 # Changelog
 
+## [v5.6-clean-sectors] — 2026-04-18
+
+### Secteurs Bucharest : pinwheel non-overlapping + default OFF
+
+**Avant :**
+- 6 polygones dessinés à la main avec des coordonnées arbitraires
+- Edges non-partagés entre secteurs voisins → chevauchements visibles
+- Activés par défaut (pollution visuelle au boot)
+
+**Après — pattern pinwheel :**
+- Centre commun : **Piața Unirii** (44.4268, 26.1025)
+- 6 points d'angle extérieurs (`SEC_N`, `SEC_NE`, `SEC_SE`, `SEC_S`, `SEC_SW`, `SEC_NW`) **partagés** entre secteurs voisins
+- Chaque polygon : `[centre, corner_in, arc_extérieur, corner_out, centre]`
+- **Impossible de chevaucher** par construction mathématique
+- Visuellement = tranches de pizza depuis Piața Unirii, avec arcs extérieurs qui approximent les vraies limites
+
+**Logique layer :**
+- `layers.sectors = false` par défaut (plus propre au boot)
+- `drawSectors()` crée les polygons dans des layerGroups (`sectorPolyLayer`, `sectorLabelLayer`)
+- N'ajoute à la carte que si `layers.sectors === true`
+- `toggleLayer('sectors')` montre/cache les deux layer groups
+- Toggle HTML : classe `on` retirée par défaut (visual sync)
+
+**Trade-off assumé :**
+- Les vraies limites admin de Bucharest sont plus complexes (suivent des rues)
+- Le pinwheel est une **approximation géométrique propre**, plus lisible qu'un vrai admin boundary sur un petit écran
+- Alternative rejetée : fetch OSM admin_level=9 au boot (dépendance réseau + complexité)
+
+**Impact calculs :**
+- `estimatePopInRadius` et `findSector` utilisent les nouveaux polygons
+- Unirea Shopping Center : `sazDens` 61 → 48, `score` 68.6 → 68.2
+- Autres sites : identiques
+- **Baseline mise à jour** : `.baseline.json` + `tests/analysis.html`
+
+**Tests :** 197/197 PASS ✓
+
+---
+
 ## [v5.5-desktop-polish] — 2026-04-18
 
 ### Desktop Apple-like art layer

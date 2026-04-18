@@ -426,7 +426,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <div class="card-title"><span class="icon">&#127760;</span> Couches cartographiques</div>
         </div>
         <div class="layer-row">
-          <div class="toggle on" id="tglSectors" onclick="toggleLayer('sectors')"></div>
+          <div class="toggle" id="tglSectors" onclick="toggleLayer('sectors')"></div>
           <div><div class="layer-label" onclick="toggleLayer('sectors')">Secteurs & SAZ</div><span class="layer-hint">Score d'attractivite par secteur</span></div>
         </div>
         <div class="layer-row">
@@ -1141,37 +1141,68 @@ let sectorSAZ = {};
 // ================================================================
 // BUCHAREST SECTORS — Enhanced data
 // ================================================================
+// ================================================================
+// BUCHAREST SECTORS — PINWHEEL (non-overlapping, shared radial edges)
+// ================================================================
+// 6 sectors share the center point (Piața Unirii) and pairwise share
+// one outer corner point with each adjacent sector. By construction
+// no two sectors can overlap.
+//
+// Outer corners are clockwise-ordered. Each sector polygon:
+//   [center, corner_in, ...outer_arc, corner_out, center]
+// ================================================================
+const BUCHAREST_CENTER = [44.4268, 26.1025]; // Piața Unirii
+// Shared corners between adjacent sectors (clockwise from north)
+const SEC_N  = [44.525, 26.115];  // S1 ↔ S2
+const SEC_NE = [44.437, 26.200];  // S2 ↔ S3
+const SEC_SE = [44.370, 26.145];  // S3 ↔ S4
+const SEC_S  = [44.343, 26.060];  // S4 ↔ S5
+const SEC_SW = [44.395, 25.960];  // S5 ↔ S6
+const SEC_NW = [44.495, 25.975];  // S6 ↔ S1
+
 const SECTORS = [
   {id:1,name:'Secteur 1',center:[44.4787,26.0655],pop:217367,area:68,
    youngPct:.43,income:'high',incomeIdx:90,rentProxy:2200,commerceIdx:85,transportIdx:90,sportIdx:82,
    desc:'Aviatorilor, Dorobanti, Floreasca, Baneasa',color:'#22c55e',
    details:'Quartier le plus aise de Bucarest. Sieges d\'ambassades, quartier d\'affaires Floreasca-Barbu Vacarescu. Population CSP+ dominante. Forte presence World Class.',
-   polygon:[[44.508,26.02],[44.52,26.04],[44.525,26.075],[44.52,26.105],[44.495,26.125],[44.48,26.115],[44.475,26.105],[44.468,26.098],[44.455,26.09],[44.445,26.085],[44.44,26.075],[44.438,26.069],[44.44,26.06],[44.445,26.07],[44.45,26.068],[44.46,26.065],[44.465,26.055],[44.472,26.055],[44.48,26.045],[44.49,26.035],[44.508,26.02]]},
-  {id:2,name:'Secteur 2',center:[44.4400,26.1350],pop:291557,area:32,
+   polygon:[BUCHAREST_CENTER, SEC_NW,
+            [44.510, 25.995], [44.535, 26.030], [44.545, 26.070], [44.540, 26.100],
+            SEC_N, BUCHAREST_CENTER]},
+  {id:2,name:'Secteur 2',center:[44.4650,26.1450],pop:291557,area:32,
    youngPct:.44,income:'medium-high',incomeIdx:65,rentProxy:1200,commerceIdx:60,transportIdx:75,sportIdx:68,
    desc:'Obor, Pantelimon, Colentina, Tei',color:'#3b82f6',
    details:'Secteur dense et mixte. Marche Obor (plus grand de Bucarest). Zone en gentrification autour du lac Tei. Bonne desserte metro M1.',
-   polygon:[[44.495,26.125],[44.49,26.14],[44.485,26.155],[44.48,26.17],[44.475,26.185],[44.465,26.195],[44.455,26.195],[44.445,26.19],[44.44,26.185],[44.435,26.175],[44.432,26.165],[44.43,26.155],[44.428,26.14],[44.43,26.125],[44.432,26.115],[44.435,26.105],[44.44,26.098],[44.445,26.095],[44.45,26.095],[44.455,26.09],[44.46,26.095],[44.468,26.098],[44.475,26.105],[44.48,26.115],[44.495,26.125]]},
-  {id:3,name:'Secteur 3',center:[44.4150,26.1550],pop:374737,area:34,
+   polygon:[BUCHAREST_CENTER, SEC_N,
+            [44.525, 26.140], [44.510, 26.175], [44.480, 26.200],
+            SEC_NE, BUCHAREST_CENTER]},
+  {id:3,name:'Secteur 3',center:[44.4050,26.1600],pop:374737,area:34,
    youngPct:.44,income:'medium',incomeIdx:50,rentProxy:1000,commerceIdx:55,transportIdx:70,sportIdx:58,
    desc:'Titan, Dristor, Vitan, Hala Laminor',color:'#eab308',
    details:'Secteur le plus peuple de Bucarest. Forte densite residentielle (grands ensembles). Quartier Titan en pleine transformation avec le projet Hala Laminor (86,300m2). Metro M1+M3.',
-   polygon:[[44.44,26.098],[44.435,26.105],[44.432,26.115],[44.43,26.125],[44.428,26.14],[44.43,26.155],[44.432,26.165],[44.435,26.175],[44.44,26.185],[44.435,26.195],[44.425,26.2],[44.415,26.2],[44.405,26.195],[44.395,26.185],[44.39,26.17],[44.388,26.155],[44.39,26.14],[44.395,26.125],[44.4,26.115],[44.405,26.1],[44.41,26.095],[44.415,26.09],[44.42,26.088],[44.425,26.09],[44.43,26.093],[44.435,26.095],[44.44,26.098]]},
-  {id:4,name:'Secteur 4',center:[44.3900,26.1100],pop:268018,area:34,
+   polygon:[BUCHAREST_CENTER, SEC_NE,
+            [44.410, 26.205], [44.390, 26.195], [44.375, 26.170],
+            SEC_SE, BUCHAREST_CENTER]},
+  {id:4,name:'Secteur 4',center:[44.3820,26.1020],pop:268018,area:34,
    youngPct:.42,income:'medium-low',incomeIdx:40,rentProxy:850,commerceIdx:45,transportIdx:65,sportIdx:48,
    desc:'Berceni, Tineretului, Piata Sudului',color:'#f97316',
    details:'Zone residentielle sud en croissance rapide. Grand Arena Shopping est le principal pole commercial. Desserte metro M2. Potentiel de croissance demographique eleve.',
-   polygon:[[44.43,26.093],[44.425,26.09],[44.42,26.088],[44.415,26.09],[44.41,26.095],[44.405,26.1],[44.4,26.115],[44.395,26.125],[44.39,26.14],[44.385,26.15],[44.375,26.15],[44.365,26.14],[44.36,26.125],[44.365,26.1],[44.37,26.09],[44.375,26.085],[44.385,26.065],[44.39,26.06],[44.4,26.055],[44.41,26.055],[44.42,26.06],[44.425,26.065],[44.43,26.075],[44.435,26.08],[44.438,26.069],[44.44,26.075],[44.44,26.085],[44.435,26.095],[44.43,26.093]]},
-  {id:5,name:'Secteur 5',center:[44.4100,26.0600],pop:240288,area:30,
+   polygon:[BUCHAREST_CENTER, SEC_SE,
+            [44.360, 26.135], [44.343, 26.100], [44.338, 26.075],
+            SEC_S, BUCHAREST_CENTER]},
+  {id:5,name:'Secteur 5',center:[44.4020,26.0100],pop:240288,area:30,
    youngPct:.40,income:'low',incomeIdx:25,rentProxy:700,commerceIdx:35,transportIdx:55,sportIdx:35,
    desc:'Rahova, Ferentari, Cotroceni, 13 Septembrie',color:'#ef4444',
    details:'Secteur contraste : quartier universitaire Cotroceni (CSP+) vs Ferentari (quartier defavorise). Mixite sociale forte. Opportunite limitee au segment Cotroceni uniquement.',
-   polygon:[[44.40666,25.9962],[44.40346,26.01331],[44.39072,26.02749],[44.38661,26.0386],[44.37827,26.05966],[44.36925,26.08721],[44.37344,26.08945],[44.37751,26.09036],[44.38321,26.08689],[44.38625,26.0913],[44.39278,26.09306],[44.39704,26.09285],[44.39837,26.09562],[44.40033,26.093],[44.40729,26.09507],[44.41222,26.09061],[44.41378,26.09205],[44.41782,26.08887],[44.42042,26.08864],[44.42475,26.09254],[44.42598,26.09482],[44.42954,26.0966],[44.43258,26.09633],[44.43467,26.0982],[44.43516,26.09569],[44.43473,26.09161],[44.43486,26.08835],[44.43504,26.08696],[44.4346,26.08463],[44.43609,26.08229],[44.43658,26.0794],[44.43808,26.06995],[44.43721,26.06908],[44.43652,26.06719],[44.43425,26.05978],[44.42935,26.06094],[44.42659,26.06054],[44.42339,26.0604],[44.4199,26.0605],[44.41733,26.05607],[44.41126,26.04563],[44.41394,26.03394],[44.41357,26.03093],[44.41218,26.0259],[44.41249,26.02207],[44.41026,26.01645],[44.40926,26.00998],[44.40666,25.9962]]},
-  {id:6,name:'Secteur 6',center:[44.4400,26.0100],pop:324994,area:38,
+   polygon:[BUCHAREST_CENTER, SEC_S,
+            [44.350, 26.025], [44.370, 25.985], [44.388, 25.965],
+            SEC_SW, BUCHAREST_CENTER]},
+  {id:6,name:'Secteur 6',center:[44.4400,26.0050],pop:324994,area:38,
    youngPct:.43,income:'medium-high',incomeIdx:62,rentProxy:1100,commerceIdx:58,transportIdx:72,sportIdx:65,
    desc:'Militari, Drumul Taberei, Crangasi',color:'#8b5cf6',
    details:'Second bassin de population. Militari Residence = plus grand quartier residentiel recent d\'Europe (~40,000 habitants). Metro M5 recemment ouvert. Fort potentiel sous-exploite en fitness.',
-   polygon:[[44.44074,25.96667],[44.42188,25.96899],[44.40744,25.98218],[44.40715,25.99926],[44.4103,26.00999],[44.41176,26.01615],[44.41219,26.02208],[44.41257,26.02546],[44.41232,26.02704],[44.40982,26.02862],[44.40612,26.03368],[44.41295,26.05275],[44.41821,26.0579],[44.42014,26.0602],[44.42326,26.06037],[44.42527,26.06061],[44.42638,26.06034],[44.42866,26.06112],[44.43079,26.06033],[44.43455,26.06027],[44.43706,26.06794],[44.43752,26.06888],[44.43778,26.07049],[44.44074,26.07328],[44.44329,26.07271],[44.44381,26.07054],[44.44501,26.07],[44.44504,26.06868],[44.4466,26.06741],[44.44799,26.06561],[44.45027,26.06312],[44.45194,26.06063],[44.4538,26.05771],[44.45772,26.05496],[44.4585,26.05215],[44.46242,26.04537],[44.4641,26.04143],[44.46478,26.03954],[44.46626,26.03684],[44.46658,26.03488],[44.46772,26.03209],[44.46828,26.02942],[44.47007,26.02776],[44.47356,26.01985],[44.47856,25.99047],[44.4664,25.97596],[44.46119,25.99955],[44.45412,26.01317],[44.44917,26.01575],[44.44828,26.01977],[44.44074,25.96667]]}
+   polygon:[BUCHAREST_CENTER, SEC_SW,
+            [44.420, 25.935], [44.450, 25.925], [44.478, 25.945],
+            SEC_NW, BUCHAREST_CENTER]},
 ];
 
 // ================================================================
@@ -1787,22 +1818,27 @@ function init() {
 // ================================================================
 // SECTORS DRAWING
 // ================================================================
+// Layer groups for sector polygons + labels, controlled by layers.sectors
+let sectorPolyLayer = null;
+let sectorLabelLayer = null;
+
 function drawSectors() {
+  // Build once; toggleLayer('sectors') controls visibility
+  sectorPolyLayer  = L.layerGroup();
+  sectorLabelLayer = L.layerGroup();
   SECTORS.forEach(s => {
     const poly = L.polygon(s.polygon,{
       color:s.color,weight:2,fillColor:s.color,fillOpacity:.12,
       smoothFactor:1
     });
-
     poly.on('click',e=>{L.DomEvent.stopPropagation(e);zoomSector(s.id)});
     poly.on('mouseover',function(){this.setStyle({fillOpacity:.28})});
     poly.on('mouseout',function(){this.setStyle({fillOpacity:.12})});
     poly.bindTooltip(`<b>${s.name}</b><br>${s.desc}<br>Pop: ${fmt(s.pop)} | 15-45: ${fmt(Math.round(s.pop*s.youngPct))}`,{
       sticky:true,className:'custom-tooltip',direction:'top'
     });
-
     sectorPolys[s.id] = poly;
-    poly.addTo(map);
+    poly.addTo(sectorPolyLayer);
 
     // Label
     L.marker(s.center,{
@@ -1811,8 +1847,13 @@ function drawSectors() {
         html:`<div style="background:${s.color};color:white;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;opacity:.85;font-family:var(--font);letter-spacing:.3px">${s.name}</div>`,
         iconSize:[80,24],iconAnchor:[40,12]
       })
-    }).addTo(map);
+    }).addTo(sectorLabelLayer);
   });
+  // Start hidden — layers.sectors is false by default
+  if (layers.sectors) {
+    sectorPolyLayer.addTo(map);
+    sectorLabelLayer.addTo(map);
+  }
 }
 
 // ================================================================
@@ -3054,7 +3095,7 @@ async function analyzeAllSectors() {
 // ================================================================
 // LAYERS
 // ================================================================
-const layers={sectors:true,competitors:false,heatmap:false,transport:false,pois:false,cartiere:false,heatDensity:false,heatYouth:false};
+const layers={sectors:false,competitors:false,heatmap:false,transport:false,pois:false,cartiere:false,heatDensity:false,heatYouth:false};
 
 function toggleLayer(name) {
   layers[name]=!layers[name];
@@ -3062,7 +3103,13 @@ function toggleLayer(name) {
   if(tgl) tgl.classList.toggle('on');
 
   if(name==='sectors'){
-    Object.values(sectorPolys).forEach(l=>{layers.sectors?l.addTo(map):map.removeLayer(l)});
+    if (layers.sectors) {
+      sectorPolyLayer?.addTo(map);
+      sectorLabelLayer?.addTo(map);
+    } else {
+      if (sectorPolyLayer)  map.removeLayer(sectorPolyLayer);
+      if (sectorLabelLayer) map.removeLayer(sectorLabelLayer);
+    }
   }
   if(name==='competitors'){
     if(layers.competitors) loadAllCompetitors();
