@@ -630,7 +630,86 @@
     margin-top: 12px; overflow-y: auto; flex: 1;
   }
 
-  /* ═════ ONBOARDING HINT ═════ */
+  /* ═════ ONBOARDING TOUR (spotlight) ═════ */
+  .fp-tour-overlay {
+    position: fixed; inset: 0;
+    z-index: 99990;
+    opacity: 0;
+    transition: opacity .3s ease-out;
+    pointer-events: none;
+  }
+  .fp-tour-overlay.on { opacity: 1; pointer-events: auto; }
+  .fp-tour-overlay.closing { opacity: 0; }
+
+  .fp-tour-spot {
+    transition: all .5s cubic-bezier(.22,.8,.28,1);
+  }
+
+  .fp-tour-tooltip {
+    position: fixed;
+    left: 14px; right: 14px;
+    background: rgba(17,24,39,.98);
+    backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: 0 12px 48px rgba(0,0,0,.8), 0 0 0 1px rgba(212,160,23,.2);
+    transition: top .4s, bottom .4s;
+    animation: fpTourPop .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes fpTourPop {
+    from { opacity: 0; transform: scale(.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .fp-tour-progress {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  .fp-tour-dot {
+    width: 24px; height: 3px; border-radius: 1.5px;
+    background: var(--border);
+    transition: background .3s;
+  }
+  .fp-tour-dot.active { background: var(--accent); }
+  .fp-tour-title {
+    font-size: 15px; font-weight: 800;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .fp-tour-body {
+    font-size: 13px;
+    color: var(--gray);
+    line-height: 1.45;
+    margin-bottom: 14px;
+  }
+  .fp-tour-actions {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  .fp-tour-skip {
+    background: transparent;
+    border: none;
+    color: var(--gray2);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 8px 12px;
+    font-family: var(--font);
+  }
+  .fp-tour-skip:active { color: var(--white); }
+  .fp-tour-next {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    font-family: var(--font);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(212,160,23,.35);
+    transition: transform var(--spring-bounce);
+  }
+  .fp-tour-next:active { transform: scale(.96); }
+
+  /* ═════ ONBOARDING HINT (legacy quick-tip) ═════ */
   .fp-onboarding-hint {
     position: fixed;
     bottom: calc(var(--peek-h) + 18px);

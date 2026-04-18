@@ -202,6 +202,7 @@
     if (newState === 'detail') {
       sheet.style.height = 'var(--detail-h)';
       buildDetail();
+      setTimeout(() => wirePullDownDismiss(), 100);
     }
 
     // Parallax: subtle scale on the map as sheet grows (gives depth)
@@ -529,11 +530,7 @@
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
-            <div class="card">
-              ${sazBar('Flux trafic',    sazFlux,  '#06b6d4')}
-              ${sazBar('Densité pop.',   sazDens,  '#22c55e')}
-              ${sazBar('% Jeunesse',     sazYouth, '#f59e0b')}
-            </div>
+            ${sazRadial(sazFlux, sazDens, sazYouth, score)}
           </div>
         </div>
 
@@ -593,7 +590,8 @@
             <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="fp-accordion-body">
-            <div class="card" style="padding:0">
+            ${buildCompsMiniMap(r.comps, t)}
+            <div class="card" style="padding:0;margin-top:10px">
               ${r.comps.slice(0, 10).map(c => `
                 <div style="padding:10px 12px;border-bottom:1px solid rgba(71,85,115,.2);display:flex;align-items:center;gap:10px">
                   <div style="width:6px;height:34px;background:${c.color};border-radius:2px"></div>
@@ -616,13 +614,29 @@
 
     qs('#fpDetailBack').addEventListener('click', () => { haptic(10); transitionTo('summary'); });
 
-    // Accordion toggles with stagger animation
+    // Accordion toggles with stagger animation + data-driven viz reveal
     qsa('.fp-accordion-item', det).forEach(item => {
       item.querySelector('.fp-accordion-head').addEventListener('click', () => {
         haptic(8);
+        const willOpen = !item.classList.contains('open');
         item.classList.toggle('open');
+        if (willOpen) {
+          // Trigger viz animations when section opens
+          setTimeout(() => {
+            if (item.dataset.sec === 'saz') animateSazRadial(item);
+            if (item.dataset.sec === 'pnl') animateSparkline(item);
+          }, 120);
+        }
       });
     });
+
+    // Auto-animate SAZ if it's initially open (first accordion = loc, but trigger for any)
+    setTimeout(() => {
+      qsa('.fp-accordion-item.open', det).forEach(item => {
+        if (item.dataset.sec === 'saz') animateSazRadial(item);
+        if (item.dataset.sec === 'pnl') animateSparkline(item);
+      });
+    }, 200);
 
     // Rent slider live recomputation
     const slider = qs('#fpRentSlider');
@@ -659,6 +673,61 @@
       </div>
     `;
   }
+
+  // ─── SAZ RADIAL CHART (3 concentric rings, Apple Watch style) ──
+  function sazRadial(fluxScore, densScore, youthScore, globalScore) {
+    // 3 concentric rings: outer=Flux (cyan), mid=Densité (green), inner=Jeunesse (amber)
+    // Each ring is a full circle stroke-dashed based on score / 100
+    const rings = [
+      { score: fluxScore,  color: '#06b6d4', r: 56, label: 'Flux' },
+      { score: densScore,  color: '#22c55e', r: 42, label: 'Densité' },
+      { score: youthScore, color: '#f59e0b', r: 28, label: 'Jeunesse' }
+    ];
+    const size = 160;
+    const cx = size / 2, cy = size / 2;
+    const strokeW = 10;
+
+    const ringsSVG = rings.map((r, idx) => {
+      const circ = 2 * Math.PI * r.r;
+      // Use CSS var trick: strokeDashoffset animates from `circ` (empty) to `circ * (1 - score/100)` (filled)
+      return `
+        <circle cx="${cx}" cy="${cy}" r="${r.r}"
+                fill="none" stroke="${r.color}33" stroke-width="${strokeW}"/>
+        <circle class="fp-radial-ring" data-ring="${idx}"
+                cx="${cx}" cy="${cy}" r="${r.r}"
+                fill="none" stroke="${r.color}" stroke-width="${strokeW}"
+                stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
+                stroke-linecap="round"
+                style="transform:rotate(-90deg);transform-origin:center;transition:stroke-dashoffset 1.2s cubic-bezier(.22,.9,.3,1);filter:drop-shadow(0 0 8px ${r.color}55)"
+                data-target="${circ * (1 - r.score / 100)}"/>
+      `;
+    }).join('');
+
+    const legend = rings.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+        <div style="width:10px;height:10px;border-radius:50%;background:${r.color};box-shadow:0 0 8px ${r.color}88"></div>
+        <div style="flex:1;font-size:12px;color:var(--white)">${r.label}</div>
+        <div style="font-size:15px;font-weight:800;color:${r.color};font-variant-numeric:tabular-nums">${r.score}</div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:16px">
+        <div style="flex-shrink:0;position:relative;width:${size}px;height:${size}px">
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible">
+            ${ringsSVG}
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+            <div class="fp-radial-score" style="font-size:30px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums">0</div>
+            <div style="font-size:9px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-top:2px">/ 100</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:0">
+          ${legend}
+        </div>
+      </div>
+    `;
+  }
   function sourceBar(label, value, total, color) {
     const pct = total > 0 ? Math.round(value / total * 100) : 0;
     return `
@@ -684,7 +753,14 @@
     ];
     // Rent slider UI — recomputes everything on input
     const currentRent = window._rentOverride?.y1 ?? 10.5;
+
+    // Sparkline: cumulative cashflow over 60 months for BASE scenario
+    const spark = buildSparkline(r.pnl?.base);
+
     return `
+      <!-- Cashflow sparkline -->
+      ${spark}
+
       <!-- Rent slider -->
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(135deg,rgba(30,41,59,.8),rgba(17,24,39,.4))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -723,6 +799,159 @@
             </div>
           `;
         }).join('')}
+      </div>
+    `;
+  }
+
+  // ─── COMPS MINI-MAP: SVG radar showing comp density around site ──
+  function buildCompsMiniMap(comps, target) {
+    if (!comps || comps.length === 0 || !target) return '';
+    const size = 240;
+    const cx = size / 2, cy = size / 2;
+    const maxDistKm = 3; // viz within 3km radius (scale up to fit)
+    const pxPerKm = (size / 2 - 20) / maxDistKm;
+
+    // Site at center + radius circles
+    const ringLabels = [1, 2, 3]; // 1km, 2km, 3km
+
+    // Comps as circles — size = captured, color = segment color
+    const dots = comps.slice(0, 40).map((c, idx) => {
+      const distKm = c.dist / 1000;
+      if (distKm > maxDistKm) return ''; // cap
+      // Project (lat,lng) difference onto the canvas preserving relative bearing
+      const dLat = c.lat - target.lat;
+      const dLng = (c.lng - target.lng) * Math.cos(target.lat * Math.PI / 180);
+      const bearing = Math.atan2(dLng, dLat); // radians, 0 = north
+      const r = distKm * pxPerKm;
+      const x = cx + r * Math.sin(bearing);
+      const y = cy - r * Math.cos(bearing);
+      const dotR = Math.max(3, Math.min(10, 3 + Math.sqrt(c.captured / 20)));
+      return `<circle class="fp-minimap-dot" data-idx="${idx}"
+                cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}"
+                fill="${c.color}" fill-opacity=".85"
+                stroke="rgba(0,0,0,.4)" stroke-width="1"
+                style="filter:drop-shadow(0 0 4px ${c.color}66);transition:transform .3s"/>`;
+    }).join('');
+
+    return `
+      <div class="card" style="padding:14px 14px 4px;background:linear-gradient(180deg,rgba(30,41,59,.4),rgba(17,24,39,.1))">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Densité concurrentielle</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">Rayon 3 km</div>
+          </div>
+          <div style="font-size:11px;color:var(--gray)">taille = captifs</div>
+        </div>
+        <svg width="100%" viewBox="0 0 ${size} ${size}" style="display:block;max-width:${size}px;margin:0 auto">
+          <defs>
+            <radialGradient id="fpMinimapBg" cx="50%" cy="50%">
+              <stop offset="0%"  stop-color="rgba(212,160,23,.15)"/>
+              <stop offset="100%" stop-color="rgba(6,8,15,0)"/>
+            </radialGradient>
+          </defs>
+          <!-- Background glow at center -->
+          <circle cx="${cx}" cy="${cy}" r="${size/2 - 10}" fill="url(#fpMinimapBg)"/>
+
+          <!-- Distance rings -->
+          ${ringLabels.map(km => `
+            <circle cx="${cx}" cy="${cy}" r="${km * pxPerKm}"
+                    fill="none" stroke="rgba(148,163,184,.2)" stroke-width="1" stroke-dasharray="2 3"/>
+            <text x="${cx + km * pxPerKm - 3}" y="${cy - 2}" fill="rgba(148,163,184,.5)" font-size="8" text-anchor="end">${km}km</text>
+          `).join('')}
+
+          <!-- Axis lines -->
+          <line x1="${pad(10)}" y1="${cy}" x2="${size - 10}" y2="${cy}" stroke="rgba(148,163,184,.15)" stroke-width="1"/>
+          <line x1="${cx}" y1="10" x2="${cx}" y2="${size - 10}" stroke="rgba(148,163,184,.15)" stroke-width="1"/>
+
+          <!-- Competitor dots -->
+          ${dots}
+
+          <!-- FP site marker at center -->
+          <circle cx="${cx}" cy="${cy}" r="14" fill="rgba(212,160,23,.3)"/>
+          <circle cx="${cx}" cy="${cy}" r="10" fill="var(--accent)" stroke="white" stroke-width="2"
+                  style="filter:drop-shadow(0 0 8px rgba(212,160,23,.6))">
+            <animate attributeName="r" values="10;12;10" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <text x="${cx}" y="${cy + 4}" fill="#000" font-size="12" font-weight="900" text-anchor="middle">FP</text>
+
+          <!-- N/S/E/W compass hints -->
+          <text x="${cx}" y="14" fill="rgba(148,163,184,.4)" font-size="9" text-anchor="middle" font-weight="600">N</text>
+        </svg>
+      </div>
+    `;
+  }
+  function pad(v) { return v; } // used above in mini-map
+
+  // ─── SPARKLINE: cumulative cashflow over 60 months ─────────────
+  function buildSparkline(pnlBase) {
+    if (!pnlBase || !Array.isArray(pnlBase.monthly) || pnlBase.monthly.length < 2) return '';
+    // Use pre-computed cumulCashFlow per monthly entry (from buildPnL)
+    const cum = pnlBase.monthly.map(m => m.cumulCashFlow || 0);
+
+    const w = 300, h = 100, pad = 10;
+    const minV = Math.min(...cum, 0);
+    const maxV = Math.max(...cum, 0);
+    const range = maxV - minV || 1;
+    const xs = cum.length;
+
+    // Zero line y
+    const zeroY = h - pad - ((0 - minV) / range) * (h - 2 * pad);
+
+    // Build path points
+    const pts = cum.map((v, i) => {
+      const x = pad + (i / (xs - 1)) * (w - 2 * pad);
+      const y = h - pad - ((v - minV) / range) * (h - 2 * pad);
+      return [x, y];
+    });
+    const pathD = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+
+    // Find breakeven: first index where cum crosses 0 upward
+    let beMonth = pnlBase.breakevenMonth || null;
+    let beX = null;
+    if (beMonth && beMonth < xs) {
+      beX = pad + (beMonth / (xs - 1)) * (w - 2 * pad);
+    }
+
+    // Fill area below line (subtle)
+    const areaD = pathD + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (h - pad) + ' L' + pad + ',' + (h - pad) + ' Z';
+
+    const endValue = cum[cum.length - 1];
+    const endSign = endValue >= 0 ? 'positif' : 'négatif';
+    const endColor = endValue >= 0 ? '#34d399' : '#f87171';
+
+    return `
+      <div class="card" style="padding:14px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.4),rgba(17,24,39,.2))">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">Cashflow cumulé</div>
+            <div style="font-size:13px;font-weight:700;color:var(--white);margin-top:2px">60 mois · Scénario base</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:900;color:${endColor};line-height:1">${fmtM(endValue)}</div>
+            <div style="font-size:10px;color:var(--gray2);margin-top:2px">final ${endSign}</div>
+          </div>
+        </div>
+        <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block">
+          <defs>
+            <linearGradient id="fpSparkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"  stop-color="${endColor}" stop-opacity=".35"/>
+              <stop offset="100%" stop-color="${endColor}" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- Zero baseline -->
+          <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${w - pad}" y2="${zeroY.toFixed(1)}"
+                stroke="rgba(148,163,184,.3)" stroke-width="1" stroke-dasharray="2 3"/>
+          <!-- Breakeven vertical line -->
+          ${beX !== null ? `<line x1="${beX.toFixed(1)}" y1="${pad}" x2="${beX.toFixed(1)}" y2="${h - pad}"
+                stroke="${endColor}" stroke-width="1" stroke-dasharray="3 2" opacity=".5"/>
+                <text x="${beX.toFixed(1)}" y="${pad + 10}" fill="${endColor}" font-size="9" text-anchor="middle" opacity=".8">BE ${beMonth}mo</text>` : ''}
+          <!-- Filled area -->
+          <path d="${areaD}" fill="url(#fpSparkGrad)" opacity=".6"/>
+          <!-- The line -->
+          <path class="fp-sparkline-path" d="${pathD}" fill="none" stroke="${endColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 4px ${endColor}66)"/>
+          <!-- End point dot -->
+          <circle cx="${pts[pts.length - 1][0].toFixed(1)}" cy="${pts[pts.length - 1][1].toFixed(1)}" r="3" fill="${endColor}"/>
+        </svg>
       </div>
     `;
   }
@@ -805,6 +1034,39 @@
     });
   }
 
+  // ─── SAZ RADIAL: animate rings from empty to filled ────────────
+  function animateSazRadial(container) {
+    const rings = qsa('.fp-radial-ring', container);
+    // Stagger reveal per ring
+    rings.forEach((ring, i) => {
+      setTimeout(() => {
+        ring.style.strokeDashoffset = ring.dataset.target;
+      }, i * 140);
+    });
+    // Animate the center score number
+    const scoreEl = container.querySelector('.fp-radial-score');
+    if (scoreEl) {
+      // Score was stored as the 4th arg in the accordion hint — pull from data
+      const hint = container.querySelector('.fp-accordion-head .hint')?.textContent || '0';
+      const targetScore = parseInt(hint);
+      animateNumber(scoreEl, 0, targetScore, 900, v => Math.round(v));
+    }
+  }
+
+  // ─── SPARKLINE: animate stroke reveal ──────────────────────────
+  function animateSparkline(container) {
+    const paths = qsa('.fp-sparkline-path', container);
+    paths.forEach(path => {
+      const len = path.getTotalLength?.() || 0;
+      path.style.strokeDasharray = len;
+      path.style.strokeDashoffset = len;
+      // Force reflow
+      path.getBoundingClientRect();
+      path.style.transition = 'stroke-dashoffset 1.2s cubic-bezier(.22,.9,.3,1)';
+      path.style.strokeDashoffset = 0;
+    });
+  }
+
   // ─── ANIMATED NUMBER COUNTING ──────────────────────────────────
   function animateNumber(el, from, to, duration, formatter) {
     if (!el) return;
@@ -812,13 +1074,19 @@
     to = isFinite(to) ? to : 0;
     const start = performance.now();
     const ease = (t) => 1 - Math.pow(1 - t, 3); // ease-out-cubic
+    let rafId = null;
     function frame(now) {
       const t = Math.min(1, (now - start) / duration);
-      const v = from + (to - from) * ease(t);
-      el.textContent = formatter(v);
-      if (t < 1) requestAnimationFrame(frame);
+      el.textContent = formatter(from + (to - from) * ease(t));
+      if (t < 1) rafId = requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(frame);
+    // Safety fallback: guarantee final value is set even if rAF is throttled
+    // (background tabs, some headless environments, older browsers)
+    setTimeout(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      el.textContent = formatter(to);
+    }, duration + 200);
   }
 
   // ─── FAB + SECONDARY SHEET ─────────────────────────────────────
@@ -925,9 +1193,87 @@
     });
   }
 
-  // ─── ONBOARDING HINT ───────────────────────────────────────────
+  // ─── PULL-DOWN on detail sticky header → back to summary ───────
+  function wirePullDownDismiss() {
+    // Listen for touchstart/move/end on the detail scroll container
+    const det = qs('#fpDetail');
+    if (!det || det.__pullWired) return;
+    det.__pullWired = true;
+
+    let startY = 0, pulling = false, started = false;
+
+    det.addEventListener('touchstart', (e) => {
+      if (state !== 'detail') return;
+      // Only start if scrolled to top (otherwise it's normal scroll)
+      if (det.scrollTop > 2) return;
+      startY = e.touches[0].clientY;
+      started = true;
+      pulling = false;
+    }, { passive: true });
+
+    det.addEventListener('touchmove', (e) => {
+      if (!started) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 30 && !pulling) pulling = true;
+      if (pulling && dy > 0) {
+        // Rubber band: visual feedback on sheet via translateY
+        const pullAmt = Math.min(100, dy * 0.6);
+        sheet.style.transform = `translateY(${pullAmt}px)`;
+        sheet.style.transition = 'none';
+      }
+    }, { passive: true });
+
+    det.addEventListener('touchend', (e) => {
+      if (!started) return;
+      sheet.style.transform = '';
+      sheet.style.transition = '';
+      if (pulling) {
+        const dy = (e.changedTouches?.[0]?.clientY || 0) - startY;
+        if (dy > 80) {
+          haptic(20);
+          transitionTo('summary');
+        }
+      }
+      started = false; pulling = false;
+    });
+  }
+
+  // ─── DOUBLE-TAP map → zoom to nearest target ───────────────────
+  function wireMapDoubleTap() {
+    if (!window._fpMap || window._fpMap.__fpDblWired) return;
+    window._fpMap.__fpDblWired = true;
+    let lastTap = 0;
+    window._fpMap.on('click', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 320) {
+        // Double-tap
+        const { lat, lng } = e.latlng;
+        let best = 0, bestD = Infinity;
+        TARGETS.forEach((t, i) => {
+          const d = Math.hypot(t.lat - lat, t.lng - lng);
+          if (d < bestD) { bestD = d; best = i; }
+        });
+        activateSite(best, true);
+        if (state === 'peek') transitionTo('summary');
+        haptic(20);
+      }
+      lastTap = now;
+    });
+  }
+
+  // ─── ONBOARDING: 3-step spotlight tour on first visit ──────────
+  const TOUR_KEY = 'fpSeenTour';
+
   function maybeShowOnboarding() {
-    if (localStorage.getItem('fpSeenOnboarding') === '1') return;
+    // Legacy hint fallback (if they already dismissed the tour but haven't seen the hint)
+    if (localStorage.getItem(TOUR_KEY) === '1') {
+      if (localStorage.getItem('fpSeenOnboarding') !== '1') showQuickHint();
+      return;
+    }
+    setTimeout(() => showTour(), 900);
+  }
+
+  function showQuickHint() {
     const hint = document.createElement('div');
     hint.className = 'fp-onboarding-hint';
     hint.textContent = 'Glisse pour explorer les sites';
@@ -938,6 +1284,119 @@
       setTimeout(() => hint.remove(), 500);
       localStorage.setItem('fpSeenOnboarding', '1');
     }, 4500);
+  }
+
+  function showTour() {
+    const steps = [
+      {
+        selector: '.fp-sheet-carousel',
+        title: 'Parcours les 5 sites',
+        body: 'Glisse horizontalement pour comparer tes candidats d\'expansion.',
+        arrow: 'bottom'
+      },
+      {
+        selector: '.fp-target-pin',
+        title: 'Les pins sur la carte',
+        body: 'Tap un pin → le site correspondant s\'active dans le carrousel.',
+        arrow: 'top'
+      },
+      {
+        selector: '.fp-detail-cta, .fp-site-card.active',
+        title: 'L\'analyse complète',
+        body: 'Tap "Voir l\'analyse" pour le P&L, scénarios, concurrents — avec slider loyer en temps réel.',
+        arrow: 'bottom'
+      }
+    ];
+
+    let current = 0;
+    const overlay = document.createElement('div');
+    overlay.className = 'fp-tour-overlay';
+    overlay.innerHTML = `
+      <svg class="fp-tour-svg" width="100%" height="100%" style="position:fixed;inset:0;pointer-events:none">
+        <defs>
+          <mask id="fpTourMask">
+            <rect width="100%" height="100%" fill="white"/>
+            <rect class="fp-tour-spot" x="0" y="0" width="0" height="0" rx="14" fill="black"/>
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(0,0,0,.72)" mask="url(#fpTourMask)"/>
+      </svg>
+      <div class="fp-tour-tooltip">
+        <div class="fp-tour-progress">
+          <span class="fp-tour-dot active"></span>
+          <span class="fp-tour-dot"></span>
+          <span class="fp-tour-dot"></span>
+        </div>
+        <div class="fp-tour-title"></div>
+        <div class="fp-tour-body"></div>
+        <div class="fp-tour-actions">
+          <button class="fp-tour-skip">Passer</button>
+          <button class="fp-tour-next">Suivant →</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    function positionSpot(selector) {
+      const target = qs(selector.split(',')[0].trim());
+      const rect = target?.getBoundingClientRect();
+      const spot = overlay.querySelector('.fp-tour-spot');
+      if (!rect || !spot) return null;
+      const pad = 10;
+      spot.setAttribute('x', Math.max(0, rect.left - pad));
+      spot.setAttribute('y', Math.max(0, rect.top - pad));
+      spot.setAttribute('width', rect.width + pad * 2);
+      spot.setAttribute('height', rect.height + pad * 2);
+      return rect;
+    }
+
+    function render(idx) {
+      const step = steps[idx];
+      const rect = positionSpot(step.selector);
+      overlay.querySelector('.fp-tour-title').textContent = step.title;
+      overlay.querySelector('.fp-tour-body').textContent = step.body;
+      qsa('.fp-tour-dot', overlay).forEach((d, i) => d.classList.toggle('active', i === idx));
+      const tooltip = overlay.querySelector('.fp-tour-tooltip');
+      if (rect) {
+        // Position tooltip above or below the spot
+        const vh = window.innerHeight;
+        const below = rect.top > vh / 2;
+        if (below) {
+          tooltip.style.top = 'auto';
+          tooltip.style.bottom = (vh - rect.top + 16) + 'px';
+        } else {
+          tooltip.style.bottom = 'auto';
+          tooltip.style.top = (rect.bottom + 16) + 'px';
+        }
+      }
+      const nextBtn = overlay.querySelector('.fp-tour-next');
+      nextBtn.textContent = (idx === steps.length - 1) ? 'Terminer' : 'Suivant →';
+    }
+
+    overlay.querySelector('.fp-tour-next').addEventListener('click', () => {
+      haptic(10);
+      current++;
+      if (current >= steps.length) { finishTour(); return; }
+      render(current);
+    });
+    overlay.querySelector('.fp-tour-skip').addEventListener('click', finishTour);
+
+    function finishTour() {
+      overlay.classList.add('closing');
+      setTimeout(() => overlay.remove(), 400);
+      localStorage.setItem(TOUR_KEY, '1');
+      localStorage.setItem('fpSeenOnboarding', '1');
+    }
+
+    // Reposition on resize (orientation changes)
+    window.addEventListener('resize', () => current < steps.length && render(current));
+
+    // Force layout, then render + show in next macrotask (more reliable than rAF)
+    overlay.getBoundingClientRect();
+    setTimeout(() => {
+      try { render(0); } catch(e) { console.warn('[FP tour] render0 failed:', e); }
+      overlay.classList.add('on');
+    }, 30);
   }
 
   // ─── TOOLTIPS: tap-to-open (carry-over) ────────────────────────
@@ -982,6 +1441,7 @@
   function tryBuildPins(tries = 0) {
     if (window._fpMap && typeof TARGETS !== 'undefined' && typeof L !== 'undefined') {
       buildTargetPins();
+      wireMapDoubleTap();
       return;
     }
     if (tries > 30) return;

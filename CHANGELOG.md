@@ -1,5 +1,61 @@
 # Changelog
 
+## [v5.1-data-storytelling] — 2026-04-18
+
+### Data visualization + gestures + onboarding (axes 4, 5, 9)
+
+**Axe 5 — Data storytelling :**
+- **SAZ radial chart** Apple Watch-style : 3 anneaux concentriques animés (Flux cyan / Densité vert / Jeunesse amber)
+  - Score central gros chiffre gold qui compte de 0 à la valeur cible (900ms ease-out-cubic)
+  - Anneaux : `stroke-dashoffset` animé depuis 360° → % cible (1.2s cascade avec stagger 140ms)
+  - Drop-shadow colorée par anneau
+  - Légende à droite avec dots glowing
+- **Sparkline cashflow 60 mois** dans accordion P&L :
+  - SVG path avec gradient area fill
+  - Ligne verticale dashed sur le breakeven month avec label
+  - End dot coloré (vert si positif, rouge si négatif)
+  - Animation stroke-dashoffset reveal (1.2s)
+  - Affiche le total final en gros
+- **Mini-map concurrents** radar SVG :
+  - FP au centre (pulse animation 2s)
+  - 3 anneaux de distance (1/2/3 km) dashed
+  - Compass "N"
+  - Dots concurrents positionnés par bearing lat/lng, taille = captifs, color = segment
+  - Drop-shadow colorée sur chaque dot
+
+**Axe 4 — Gesture richness :**
+- **Pull-down sur detail view** → retour summary (rubber band effect)
+  - Détecte scroll top + touchmove vers le bas
+  - Sheet translate avec resistance (dy * 0.6)
+  - > 80px = transition vers summary + haptic
+- **Double-tap sur la carte** → zoom sur le site cible le plus proche
+  - Détection via timestamp (double-tap threshold 320ms)
+  - `flyTo` + active site dans carrousel
+  - Transition to summary si en peek
+
+**Axe 9 — Onboarding tour :**
+- 3 étapes au 1er login avec **spotlight effect** (SVG mask cut-out)
+- Tooltip gold-bordered avec :
+  - 3 progress dots
+  - Title + body + Suivant / Passer
+  - Repositioned below or above spotlight selon zone
+- Animation `fpTourPop` spring 450ms
+- Skippable, stocké dans localStorage `fpSeenTour`
+
+**Fix :**
+- `animateNumber` : ajout fallback setTimeout pour garantir la valeur finale quand rAF est throttled (onglets background, environnements headless)
+
+**Non-régression :**
+- Tests 197/197 PASS ✓
+- Desktop strictement inchangé
+
+**Fichiers modifiés :**
+- `mobile.css` : `.fp-tour-overlay`, `.fp-tour-tooltip`, `.fp-tour-spot` (SVG mask), tour animations
+- `src/mobile.js` : `sazRadial`, `animateSazRadial`, `buildSparkline`, `animateSparkline`, `buildCompsMiniMap`, `wirePullDownDismiss`, `wireMapDoubleTap`, `showTour`
+- `config.js` : MODEL_VERSION v5.1
+
+---
+
 ## [v5.0-apple-like] — 2026-04-18
 
 ### UX excellence — polish "Apple-like 2026"
