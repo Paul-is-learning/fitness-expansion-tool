@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>FP Romania — Smoke Test</title>
+<style>
+  body { font-family: ui-monospace, monospace; background: #0b1220; color: #e2e8f0; padding: 20px; }
+  h1 { color: #fbbf24; }
+  .pass { color: #22c55e; font-weight: 700; }
+  .fail { color: #ef4444; font-weight: 700; background: #450a0a; padding: 0 6px; border-radius: 3px; }
+  .info { color: #94a3b8; font-size: 12px; }
+  table { border-collapse: collapse; margin: 8px 0; font-size: 12px; width: 100%; }
+  th, td { padding: 4px 10px; border-bottom: 1px solid #1e293b; text-align: right; }
+  th { background: #1e293b; text-align: center; }
+  td:first-child, th:first-child { text-align: left; color: #fbbf24; }
+  .summary { font-size: 16px; padding: 12px; border-radius: 6px; margin: 12px 0; }
+  .summary.ok { background: #052e16; color: #86efac; border: 1px solid #22c55e; }
+  .summary.ko { background: #450a0a; color: #fca5a5; border: 1px solid #ef4444; }
+  button { background: #fbbf24; color: #0b1220; border: none; padding: 10px 20px; font-weight: 700; cursor: pointer; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<h1>FP Romania — Smoke Test (regression check)</h1>
+<p class="info">Runs the 5 target sites through <code>runCaptageAnalysis()</code> and
+compares key financial + member metrics against <code>.baseline.json</code>.<br>
+Run this after any refactor or data update. If a cell turns red, the model has regressed — inspect the diff.</p>
+
+<button onclick="runTests()">▶ Run tests</button>
+<div id="result"></div>
+
+<!-- Load the full app in a hidden iframe so we get its globals -->
+<iframe id="appFrame" src="index.html" style="display:none;width:1200px;height:800px" onload="window._frameReady=true"></iframe>
+
+<script>
+const BASELINE = {
+  "Baneasa Shopping City": {arpu:22.98,beBase:5,captifs:283,comps:4,destBonus:2689,irrBase:50.8,ltv:903,ltvCac:18.1,members:8762,natifs:290,npvBase:3016682,pbBase:45,popTarget:40816,sazDens:57,sazFlux:30,sazYouth:27,score:68,verdict:"GO CONDITIONNEL",walkIn:5500},
+  "Grand Arena": {arpu:27.66,beBase:20,captifs:749,comps:3,destBonus:0,irrBase:-9.43,ltv:960,ltvCac:19.2,members:3135,natifs:1336,npvBase:-963553,pbBase:null,popTarget:119309,sazDens:61,sazFlux:15,sazYouth:22,score:50.9,verdict:"WATCH",walkIn:1050},
+  "Hala Laminor": {arpu:27.27,beBase:5,captifs:3228,comps:19,destBonus:0,irrBase:47.95,ltv:952,ltvCac:19,members:7093,natifs:785,npvBase:2743651,pbBase:47,popTarget:262792,sazDens:69,sazFlux:65,sazYouth:37,score:68.8,verdict:"GO CONDITIONNEL",walkIn:3080},
+  "Militari Shopping": {arpu:27.69,beBase:13,captifs:723,comps:5,destBonus:0,irrBase:-3.84,ltv:963,ltvCac:19.3,members:3339,natifs:1356,npvBase:-758063,pbBase:null,popTarget:100316,sazDens:70,sazFlux:22,sazYouth:42,score:53.7,verdict:"WATCH",walkIn:1260},
+  "Unirea Shopping Center": {arpu:25.96,beBase:7,captifs:2119,comps:17,destBonus:0,irrBase:30.99,ltv:939,ltvCac:18.8,members:5810,natifs:1941,npvBase:1275546,pbBase:null,popTarget:316718,sazDens:61,sazFlux:69,sazYouth:69,score:68.6,verdict:"GO CONDITIONNEL",walkIn:1750}
+};
+
+const METRICS = ["members","captifs","natifs","walkIn","destBonus","comps","popTarget","sazFlux","sazDens","sazYouth","irrBase","npvBase","beBase","pbBase","arpu","ltv","ltvCac","score","verdict"];
+
+async function runTests() {
+  const out = document.getElementById('result');
+  out.innerHTML = '<p class="info">Waiting for app frame…</p>';
+  while(!window._frameReady) await new Promise(r => setTimeout(r, 100));
+  const w = document.getElementById('appFrame').contentWindow;
+
+  // Note: `const` declarations don't propagate to window, so we use w.eval()
+  // to run code inside the iframe's global scope.
+  const results = await w.eval(`(async () => {
+    document.getElementById('loginEmail').value = 'paulbecaud@isseo-dev.com';
+    document.getElementById('loginPassword').value = 'FP2026!';
+    doLogin();
+    await new Promise(r => setTimeout(r, 1500));
+    await loadAllCompetitors();
+    await new Promise(r => setTimeout(r, 500));
+    const arr = [];
+    for(const site of TARGETS) {
+      const r = runCaptageAnalysis(site.lat, site.lng, 3000);
+      const exec = computeExecSummary(r);
+      arr.push({
+        name: site.name,
+        members: r.totalTheorique, captifs: r.totalCaptifs,
+        natifs: r.native?.captured || 0, walkIn: r.walkIn?.walkInMembers || 0,
+        destBonus: r.destinationBonus?.bonusMembers || 0, comps: r.comps.length,
+        popTarget: r.popTarget, sazFlux: r.saz?.flux, sazDens: r.saz?.densite, sazYouth: r.saz?.jeunesse,
+        irrBase: r.pnl?.base?.irr, npvBase: Math.round(r.pnl?.base?.npv),
+        beBase: r.pnl?.base?.breakevenMonth, pbBase: r.pnl?.base?.paybackMonth,
+        arpu: r.arpu, ltv: Math.round(r.ltv), ltvCac: r.ltvCacRatio,
+        score: exec.total,
+        verdict: typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict
+      });
+    }
+    return arr;
+  })()`);
+
+  let totalCells = 0, failures = 0;
+  let rows = '';
+  for (const actual of results) {
+    const exp = BASELINE[actual.name];
+    rows += '<tr><td>' + actual.name + '</td>';
+    for (const k of METRICS) {
+      totalCells++;
+      const e = exp[k], a = actual[k];
+      const eq = JSON.stringify(e) === JSON.stringify(a);
+      if (!eq) failures++;
+      rows += '<td class="' + (eq ? 'pass' : 'fail') + '" title="' + k + ': ' + a + ' (expected ' + e + ')">' +
+              (eq ? '✓' : (a + '≠' + e)) + '</td>';
+    }
+    rows += '</tr>';
+  }
+
+  const summary = failures === 0
+    ? '<div class="summary ok">✅ ALL PASS — ' + totalCells + '/' + totalCells + ' cells match baseline</div>'
+    : '<div class="summary ko">❌ FAIL — ' + failures + '/' + totalCells + ' cells regressed</div>';
+
+  const headers = '<tr><th>Site</th>' + METRICS.map(m => '<th>' + m + '</th>').join('') + '</tr>';
+  out.innerHTML = summary + '<table>' + headers + rows + '</table>';
+}
+</script>
+
+</body>
+</html>
