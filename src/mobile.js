@@ -2349,10 +2349,18 @@
     nodes.forEach(el => {
       const srcEl = document.getElementById(el.dataset.origId);
       if (!srcEl || srcEl === el) return;
-      // Skip form controls — their value is controlled by user + desktop sync,
-      // and rewriting innerHTML would drop the current selection / typed text.
       const tag = el.tagName?.toLowerCase();
-      if (tag === 'select' || tag === 'input' || tag === 'textarea') return;
+      // <select>: copy options from source (dynamic content), preserve current value.
+      if (tag === 'select') {
+        const prevVal = el.value;
+        el.innerHTML = srcEl.innerHTML;
+        // Re-apply previous value if still a valid option; else fall back to source's value.
+        const has = Array.from(el.options).some(o => o.value === prevVal);
+        el.value = has ? prevVal : (srcEl.value || '');
+        return;
+      }
+      // <input>/<textarea>: skip — user's typed text must not be wiped.
+      if (tag === 'input' || tag === 'textarea') return;
       el.innerHTML = srcEl.innerHTML;
     });
   }

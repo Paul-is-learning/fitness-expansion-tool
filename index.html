@@ -3293,10 +3293,13 @@ async function loadAllCompetitors() {
   if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
   setStatus('ok',`${comps.length} concurrents charges`);
 
-  // Enrich with Google Places data (async, non-blocking)
+  // Enrich with Google Places data (async, non-blocking).
+  // Bugfix: only re-render markers if the competitors layer is still on.
+  // Otherwise the async .then() would re-populate the cluster after mobile
+  // had explicitly hidden it (clusters re-appearing at zoom-out = surprise).
   if (_googleHasKey()) {
     enrichWithGoogle(comps).then(() => {
-      showCompsOnMap(comps);
+      if (layers.competitors) showCompsOnMap(comps);
     });
   }
 }
