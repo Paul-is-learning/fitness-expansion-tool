@@ -731,7 +731,7 @@
     {
       tint: '#d4a017',
       eyebrow: 'CARTE LIVE',
-      title: '5 sites priorisés, Bucharest',
+      title: 'Identification des opportunités prioritaires',
       subtitle: 'Hala Laminor, Unirea, Militari, Grand Arena, Baneasa. Pins numérotés, swipe pour comparer, analyse auto en 1 tap.',
       demo: demoPins,
       cta: 'Suivant'
