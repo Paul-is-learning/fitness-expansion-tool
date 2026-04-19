@@ -277,6 +277,59 @@
       'dlegend.indep': 'Indépendant',
       'dlegend.target': 'Site cible FP',
 
+      // ─── Desktop: tab-compete ────────────────────────────────────
+      'dcompete.summary': 'Synthèse concurrentielle',
+      'dcompete.placeholder': 'Cliquez sur un point de la carte ou lancez "Charger concurrents" pour démarrer l\'analyse.',
+      'dcompete.filterBrand': 'Filtrer par marque',
+      'dcompete.detected': 'Concurrents détectés',
+      'dcompete.segment': 'Répartition par segment',
+      'dcompete.gap': 'Gap Analysis par secteur',
+
+      // ─── Desktop: tab-mysites ────────────────────────────────────
+      'dmysites.title': "Mes sites d'implantation",
+      'dmysites.addBtn': '+ Ajouter',
+      'dmysites.hint': 'Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.',
+      'dmysites.addrPlaceholder': 'Adresse (ex: Bd. Iuliu Maniu 100)',
+      'dmysites.geocode': 'Géocoder',
+      'dmysites.analysisTitle': 'Analyse détaillée du site',
+      'dmysites.closeAnalysis': '× Fermer',
+
+      // ─── Desktop: captage widget ─────────────────────────────────
+      'dcapt.title': 'Potentiel de captage',
+      'dcapt.radius': 'Rayon de captage',
+      'dcapt.captureRates': 'TAUX DE CAPTURE (ajustables)',
+      'dcapt.premWC': 'Premium (WC)',
+      'dcapt.midPrem': 'Mid-premium',
+      'dcapt.midSF': 'Mid (SF/18G)',
+      'dcapt.indep': 'Indépendant',
+      'dcapt.low': 'Low-cost',
+      'dcannibal.title': 'Risque de cannibalisation',
+
+      // ─── Desktop: tab-dash ───────────────────────────────────────
+      'ddash.zones': 'Zones analysées',
+      'ddash.export': '📥 Export CSV',
+      'ddash.col.zone': 'Zone',
+      'ddash.col.pop': 'Pop.',
+      'ddash.col.young': '15-45',
+      'ddash.col.saz': 'SAZ ▲',
+      'ddash.col.conc': 'Conc.',
+      'ddash.col.closest': '+ proche',
+      'ddash.col.potCA': 'Pot. CA',
+      'ddash.col.reco': 'Reco',
+      'ddash.compare': 'Comparaison sites',
+      'ddash.siteA': '-- Site A --',
+      'ddash.siteB': '-- Site B --',
+      'ddash.trajectory': 'Trajectoire financière réseau',
+      'ddash.bpParams': 'Paramètres clés BP',
+      'ddash.pricing': 'Pricing benchmark Roumanie',
+
+      // ─── Desktop: tab-site + sources ─────────────────────────────
+      'dsitecard.placeholder.html': 'Cliquez sur un point de la carte<br>pour générer une fiche de due diligence',
+      'dsources.title': 'Sources de données',
+      'dsources.limits': 'Limites & avertissements',
+      'dsector.row.pop': 'Pop',
+      'dsector.row.youngRange': '15-45',
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Oui',
       'common.no': 'Non',
@@ -542,6 +595,59 @@
       'dlegend.low': 'Low-cost',
       'dlegend.indep': 'Independent',
       'dlegend.target': 'FP target site',
+
+      // ─── Desktop: tab-compete ────────────────────────────────────
+      'dcompete.summary': 'Competitive overview',
+      'dcompete.placeholder': 'Click on a map point or hit "Load competitors" to start the analysis.',
+      'dcompete.filterBrand': 'Filter by brand',
+      'dcompete.detected': 'Competitors detected',
+      'dcompete.segment': 'Segment distribution',
+      'dcompete.gap': 'Gap analysis per sector',
+
+      // ─── Desktop: tab-mysites ────────────────────────────────────
+      'dmysites.title': 'My target sites',
+      'dmysites.addBtn': '+ Add',
+      'dmysites.hint': 'Click "Add" then click on the map to place a site. Or enter an address below.',
+      'dmysites.addrPlaceholder': 'Address (e.g. Bd. Iuliu Maniu 100)',
+      'dmysites.geocode': 'Geocode',
+      'dmysites.analysisTitle': 'Detailed site analysis',
+      'dmysites.closeAnalysis': '× Close',
+
+      // ─── Desktop: captage widget ─────────────────────────────────
+      'dcapt.title': 'Capture potential',
+      'dcapt.radius': 'Capture radius',
+      'dcapt.captureRates': 'CAPTURE RATES (adjustable)',
+      'dcapt.premWC': 'Premium (WC)',
+      'dcapt.midPrem': 'Mid-premium',
+      'dcapt.midSF': 'Mid (SF/18G)',
+      'dcapt.indep': 'Independent',
+      'dcapt.low': 'Low-cost',
+      'dcannibal.title': 'Cannibalisation risk',
+
+      // ─── Desktop: tab-dash ───────────────────────────────────────
+      'ddash.zones': 'Zones analyzed',
+      'ddash.export': '📥 Export CSV',
+      'ddash.col.zone': 'Zone',
+      'ddash.col.pop': 'Pop.',
+      'ddash.col.young': '15-45',
+      'ddash.col.saz': 'SAZ ▲',
+      'ddash.col.conc': 'Comp.',
+      'ddash.col.closest': 'Nearest',
+      'ddash.col.potCA': 'Rev. pot.',
+      'ddash.col.reco': 'Reco',
+      'ddash.compare': 'Site comparison',
+      'ddash.siteA': '-- Site A --',
+      'ddash.siteB': '-- Site B --',
+      'ddash.trajectory': 'Network financial trajectory',
+      'ddash.bpParams': 'Key BP parameters',
+      'ddash.pricing': 'Romania pricing benchmark',
+
+      // ─── Desktop: tab-site + sources ─────────────────────────────
+      'dsitecard.placeholder.html': 'Click on a point on the map<br>to generate a due diligence sheet',
+      'dsources.title': 'Data sources',
+      'dsources.limits': 'Limitations & caveats',
+      'dsector.row.pop': 'Pop',
+      'dsector.row.youngRange': '15-45',
 
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Yes',

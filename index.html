@@ -592,22 +592,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <div class="tab-panel" id="tab-compete">
       <div class="card" id="compSummaryCard">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128200;</span> Synthese concurrentielle</div>
+          <div class="card-title"><span class="icon">&#128200;</span> <span data-i18n="dcompete.summary">Synthèse concurrentielle</span></div>
         </div>
-        <div id="compSummary"><p style="font-size:12px;color:var(--gray2);padding:10px 0">Cliquez sur un point de la carte ou lancez "Charger concurrents" pour demarrer l'analyse.</p></div>
+        <div id="compSummary"><p style="font-size:12px;color:var(--gray2);padding:10px 0" data-i18n="dcompete.placeholder">Cliquez sur un point de la carte ou lancez "Charger concurrents" pour démarrer l'analyse.</p></div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127919;</span> Filtrer par marque</div>
-          <button class="btn btn-sm" onclick="toggleAllBrands(true)">Tout</button>
+          <div class="card-title"><span class="icon">&#127919;</span> <span data-i18n="dcompete.filterBrand">Filtrer par marque</span></div>
+          <button class="btn btn-sm" onclick="toggleAllBrands(true)" data-i18n="common.all">Tout</button>
         </div>
         <div id="brandFilters" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128205;</span> Concurrents detectes</div>
+          <div class="card-title"><span class="icon">&#128205;</span> <span data-i18n="dcompete.detected">Concurrents détectés</span></div>
           <span class="badge badge-blue" id="compCountBadge">0</span>
         </div>
         <div id="compList" style="max-height:300px;overflow-y:auto"></div>
@@ -615,7 +615,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127856;</span> Repartition par segment</div>
+          <div class="card-title"><span class="icon">&#127856;</span> <span data-i18n="dcompete.segment">Répartition par segment</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Segmentation concurrentielle</strong><br><strong style="color:#ef4444">Premium</strong>: World Class, Anytime (>40EUR/mois)<br><strong style="color:#f97316">Mid-range</strong>: BeFIT, 18GYM, Superfit (25-35EUR)<br><strong style="color:#eab308">Low-cost</strong>: Basic-Fit, SmartFit (<20EUR)<br><strong style="color:#22c55e">Independant</strong>: Salles locales<div class="tip-source">Source : worldclass.ro, stayfit.ro, befit.ro (mars 2025)</div></div></span>
         </div>
         <div class="chart-wrap" style="height:180px"><canvas id="segmentChart"></canvas></div>
@@ -623,7 +623,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128202;</span> Gap Analysis par secteur</div>
+          <div class="card-title"><span class="icon">&#128202;</span> <span data-i18n="dcompete.gap">Gap Analysis par secteur</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Gap Analysis</strong><br>Compare la <strong>population cible</strong> (15-45 ans) a la <strong>densite concurrentielle</strong> de chaque secteur. Les secteurs avec un ratio pop/concurrents eleve representent des <strong>zones blanches</strong> (opportunites). Un ratio faible indique une saturation.<div class="tip-source">Calcul : (Pop_cible / Nb_concurrents) normalise</div></div></span>
         </div>
         <div class="chart-wrap" style="height:240px"><canvas id="gapChart"></canvas></div>
@@ -641,46 +641,46 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <div class="tab-panel" id="tab-mysites">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9733;</span> Mes sites d'implantation</div>
-          <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()">+ Ajouter</button>
+          <div class="card-title"><span class="icon">&#9733;</span> <span data-i18n="dmysites.title">Mes sites d'implantation</span></div>
+          <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()" data-i18n="dmysites.addBtn">+ Ajouter</button>
         </div>
-        <p style="font-size:11px;color:var(--gray2);margin-bottom:10px">Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.</p>
+        <p style="font-size:11px;color:var(--gray2);margin-bottom:10px" data-i18n="dmysites.hint">Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.</p>
         <div style="display:flex;gap:6px;margin-bottom:12px">
-          <input type="text" id="newSiteAddr" placeholder="Adresse (ex: Bd. Iuliu Maniu 100)" style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
-          <button class="btn btn-sm" onclick="addSiteByAddress()">Geocoder</button>
+          <input type="text" id="newSiteAddr" placeholder="Adresse (ex: Bd. Iuliu Maniu 100)" data-i18n-placeholder="dmysites.addrPlaceholder" style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
+          <button class="btn btn-sm" onclick="addSiteByAddress()" data-i18n="dmysites.geocode">Geocoder</button>
         </div>
         <div id="customSitesList"></div>
       </div>
       <div class="card" id="siteAnalysisCard" style="display:none">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-          <div class="card-title"><span class="icon">&#128202;</span> Analyse detaillee du site</div>
-          <button onclick="exitAnalysis()" style="background:none;border:1px solid var(--gray2);color:var(--gray2);border-radius:6px;padding:3px 10px;font-size:9px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--gray2)';this.style.color='var(--gray2)'">&times; Fermer</button>
+          <div class="card-title"><span class="icon">&#128202;</span> <span data-i18n="dmysites.analysisTitle">Analyse détaillée du site</span></div>
+          <button onclick="exitAnalysis()" style="background:none;border:1px solid var(--gray2);color:var(--gray2);border-radius:6px;padding:3px 10px;font-size:9px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--gray2)';this.style.color='var(--gray2)'" data-i18n="dmysites.closeAnalysis">&times; Fermer</button>
         </div>
         <div id="siteAnalysisContent"></div>
       </div>
       <div class="card" id="captageCard" style="display:none">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127919;</span> Potentiel de captage</div>
+          <div class="card-title"><span class="icon">&#127919;</span> <span data-i18n="dcapt.title">Potentiel de captage</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Modele de captage</strong><br><b style="color:#f97316">Captifs</b> = membres actuels des concurrents qui switcheraient vers FP (prix + proximite + positionnement).<br><b style="color:var(--green)">Natifs</b> = population non-inscrite en salle qui rejoindrait FP (nouvelle offre = nouvelle demande).<br><br>Le total donne les <b>membres theoriques a terme</b> pour un club FP a cet emplacement.<div class="tip-source">Calibre sur benchmark FP France + data WC Romania</div></div></span>
         </div>
         <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>Rayon de captage</span><span id="captageRadiusVal" style="font-weight:700">3 km</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span data-i18n="dcapt.radius">Rayon de captage</span><span id="captageRadiusVal" style="font-weight:700">3 km</span></div>
           <input type="range" id="captageRadiusSlider" min="1000" max="5000" step="500" value="3000" style="width:100%;accent-color:#f97316" oninput="updateCaptageRadius()">
           <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gray2)"><span>1 km</span><span>2 km</span><span>3 km</span><span>4 km</span><span>5 km</span></div>
         </div>
         <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
-          <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px">TAUX DE CAPTURE (ajustables)</div>
-          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--red)">Premium (WC)</span><span id="crPremVal">8%</span></div><input type="range" min="0" max="40" value="8" id="crPrem" style="width:100%;accent-color:#ef4444" oninput="updateCaptureRates()"></div>
-          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:#f97316">Mid-premium</span><span id="crMidPVal">12%</span></div><input type="range" min="0" max="40" value="12" id="crMidP" style="width:100%;accent-color:#f97316" oninput="updateCaptureRates()"></div>
-          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--yellow)">Mid (SF/18G)</span><span id="crMidVal">15%</span></div><input type="range" min="0" max="40" value="15" id="crMid" style="width:100%;accent-color:#eab308" oninput="updateCaptureRates()"></div>
-          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--green)">Independant</span><span id="crIndVal">10%</span></div><input type="range" min="0" max="40" value="10" id="crInd" style="width:100%;accent-color:#22c55e" oninput="updateCaptureRates()"></div>
-          <div><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--gray)">Low-cost</span><span id="crLowVal">4%</span></div><input type="range" min="0" max="25" value="4" id="crLow" style="width:100%;accent-color:#64748b" oninput="updateCaptureRates()"></div>
+          <div style="font-size:9px;font-weight:700;color:#f97316;margin-bottom:6px" data-i18n="dcapt.captureRates">TAUX DE CAPTURE (ajustables)</div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--red)" data-i18n="dcapt.premWC">Premium (WC)</span><span id="crPremVal">8%</span></div><input type="range" min="0" max="40" value="8" id="crPrem" style="width:100%;accent-color:#ef4444" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:#f97316" data-i18n="dcapt.midPrem">Mid-premium</span><span id="crMidPVal">12%</span></div><input type="range" min="0" max="40" value="12" id="crMidP" style="width:100%;accent-color:#f97316" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--yellow)" data-i18n="dcapt.midSF">Mid (SF/18G)</span><span id="crMidVal">15%</span></div><input type="range" min="0" max="40" value="15" id="crMid" style="width:100%;accent-color:#eab308" oninput="updateCaptureRates()"></div>
+          <div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--green)" data-i18n="dcapt.indep">Independant</span><span id="crIndVal">10%</span></div><input type="range" min="0" max="40" value="10" id="crInd" style="width:100%;accent-color:#22c55e" oninput="updateCaptureRates()"></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--gray)" data-i18n="dcapt.low">Low-cost</span><span id="crLowVal">4%</span></div><input type="range" min="0" max="25" value="4" id="crLow" style="width:100%;accent-color:#64748b" oninput="updateCaptureRates()"></div>
         </div>
         <div id="captageContent"></div>
       </div>
       <div class="card" id="cannibalizationCard" style="display:none">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9888;</span> Risque de cannibalisation</div>
+          <div class="card-title"><span class="icon">&#9888;</span> <span data-i18n="dcannibal.title">Risque de cannibalisation</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Cannibalisation</strong><br>Mesure le risque de chevauchement des zones de chalandise entre vos sites. Distance critique: <strong>&lt;1.5km = critique</strong>, 1.5-3km = significatif, 3-5km = modere, &gt;5km = faible.<div class="tip-source">Benchmark: distance minimum entre 2 clubs meme enseigne = 2.5km en zone dense</div></div></span>
         </div>
         <div id="cannibalizationContent"></div>
@@ -699,20 +699,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <!-- ============ DASHBOARD TAB ============ -->
     <div class="tab-panel" id="tab-dash">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="card-title" style="margin:0"><span class="icon">&#128203;</span> Zones analysees</div>
-        <button class="export-btn" onclick="exportCSV()">&#128229; Export CSV</button>
+        <div class="card-title" style="margin:0"><span class="icon">&#128203;</span> <span data-i18n="ddash.zones">Zones analysées</span></div>
+        <button class="export-btn" onclick="exportCSV()" data-i18n="ddash.export">&#128229; Export CSV</button>
       </div>
       <div style="overflow-x:auto;margin-bottom:14px;border-radius:8px;border:1px solid var(--border)">
         <table class="dash-table" id="dashTable">
           <thead><tr>
-            <th onclick="sortTable(0)">Zone</th>
-            <th onclick="sortTable(1)">Pop.</th>
-            <th onclick="sortTable(2)">15-45</th>
-            <th onclick="sortTable(3)">SAZ &#9650;</th>
-            <th onclick="sortTable(4)">Conc.</th>
-            <th onclick="sortTable(5)">+ proche</th>
-            <th onclick="sortTable(6)">Pot. CA</th>
-            <th onclick="sortTable(7)">Reco</th>
+            <th onclick="sortTable(0)" data-i18n="ddash.col.zone">Zone</th>
+            <th onclick="sortTable(1)" data-i18n="ddash.col.pop">Pop.</th>
+            <th onclick="sortTable(2)" data-i18n="ddash.col.young">15-45</th>
+            <th onclick="sortTable(3)" data-i18n="ddash.col.saz">SAZ &#9650;</th>
+            <th onclick="sortTable(4)" data-i18n="ddash.col.conc">Conc.</th>
+            <th onclick="sortTable(5)" data-i18n="ddash.col.closest">+ proche</th>
+            <th onclick="sortTable(6)" data-i18n="ddash.col.potCA">Pot. CA</th>
+            <th onclick="sortTable(7)" data-i18n="ddash.col.reco">Reco</th>
           </tr></thead>
           <tbody id="dashBody"></tbody>
         </table>
@@ -720,15 +720,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9878;</span> Comparaison sites</div>
+          <div class="card-title"><span class="icon">&#9878;</span> <span data-i18n="ddash.compare">Comparaison sites</span></div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <select id="compareA" style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)" onchange="runComparison()">
-            <option value="">-- Site A --</option>
+            <option value="" data-i18n="ddash.siteA">-- Site A --</option>
           </select>
           <span style="color:var(--gray2);font-size:14px;align-self:center">vs</span>
           <select id="compareB" style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)" onchange="runComparison()">
-            <option value="">-- Site B --</option>
+            <option value="" data-i18n="ddash.siteB">-- Site B --</option>
           </select>
         </div>
         <div id="comparisonResult"></div>
@@ -736,7 +736,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128176;</span> Trajectoire financiere reseau</div>
+          <div class="card-title"><span class="icon">&#128176;</span> <span data-i18n="ddash.trajectory">Trajectoire financière réseau</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Projections BP V17</strong><br>CA Enseigne et EBITDA consolides sur 10 ans. Hypotheses : 40 clubs a maturite (18 propres + 22 franchises), prix 28EUR TTC/mois (23,14 HT), cible 4000 adherents/club.<div class="tip-source">Source : BP MF FP V17 — Isseo</div></div></span>
         </div>
         <div class="chart-wrap" style="height:200px"><canvas id="finChart"></canvas></div>
@@ -744,7 +744,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128209;</span> Parametres cles BP</div>
+          <div class="card-title"><span class="icon">&#128209;</span> <span data-i18n="ddash.bpParams">Paramètres clés BP</span></div>
           <span class="badge badge-yellow">V17</span>
         </div>
         <div class="metric-row"><span class="metric-label">CAPEX / club (hors leasing)</span><span class="metric-value">1 176k EUR</span></div>
@@ -768,7 +768,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127942;</span> Pricing benchmark Roumanie</div>
+          <div class="card-title"><span class="icon">&#127942;</span> <span data-i18n="ddash.pricing">Pricing benchmark Roumanie</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Positionnement prix</strong><br>FP se positionne en <strong>premium low-cost</strong> entre 20-28EUR/mois, sous BeFIT (30EUR) et tres loin de World Class (46-145EUR). Le marche roumain a une penetration de ~5% vs 10-15% en Europe de l'Ouest.<div class="tip-source">Source : Pitch MF FP x Isseo, mars 2025</div></div></span>
         </div>
         <div class="chart-wrap" style="height:160px"><canvas id="pricingChart"></canvas></div>
@@ -780,13 +780,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <div id="siteCardContent">
         <div style="text-align:center;padding:50px 20px;color:var(--gray2)">
           <div style="font-size:40px;margin-bottom:12px;opacity:.5">&#128205;</div>
-          <p style="font-size:13px;line-height:1.6">Cliquez sur un point de la carte<br>pour generer une fiche de due diligence</p>
+          <p style="font-size:13px;line-height:1.6" data-i18n="dsitecard.placeholder.html">Cliquez sur un point de la carte<br>pour générer une fiche de due diligence</p>
         </div>
       </div>
       <!-- Captage widget in Fiche Site tab -->
       <div class="card" id="captageCardSite" style="display:none">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127919;</span> Potentiel de captage</div>
+          <div class="card-title"><span class="icon">&#127919;</span> <span data-i18n="dcapt.title">Potentiel de captage</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Captifs</strong> = membres concurrents qui switchent vers FP (prix + proximite).<br><strong>Natifs</strong> = non-inscrits qui rejoignent FP (nouvelle offre).<br>Total = membres theoriques a terme.<div class="tip-source">Taux ajustables ci-dessous</div></div></span>
         </div>
         <div style="margin-bottom:10px">
@@ -808,7 +808,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <!-- ============ SOURCES TAB ============ -->
     <div class="tab-panel" id="tab-sources">
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">&#128218;</span> Sources de donnees</div></div>
+        <div class="card-header"><div class="card-title"><span class="icon">&#128218;</span> <span data-i18n="dsources.title">Sources de données</span></div></div>
         <div style="font-size:11px;line-height:1.8;color:var(--gray)">
           <div style="font-weight:700;color:var(--cyan);margin-bottom:4px">POPULATION & DEMOGRAPHIE</div>
           <div>&#8226; <b>INS Romania</b> — Recensement 2021 (RPL 2021). Population par secteur: 1,716,961 habitants. <a href="https://recensamantromania.ro" style="color:var(--cyan)" target="_blank">recensamantromania.ro</a></div>
@@ -881,7 +881,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">&#9888;</span> Limites & avertissements</div></div>
+        <div class="card-header"><div class="card-title"><span class="icon">&#9888;</span> <span data-i18n="dsources.limits">Limites & avertissements</span></div></div>
         <div style="font-size:11px;line-height:1.8;color:var(--gray)">
           <div>&#8226; Les estimations de membres sont des <b>approximations</b> basees sur des proxies (surface, reviews). Aucune donnee reelle publiee par les enseignes roumaines</div>
           <div>&#8226; Les Google Reviews sont des <b>estimations</b> collectees via sites aggregateurs, pas scraping direct Google</div>
@@ -6316,6 +6316,7 @@ function switchTab(name) {
 // SIDEBAR RENDER
 // ================================================================
 function renderSectorList() {
+  const tr = (k) => (typeof window.t === 'function' ? window.t(k) : k);
   el('sectorList').innerHTML=SECTORS.map(s=>{
     const popT=Math.round(s.pop*s.youngPct);
     return `<div class="sector-row" onclick="zoomSector(${s.id})">
@@ -6323,7 +6324,7 @@ function renderSectorList() {
       <div class="sector-body">
         <h4>${s.name}</h4>
         <p>${s.desc}</p>
-        <p>Pop: ${fmt(s.pop)} | 15-45: ${fmt(popT)} | ${s.income}</p>
+        <p>${tr('dsector.row.pop')}: ${fmt(s.pop)} | ${tr('dsector.row.youngRange')}: ${fmt(popT)} | ${s.income}</p>
       </div>
       <div class="sector-saz" id="sazS${s.id}" style="color:var(--gray2)">—</div>
     </div>`;
