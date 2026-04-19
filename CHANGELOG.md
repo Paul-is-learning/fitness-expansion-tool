@@ -1,5 +1,45 @@
 # Changelog
 
+## [v6.23-tour-grid-stack-layout] — 2026-04-19
+
+### Bug fixé (V2) : chevauchement contenu/nav persistant sur tours BP + Sources
+
+**Symptôme** (après v6.22 qui n'avait fixé que partiellement) : le contenu des slides BP (Hypothèses, Coûts) et Sources débordait sur les dots de navigation et le bouton "Suivant". Reproductible sur tous les viewports, les fenêtres étaient "presque toutes inutilisables" (Paul, 2026-04-19).
+
+**Root cause** (cause profonde identifiée) : les slides avaient `position: absolute` → elles ne contribuaient pas à la hauteur naturelle du wrap. Un `syncWrapHeight` JS lisait `slide.scrollHeight` et forçait `slidesWrap.style.height`, mais cette sync avait des problèmes de timing (RAF throttling, animation delays) et interactions complexes avec flex-shrink + max-height. Résultat : hauteur JS parfois trop petite → contenu absolue overflow → chevauche les frères flex (dots, actions).
+
+**Fix** (refonte) : **CSS grid stacking** au lieu de position:absolute.
+- `.fp-onb-slides-wrap { display: grid; grid-template-columns: minmax(0, 1fr); }`
+- `.fp-onb-slide { grid-column: 1; grid-row: 1; }` → toutes les slides partagent la même cellule grid
+- La cellule grid prend automatiquement la hauteur du plus grand slide
+- Plus aucun JS de height sync (fonction `syncWrapHeight` devenue no-op stub)
+- `overflow-y: auto` + `max-height: calc(100vh - 200px)` comme safety net si le plus grand slide dépasse le viewport
+- `scrollTop = 0` au changement de slide pour repartir du haut
+
+**Tradeoff assumé** : les slides courtes ont ~60-80px d'espace vide en bas (la cellule grid prend la hauteur de la plus grande slide du tour). Acceptable vs. le chevauchement bloquant.
+
+**Fichiers touchés** :
+- `src/onboarding-tour.js` : CSS `.fp-onb-slide` + `.fp-onb-slides-wrap` refaites grid (position:absolute supprimée) ; `syncWrapHeight` → stub no-op ; `promoteActive` reset scrollTop.
+- `config.js` : bump `MODEL_VERSION` → `v6.23-tour-grid-stack-layout`.
+
+---
+
+## [v6.22-tour-slides-wrap-overflow] — 2026-04-19
+
+### Bug fixé : dernier item des slides BP (Hypothèses, Coûts) masqué par les dots/bouton Suivant
+
+**Symptôme** : le slide "5 hypothèses clés" (slide 2) affichait "Redevance MF" derrière la nav. Même bug sur slide 4 "Structure de coûts" : le card "EBITDA cible Y5+" chevauchait les dots et le bouton "Suivant". Reproductible sur toutes tailles d'écran où la hauteur du contenu dépassait l'espace disponible.
+
+**Root cause** : `.fp-onb-slides-wrap` avait `flex: 1 / flex: 0 0 auto` + hauteur JS via `syncWrapHeight` SANS `overflow`. Quand le contenu du slide dépassait l'espace dispo dans le card (contraint par `max-height: calc(100dvh - 48px)`), le slides-wrap débordait vers le bas. Les dots et actions (frères dans le flex column) se retrouvaient visuellement AU-DESSUS du contenu overflow à cause du `overflow: visible` par défaut. Le dernier item du slide flottait derrière les éléments de navigation.
+
+**Fix** : ajout de `overflow-y: auto` + `max-height: calc(100dvh - 220px)` + `-webkit-overflow-scrolling: touch` + `scrollbar-width: none` sur la règle **de base** `.fp-onb-slides-wrap` (pas seulement en media query mobile). Quand le contenu dépasse, il scrolle DANS le wrap → dots+actions restent toujours visibles en dessous. Règle mobile simplifiée pour juste override `min-height` (220px) et `max-height` (calc(100dvh - 180px) vu la padding card réduite).
+
+**Fichiers touchés** :
+- `src/onboarding-tour.js` : règle de base `.fp-onb-slides-wrap` étendue (overflow + max-height universelle) ; media query mobile simplifiée.
+- `config.js` : bump `MODEL_VERSION` → `v6.22-tour-slides-wrap-overflow`.
+
+---
+
 ## [v6.21-persist-kpis-post-slider] — 2026-04-19
 
 ### 🔥 Bug critique fixé : KPIs (TRI, NPV, verdict) non persistés après ajustement loyer/charges/surface

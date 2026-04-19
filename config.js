@@ -26,4 +26,4 @@ const GOOGLE_CACHE_KEY = 'fp_google_cache';
 const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
 
 // Model version — bumped when cached data format changes; triggers cache clear
-const MODEL_VERSION = 'v6.21-persist-kpis-post-slider';
+const MODEL_VERSION = 'v6.23-tour-grid-stack-layout';

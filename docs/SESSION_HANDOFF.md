@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.8-reliability (voir CHANGELOG.md pour détail)
+- **Versions actuelle** : v6.23-tour-grid-stack-layout (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -165,7 +165,13 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session
+## Dernière session (≤ v6.23)
+- Diagnostic : sur desktop 1440×900, ancien CSS persistait à cause du cache navigateur (.js chargés avec `defer`). Mobile était refresh, desktop non. Code lui-même clean (vérifié screenshot).
+- Solutions cache desktop : (1) bouton 🔄 in-app bottom-left, (2) Cmd+Shift+R (Chrome/Arc/Edge) ou Cmd+Option+R (Safari), (3) DevTools → Network → "Disable cache" + Cmd+R.
+- Bump MODEL_VERSION → `v6.23-tour-grid-stack-layout` purge auto les caches internes (`fpSiteAnalyses`, `fpCustomSites.analysisData`, `opCache`) au prochain reload.
+- Travaux v6.13 → v6.23 (commits récents) : onboarding tours i18n FR/EN 8 slides, demo panel "Comment ça marche" carousel 6 slides Apple-like, tours BP/Sources lisibles + effets 2027, slide BP fidèle structure OnAir-calibrated, fix persistance KPIs après override loyer/charges/surface (commit `63063aa`).
+
+## Sessions historiques
 - v6.1 : OPEX time-decay Y1 20% → Y5 15%
 - v6.2 : OPEX Y5+ compressé à 12% (décision Paul)
 - v6.3 : Financement equity/loan 30/70 @ 6.5% / 7ans + IRR equity + 2 nouveaux accordions (Financement + BP Template)

@@ -262,10 +262,16 @@
     .fp-onb-skip-confirm button:hover { filter: brightness(1.15); }
 
     /* ═══ Slide transitions ═══ */
-    .fp-onb-slide { position: absolute; top: 0; left: 0; right: 0;
-      opacity: 0; pointer-events: none;
+    /* Slides stack dans un grid-cell commun : la cellule prend la hauteur du
+       plus grand slide, donc le wrap s'auto-dimensionne sans JS de sync. */
+    .fp-onb-slide {
+      grid-column: 1;
+      grid-row: 1;
+      opacity: 0;
+      pointer-events: none;
       transform: translateX(0);
       transition: opacity .35s ease-out, transform .45s cubic-bezier(.22,.96,.36,1);
+      min-width: 0;
     }
     .fp-onb-slide.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
     .fp-onb-slide.leaving-left  { opacity: 0; transform: translateX(-34px); pointer-events: none; }
@@ -273,7 +279,20 @@
     .fp-onb-slide.entering-left  { opacity: 0; transform: translateX(-34px); pointer-events: none; }
     .fp-onb-slide.entering-right { opacity: 0; transform: translateX(34px); pointer-events: none; }
 
-    .fp-onb-slides-wrap { position: relative; flex: 1; min-height: 340px; }
+    .fp-onb-slides-wrap {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      flex: 0 1 auto;
+      min-height: 220px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: calc(100dvh - 200px);
+      max-height: calc(100vh - 200px);
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .fp-onb-slides-wrap::-webkit-scrollbar { display: none; }
 
     /* ═══ DEMO: Welcome logo stroke-draw + sparks ═══ */
     /* Logo slide BIENVENUE: fade-in + scale à l'entrée */
@@ -806,16 +825,15 @@
       .fp-onb-card {
         padding: 22px 18px 16px;
         border-radius: 28px;
-        /* Pas d'overflow:auto — on préfère que la carte grandisse pour le CTA
-           reste toujours visible. La hauteur du wrap est sync par JS à scrollHeight
-           du slide actif (voir syncWrapHeight). */
       }
       .fp-onb-title { font-size: 21px; line-height: 1.15; }
       .fp-onb-subtitle { font-size: 12.5px; line-height: 1.45; }
       .fp-onb-slide { gap: 11px; }
       /* Wrap auto-height : JS sync wrap.style.height sur scrollHeight du slide actif.
-         flex:0 0 auto empêche le flex layout du card d'écraser la hauteur JS. */
-      .fp-onb-slides-wrap { min-height: 260px; flex: 0 0 auto; }
+         flex:0 0 auto empêche le flex layout du card d'écraser la hauteur JS.
+         overflow-y:auto + max-height garantit que dots+actions restent toujours
+         visibles même quand le contenu dépasse la hauteur disponible du card. */
+      .fp-onb-slides-wrap { min-height: 200px; max-height: calc(100dvh - 170px); max-height: calc(100vh - 170px); }
       .fp-onb-demo { min-height: 130px; margin: 6px 0 4px; }
       .fp-onb-demo-pins { height: 148px; }
       .fp-onb-demo-phone { width: 104px; height: 168px; }
@@ -1635,21 +1653,10 @@
     });
   }
 
-  // Sync la hauteur du wrap à la hauteur du slide actif (mobile surtout) pour
-  // éviter que le contenu déborde sous les dots / CTA quand les demos BP /
-  // Sources sont denses (5-6 rows + subtitle long).
-  function syncWrapHeight(slide) {
-    if (!slidesWrap || !slide) return;
-    try {
-      const apply = () => {
-        const h = slide.scrollHeight;
-        if (h > 0) slidesWrap.style.height = h + 'px';
-      };
-      apply();                      // immediate (scrollHeight force layout)
-      setTimeout(apply, 30);        // re-measure après reflow
-      setTimeout(apply, 420);       // re-measure après .ready + animations
-    } catch {}
-  }
+  // NOOP : depuis v6.23 le wrap utilise CSS grid pour empiler les slides dans
+  // une même cellule. La cellule prend la hauteur du plus grand slide, donc
+  // plus besoin de sync JS. Gardé comme stub pour compat appels existants.
+  function syncWrapHeight() { /* no-op */ }
 
   // Relance les animations inline (bars, shine, etc.) sur les slides visités
   // après le boot. Nécessaire car certains navigateurs (et headless) figent
@@ -1695,7 +1702,8 @@
     const promoteActive = () => {
       next.classList.remove('entering-left', 'entering-right');
       next.classList.add('active');
-      syncWrapHeight(next);
+      // Reset scroll pour que les slides longs démarrent en haut
+      if (slidesWrap) slidesWrap.scrollTop = 0;
       // Relance les animations des demos inline (bars, cards) qui peuvent
       // avoir été "consommées" au boot quand le slide était invisible.
       replayInlineAnimations(next);
@@ -1703,7 +1711,6 @@
         next.classList.add('ready');
         animateCounters(next, newIdx);
         animateTyping(next);
-        syncWrapHeight(next);
       }, 380);
     };
     if (typeof requestAnimationFrame === 'function') {
