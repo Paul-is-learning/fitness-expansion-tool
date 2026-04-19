@@ -1001,19 +1001,23 @@
   }
 
   function demoBpCosts() {
-    // Structure de coûts % CA (benchmark OnAir calibré)
+    // Structure de coûts % CA — verrouillée post-calibration OnAir Montreuil v6.x
+    // Sources: docs/SESSION_HANDOFF.md + PNL_DEFAULTS dans index.html
+    // OnAir observé: Staff 9% / Loyer 12.4% / OPEX 10.8% / Royalties 4% / Pub 1% / EBITDA 44.7%
+    // Ajustements Romania: OPEX +1.2pp prudent (12% Y5+), Royalties 6% (master-franchise Isseo vs 4% classique)
     const costs = [
-      { lbl: 'Staff',        pct: 9,    c: '#60a5fa' },
-      { lbl: 'Loyer + charges', pct: 12.4, c: '#f97316' },
-      { lbl: 'OPEX ops',     pct: 12,   c: '#34d399' },
-      { lbl: 'Royalties MF', pct: 6,    c: '#a78bfa' },
-      { lbl: 'Fonds pub',    pct: 1,    c: '#fbbf24' },
+      { lbl: 'Cost of sales',  pct: 2.8,  c: '#94a3b8', note: 'calibré OnAir 2,77%' },
+      { lbl: 'Staff',          pct: 9,    c: '#60a5fa', note: '+ plancher 65k€/an · 4 ETP' },
+      { lbl: 'Loyer + charges',pct: 12.4, c: '#f97316', note: 'variable par site' },
+      { lbl: 'OPEX ops Y1→Y5', pct: 16,   c: '#34d399', note: '20% Y1 → 12% Y5+ (time-decay)' },
+      { lbl: 'Royalties MF',   pct: 6,    c: '#a78bfa', note: 'master-franchise Isseo · OnAir 4%' },
+      { lbl: 'Fonds pub',      pct: 1,    c: '#fbbf24', note: 'standard franchise EU' },
     ];
     const total = costs.reduce((a,c)=>a+c.pct, 0);
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-        ${costs.map((c,i)=>`<div style="opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1+i*0.1}s forwards"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;margin-bottom:3px"><span style="color:#fff;font-weight:700">${c.lbl}</span><span style="color:${c.c};font-weight:800">${c.pct}% du CA</span></div><div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow ${0.8 + i*0.1}s cubic-bezier(.34,1.12,.52,1) ${0.15 + i*0.1}s forwards;--w:${(c.pct/20)*100}%"></div></div></div>`).join('')}
-        <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;font-size:11px;font-weight:800"><span style="color:#fff">Total OPEX</span><span style="color:var(--onb-tint)">${total.toFixed(1)}% · EBITDA 55%+</span></div>
+      <div style="width:100%;display:flex;flex-direction:column;gap:5px">
+        ${costs.map((c,i)=>`<div style="opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1+i*0.08}s forwards"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10px;margin-bottom:1px"><span style="color:#fff;font-weight:700">${c.lbl}</span><span style="color:${c.c};font-weight:800">${c.pct}% CA</span></div><div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow ${0.8 + i*0.08}s cubic-bezier(.34,1.12,.52,1) ${0.15 + i*0.08}s forwards;--w:${Math.min((c.pct/16)*100, 100)}%"></div></div><div style="font-size:8px;color:rgba(255,255,255,.45);margin-top:1px;font-style:italic;line-height:1.3">${c.note}</div></div>`).join('')}
+        <div style="margin-top:4px;padding:6px 9px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:7px"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800"><span style="color:#fff">EBITDA cible Y5+</span><span style="color:#34d399">~44-55%</span></div><div style="font-size:8.5px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.35">OnAir 44,7% (audit Fiteco) · FP Romania +10pp buffer prudent</div></div>
       </div>
     `;
   }
