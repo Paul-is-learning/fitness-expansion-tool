@@ -696,6 +696,12 @@
     @keyframes fpOnbFadeIn      { to { opacity: 1; } }
     @keyframes fpOnbSlideIn     { to { opacity: 1; transform: translateX(0); } }
     @keyframes fpOnbBarGrow     { to { transform: scaleY(1); } }
+    /* Bars demoBpRevenue : animation gated par .ready (sinon consumed au boot
+       car toutes slides rendues simultanément en grid-stack v6.23) */
+    .fp-onb-revenue-bar { transform: scaleY(0); transform-origin: bottom; }
+    .fp-onb-slide.ready .fp-onb-revenue-bar {
+      animation: fpOnbBarGrow .85s cubic-bezier(.34,1.36,.4,1) var(--bar-delay, 0s) forwards;
+    }
     @keyframes fpOnbWidthGrow   { to { width: var(--w, 50%); } }
     @keyframes fpOnbCardIn      { to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes fpOnbRingDraw    { to { stroke-dashoffset: var(--to, 0); } }
@@ -1197,7 +1203,7 @@
         </div>
         <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:120px;padding:0 2px;border-bottom:1px solid rgba(255,255,255,.1);position:relative">
           <div style="position:absolute;inset:0;background:radial-gradient(ellipse at bottom, rgba(212,160,23,.08), transparent 70%);pointer-events:none"></div>
-          ${years.map((v,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative"><div class="fp-onb-wow-bar" style="width:100%;height:${Math.round(v/max*100)}%;background:linear-gradient(180deg, var(--onb-tint), rgba(212,160,23,.35));border-radius:3px 3px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .85s cubic-bezier(.34,1.36,.4,1) ${0.05 + i*0.08}s forwards;box-shadow:0 0 8px color-mix(in srgb, var(--onb-tint,#d4a017) 30%, transparent);--shine-delay:${1 + i*0.08}s"></div><div style="font-size:8px;color:rgba(255,255,255,.5);font-weight:600">A${i+1}</div></div>`).join('')}
+          ${years.map((v,i)=>`<div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;position:relative"><div class="fp-onb-wow-bar fp-onb-revenue-bar" style="width:100%;height:${Math.round(v/max*100)}%;background:linear-gradient(180deg, var(--onb-tint), rgba(212,160,23,.35));border-radius:3px 3px 0 0;box-shadow:0 0 8px color-mix(in srgb, var(--onb-tint,#d4a017) 30%, transparent);--bar-delay:${0.05 + i*0.08}s;--shine-delay:${1 + i*0.08}s"></div><div style="font-size:8px;color:rgba(255,255,255,.5);font-weight:600">A${i+1}</div></div>`).join('')}
         </div>
         <div style="display:flex;justify-content:space-between;padding:0 4px;font-size:10px;color:rgba(255,255,255,.65)">
           <span>CA · M€</span><span style="color:var(--onb-tint);font-weight:700"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€ A10" data-delay="900">0</span></span>

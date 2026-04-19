@@ -1,5 +1,27 @@
 # Changelog
 
+## [v6.24-revenue-bars-ready-gated] — 2026-04-19
+
+### Bug fixé : courbe de revenus A1→A10 (slide REVENUS du tour BP) invisible
+
+**Symptôme** : sur le slide "ÉTAPE 2 · REVENUS", l'axe X (A1...A10) et le label "CA · M€ · 51,3 M€ A10" s'affichaient, mais les barres de la courbe ramp-up restaient à hauteur 0 — grand espace vide entre subtitle et axe.
+
+**Root cause** (deux problèmes superposés) :
+1. **Sizing cassé** : le wrapper intermédiaire de chaque barre (`flex:1; flex-direction:column; align-items:center`) avait hauteur `auto` car le bar-container parent utilisait `align-items:flex-end` (pas de stretch sur l'axe transverse). La barre `height:${pct}%` référait donc à un parent à hauteur `auto` → résolution à 0 par la spec CSS.
+2. **Animation potentiellement consumed au boot** : depuis le grid-stack v6.23, toutes les slides sont rendues simultanément ; les animations `forwards` inline déclarées sur les barres se terminaient pendant que le slide était invisible. Le replay JS (`replayInlineAnimations`) ne re-déclenchait pas systématiquement.
+
+**Fix** :
+- **Sizing** : ajout `align-self:stretch; justify-content:flex-end` sur le wrapper intermédiaire → il prend les 120px du bar-container, la barre `height:%` calcule correctement.
+- **Animation** : nouvelle classe `fp-onb-revenue-bar` avec `transform:scaleY(0)` initial. L'animation `fpOnbBarGrow` est conditionnée par `.fp-onb-slide.ready .fp-onb-revenue-bar` (CSS rule, pas inline) avec delay via variable `--bar-delay`. Garantit que l'anim démarre seulement quand le slide est promoted (via la classe `.ready` ajoutée 380ms après promote dans `goToSlide`).
+
+**Vérification** : barres A1=1px → A10=109px (sur 120px max), animation propre au passage du slide. Screenshot validé.
+
+**Fichiers touchés** :
+- `src/onboarding-tour.js` : nouvelle classe `.fp-onb-revenue-bar` + CSS rule gated `.fp-onb-slide.ready` ; HTML `demoBpRevenue` refait (wrapper stretch + delay en var CSS, animation inline supprimée).
+- `config.js` : bump `MODEL_VERSION` → `v6.24-revenue-bars-ready-gated`.
+
+---
+
 ## [v6.23-tour-grid-stack-layout] — 2026-04-19
 
 ### Bug fixé (V2) : chevauchement contenu/nav persistant sur tours BP + Sources
