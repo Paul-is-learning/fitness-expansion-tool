@@ -501,6 +501,8 @@
       border-radius: 14px;
       padding: 18px 10px 10px;
       display: flex; flex-direction: column; gap: 10px;
+      position: relative;
+      overflow: hidden;
     }
     .fp-onb-demo-phone .search {
       background: rgba(30,41,59,.7);
@@ -531,7 +533,9 @@
     .fp-onb-demo-phone .drop {
       width: 14px; height: 14px; border-radius: 50%;
       background: var(--onb-tint,#d4a017);
-      position: absolute; bottom: 24px; left: 50%;
+      /* Positionné dans .phone-screen (overflow:hidden, position:relative).
+         Reste toujours à l'intérieur de l'écran même avec la perspective 3D du phone. */
+      position: absolute; bottom: 18px; left: 50%;
       transform: translate(-50%, 0);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--onb-tint,#d4a017) 30%, transparent);
     }
@@ -707,26 +711,31 @@
 
   // ─── Demo builders ────────────────────────────────────────────
   function demoWelcome() {
+    // Logo officiel PNG (identique à la page de login) + "powered by ISSEO".
+    // Les constantes window.FP_LOGO_PNG / ISSEO_LOGO_PNG sont fournies par
+    // src/fp-logos.js (chargé avant ce module).
+    const fpLogo = window.FP_LOGO_PNG || '';
+    const isseoLogo = window.ISSEO_LOGO_PNG || '';
     return `
       <div class="fp-onb-demo-welcome">
-        <svg viewBox="0 0 160 160" aria-hidden="true">
-          <defs>
-            <linearGradient id="fpOnbLogoGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#fff"/>
-              <stop offset="1" stop-color="var(--onb-tint,#d4a017)"/>
-            </linearGradient>
-          </defs>
-          <!-- "FP" monogram -->
-          <path class="logo-stroke" d="M 40 50 L 40 110 M 40 50 L 72 50 M 40 75 L 66 75" fill="none" stroke="url(#fpOnbLogoGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-          <path class="logo-stroke" d="M 92 110 L 92 50 L 112 50 Q 122 50 122 62 Q 122 74 112 74 L 92 74" fill="none" stroke="url(#fpOnbLogoGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- Sparks -->
-          <circle class="spark" cx="30"  cy="40"  r="2.5" fill="#d4a017"/>
-          <circle class="spark" cx="132" cy="36"  r="2"   fill="#fbbf24"/>
-          <circle class="spark" cx="140" cy="80"  r="2.5" fill="#d4a017"/>
-          <circle class="spark" cx="130" cy="126" r="2"   fill="#fbbf24"/>
-          <circle class="spark" cx="40"  cy="130" r="2.5" fill="#d4a017"/>
-          <circle class="spark" cx="22"  cy="90"  r="2"   fill="#fbbf24"/>
-        </svg>
+        <div class="fp-onb-welcome-stack" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;width:100%;height:100%;position:relative">
+          <img src="${fpLogo}" alt="Fitness Park" style="height:52px;width:auto;filter:drop-shadow(0 4px 12px rgba(212,160,23,.25))">
+          <div style="display:flex;align-items:center;gap:10px;width:160px">
+            <div style="flex:1;height:1px;background:linear-gradient(to right,transparent,rgba(212,160,23,.45))"></div>
+            <span style="font-size:8px;color:rgba(212,160,23,.75);letter-spacing:2.5px;font-weight:700">POWERED BY</span>
+            <div style="flex:1;height:1px;background:linear-gradient(to left,transparent,rgba(212,160,23,.45))"></div>
+          </div>
+          <img src="${isseoLogo}" alt="Isseo" style="height:28px;width:auto;opacity:.78">
+          <!-- Sparks ambient, pour rester dans le style du slide precedent -->
+          <svg viewBox="0 0 160 160" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+            <circle class="spark" cx="20"  cy="24"  r="2.5" fill="#d4a017"/>
+            <circle class="spark" cx="140" cy="30"  r="2"   fill="#fbbf24"/>
+            <circle class="spark" cx="148" cy="110" r="2.5" fill="#d4a017"/>
+            <circle class="spark" cx="132" cy="142" r="2"   fill="#fbbf24"/>
+            <circle class="spark" cx="30"  cy="140" r="2.5" fill="#d4a017"/>
+            <circle class="spark" cx="12"  cy="96"  r="2"   fill="#fbbf24"/>
+          </svg>
+        </div>
       </div>
     `;
   }
@@ -839,8 +848,9 @@
         <div class="fp-onb-demo-phone-screen">
           <div class="search" data-typing data-text="AFI Cotroceni"></div>
           <div class="hit">📍 AFI Cotroceni</div>
+          <!-- Pin drop à l'intérieur du phone-screen (était sibling, sortait en 3D transform) -->
+          <div class="drop"></div>
         </div>
-        <div class="drop"></div>
       </div>
     `;
   }
