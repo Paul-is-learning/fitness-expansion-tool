@@ -330,6 +330,10 @@
       'dsector.row.pop': 'Pop',
       'dsector.row.youngRange': '15-45',
 
+      // ─── Desktop: demo button (map overlay bottom-left) ──────────
+      'ddemo.btn': '▶ Démonstration',
+      'ddemo.title': "Lancer la présentation de l'outil",
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Oui',
       'common.no': 'Non',
@@ -648,6 +652,10 @@
       'dsources.limits': 'Limitations & caveats',
       'dsector.row.pop': 'Pop',
       'dsector.row.youngRange': '15-45',
+
+      // ─── Desktop: demo button (map overlay bottom-left) ──────────
+      'ddemo.btn': '▶ Demo tour',
+      'ddemo.title': 'Launch the product walkthrough',
 
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Yes',

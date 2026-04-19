@@ -928,6 +928,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     </div>
   </div>
   <div class="map-overlay-bl">
+    <!-- Bouton Démo : relance l'onboarding tour Apple-like depuis la map desktop.
+         Reset le compteur pour l'user courant, lance immediatement. -->
+    <button id="fpDemoBtn" onclick="replayOnboardingTour()"
+            style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:8px 14px;background:linear-gradient(135deg, rgba(212,160,23,.18) 0%, rgba(212,160,23,.08) 100%);border:1px solid rgba(212,160,23,.5);border-radius:10px;color:var(--accent);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .15s, box-shadow .2s, background .2s"
+            onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(212,160,23,.35)';this.style.background='linear-gradient(135deg, rgba(212,160,23,.28) 0%, rgba(212,160,23,.14) 100%)'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(0,0,0,.35)';this.style.background='linear-gradient(135deg, rgba(212,160,23,.18) 0%, rgba(212,160,23,.08) 100%)'"
+            data-i18n="ddemo.btn" data-i18n-title="ddemo.title" title="Lancer la présentation de l'outil">
+      ▶ Démonstration
+    </button>
     <div class="map-box" style="padding:8px 12px;font-size:10px;color:var(--gray2);min-width:auto">
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px"></span><span data-i18n="dlegend.premium">Premium</span></span>
@@ -1892,7 +1901,13 @@ function init() {
       runSiteAnalysis(site);
       return;
     }
-    if(!analysisMode) return; // Analysis mode must be active
+    // Auto-trigger analysis sur les tabs dédiés à l'analyse d'un point de carte
+    // (Concurrence + Fiche Site) même sans avoir activé Mode analyse — l'user
+    // est là pour ça, pas besoin de toggle intermédiaire. Tab Explorer garde le
+    // toggle pour éviter les clics accidentels pendant la navigation.
+    const activeTab = document.querySelector('.tab.active')?.dataset?.tab;
+    const autoAnalyzeTabs = ['compete', 'site'];
+    if(!analysisMode && !autoAnalyzeTabs.includes(activeTab)) return;
     onMapClick(e);
   });
   document.addEventListener('keydown',e=>{
