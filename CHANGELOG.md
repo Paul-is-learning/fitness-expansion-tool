@@ -1,5 +1,18 @@
 # Changelog
 
+## [v6.26-capex-leasing-total] — 2026-04-19
+
+### UX : vignette CAPEX du tour BP affiche aussi le total cash + leasing
+
+Demande Paul : voir d'un coup d'œil l'engagement total réel par club, pas seulement le CAPEX bilan.
+
+- Big number renommé "CAPEX total / club" → **"CAPEX BILAN / CLUB"** (clarification : c'est l'investissement comptabilisé au bilan, hors leasing).
+- Ajout sous-ligne avec separator : **"+ leasing 504 k€ (60% équip · 5 ans) → Total cash + leasing 1 680 k€"**. Le total est en vert (#34d399) et utilise le data-counter d'animation.
+- Aucun changement modèle — purement UI/UX. Calculs P&L inchangés.
+- Bump MODEL_VERSION → `v6.26-capex-leasing-total` (cache-bust assets navigateur).
+
+---
+
 ## [v6.25-impots-locaux-2pct] — 2026-04-19
 
 ### Conservatisme investisseur : ajout 2% impôts locaux RO dans le P&L
