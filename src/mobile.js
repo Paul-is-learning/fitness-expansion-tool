@@ -1717,6 +1717,22 @@
     fab.addEventListener('click', openSecondarySheet);
   }
 
+  // ─── DEMO FAB mobile (bottom-left) ─────────────────────────────
+  // Miroir du FAB principal, avec icône play. Ouvre le showDemoPanel
+  // qui propose: Visite guidée (tour) OU Comment ça marche (carousel 6 slides).
+  function buildDemoFab() {
+    if (qs('.fp-mobile-fab-demo')) return;
+    const fab = document.createElement('div');
+    fab.className = 'fp-mobile-fab-demo';
+    fab.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M 7 4 L 19 12 L 7 20 Z"/></svg>`;
+    fab.setAttribute('aria-label', 'Démonstration');
+    document.body.appendChild(fab);
+    fab.addEventListener('click', () => {
+      try { haptic(18); } catch {}
+      if (typeof window.showDemoPanel === 'function') window.showDemoPanel();
+    });
+  }
+
   function buildSecondarySheet() {
     if (qs('.fp-secondary-sheet')) return;
     // Backdrop
@@ -2794,6 +2810,7 @@
     buildSearchOverlay();
     buildSheet();
     buildFab();
+    buildDemoFab();
     hookTooltips();
     transitionTo('peek');
 

@@ -199,6 +199,33 @@
   body.fp-sheet-summary .fp-mobile-fab { bottom: calc(var(--summary-h) + 12px); }
   body.fp-sheet-detail .fp-mobile-fab { transform: scale(0) rotate(-90deg); pointer-events: none; }
 
+  /* ═════ DEMO FAB (bottom-left, miroir du FAB outils) ═════ */
+  .fp-mobile-fab-demo {
+    position: fixed;
+    left: 14px;
+    bottom: calc(var(--peek-h) + 16px + var(--safe-bottom));
+    width: var(--fab-size); height: var(--fab-size);
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(212,160,23,.22) 0%, rgba(17,24,39,.96) 100%);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(212,160,23,.6);
+    box-shadow: var(--shadow-card), 0 0 12px rgba(212,160,23,.25);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    z-index: 950;
+    transition: bottom var(--transition-snap), transform var(--spring-bounce),
+                box-shadow .25s, background .25s;
+    cursor: pointer;
+    padding-left: 2px;  /* Décalage optique pour centrer le triangle play */
+  }
+  .fp-mobile-fab-demo:active { transform: scale(.85); }
+  .fp-mobile-fab-demo:hover {
+    box-shadow: var(--shadow-card), 0 0 20px rgba(212,160,23,.45);
+  }
+  .fp-mobile-fab-demo svg { width: 22px; height: 22px; }
+  body.fp-sheet-summary .fp-mobile-fab-demo { bottom: calc(var(--summary-h) + 12px); }
+  body.fp-sheet-detail .fp-mobile-fab-demo { transform: scale(0) rotate(-90deg); pointer-events: none; }
+
   /* Spring on avatar + search pill taps */
   .fp-avatar, .fp-search-pill { transition: transform var(--spring-bounce), background-color .2s; }
   .fp-avatar:active { transform: scale(.9); }
