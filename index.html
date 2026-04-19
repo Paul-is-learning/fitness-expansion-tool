@@ -7642,7 +7642,7 @@ function showDemoPanel() {
         <button class="dp-closeX" onclick="document.getElementById('demoPanel').remove()">&times;</button>
       </div>
 
-      <!-- Section 1: CTA Tour -->
+      <!-- Section 1: CTA Tour principal -->
       <div class="dp-section" style="background:linear-gradient(135deg, rgba(212,160,23,.1), rgba(212,160,23,.02));border-color:rgba(212,160,23,.4)">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
           <div style="flex:1;min-width:240px">
@@ -7650,6 +7650,28 @@ function showDemoPanel() {
             <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.5" data-i18n="demopanel.tour.desc">8 slides Apple-style, animations live. Tu découvres la map, les pins, les sliders, le SAZ, le P&L et le financement. Durée ~90s.</div>
           </div>
           <button class="dp-cta" onclick="launchOnboardingTour()" data-i18n="demopanel.tour.cta">▶ Lancer</button>
+        </div>
+      </div>
+
+      <!-- Section 1b: CTA BP cible pays -->
+      <div class="dp-section" style="background:linear-gradient(135deg, rgba(96,165,250,.1), rgba(96,165,250,.02));border-color:rgba(96,165,250,.4)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div class="dp-section-title"><span style="font-size:18px">📑</span> <span data-i18n="demopanel.bp.title">Construction du BP</span></div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.5" data-i18n="demopanel.bp.desc">7 étapes Apple-style. Hypothèses clés, courbe revenus 10 ans, structure de coûts % CA, CAPEX 1,2M€, méthodologie Monte Carlo (1 000 simulations), verdict chiffré. ~80s.</div>
+          </div>
+          <button class="dp-cta" style="background:linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);color:#0a0d17;box-shadow:0 4px 14px rgba(96,165,250,.35)" onclick="try{document.getElementById('demoPanel')?.remove();}catch{} window.startBpTour?.()" data-i18n="demopanel.bp.cta">▶ Lancer</button>
+        </div>
+      </div>
+
+      <!-- Section 1c: CTA Sources de données -->
+      <div class="dp-section" style="background:linear-gradient(135deg, rgba(167,139,250,.1), rgba(167,139,250,.02));border-color:rgba(167,139,250,.4)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div class="dp-section-title"><span style="font-size:18px">📚</span> <span data-i18n="demopanel.sources.title">Sources de données</span></div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.5" data-i18n="demopanel.sources.desc">6 étapes didactiques. INS census + OSM volumétrique, 92 clubs vérifiés, flux métro/tram/malls/bureaux, prix immobilier par quartier, rigueur et limites assumées. ~60s.</div>
+          </div>
+          <button class="dp-cta" style="background:linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);color:#fff;box-shadow:0 4px 14px rgba(167,139,250,.35)" onclick="try{document.getElementById('demoPanel')?.remove();}catch{} window.startSourcesTour?.()" data-i18n="demopanel.sources.cta">▶ Lancer</button>
         </div>
       </div>
 
@@ -7760,10 +7782,10 @@ function showDemoPanel() {
             </div>
             <p class="hiw-desc" data-i18n="demopanel.s4.desc">Pour chaque club concurrent dans le rayon, 4 facteurs calculent combien de membres switchent vers FP.</p>
             <div class="hiw-anim hiw-formula">
-              <div class="hiw-fline"><span class="hiw-fk">Captifs</span><span class="hiw-feq">=</span><span class="hiw-fv">taux_base × decay_distance × note_Google × élasticité_prix</span></div>
-              <div class="hiw-fline"><span class="hiw-fk">Natifs</span><span class="hiw-feq">=</span><span class="hiw-fv">pop non-inscrite × conversion sectorielle</span></div>
-              <div class="hiw-fline"><span class="hiw-fk">Walk-in</span><span class="hiw-feq">=</span><span class="hiw-fv">0,7% × visiteurs mall (si en CC)</span></div>
-              <div class="hiw-fline"><span class="hiw-fk">Dest. bonus</span><span class="hiw-feq">=</span><span class="hiw-fv">proximité POI premium (malls prestige, bureaux)</span></div>
+              <div class="hiw-fline"><span class="hiw-fk" data-i18n="hiw.capt.captifs">Captifs</span><span class="hiw-feq">=</span><span class="hiw-fv" data-i18n="hiw.capt.captifsF">taux switch × proximité × qualité (Google) × écart de prix</span></div>
+              <div class="hiw-fline"><span class="hiw-fk" data-i18n="hiw.capt.natifs">Natifs</span><span class="hiw-feq">=</span><span class="hiw-fv" data-i18n="hiw.capt.natifsF">pop non-inscrite × taux de conversion</span></div>
+              <div class="hiw-fline"><span class="hiw-fk">Walk-in</span><span class="hiw-feq">=</span><span class="hiw-fv" data-i18n="hiw.capt.walkinF">0,7% × visiteurs mall (si en CC)</span></div>
+              <div class="hiw-fline"><span class="hiw-fk" data-i18n="hiw.capt.bonus">Dest. bonus</span><span class="hiw-feq">=</span><span class="hiw-fv" data-i18n="hiw.capt.bonusF">proximité POI premium (malls, bureaux)</span></div>
               <div class="hiw-fline hiw-ftotal"><span class="hiw-fk">TOTAL</span><span class="hiw-feq">=</span><span class="hiw-fv hiw-total-v"><span data-counter data-target="4823" data-format="fr-thousands" data-delay="1000">0</span> membres théoriques A3</span></div>
             </div>
           </div>

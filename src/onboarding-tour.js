@@ -25,7 +25,10 @@
   // ─── Constants ────────────────────────────────────────────────
   const MAX_RUNS = 10;
   const KEY_PREFIX = 'fpOnbTour:';    // localStorage key per user id
-  const SLIDE_COUNT = 8;
+  // Nombre de slides du tour courant. Dynamique depuis v6.19 pour supporter
+  // plusieurs tours (onboarding, BP cible pays, sources de données).
+  let SLIDE_COUNT = 8;
+  let activeSlides = null;  // Pointeur vers le set de slides actif (SLIDES|SLIDES_BP|...)
   const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // ─── Counter ──────────────────────────────────────────────────
@@ -670,6 +673,16 @@
       100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) rotate(var(--rot,0deg)) scale(1); }
     }
 
+    /* ═══ Animations réutilisables pour tours BP + Sources ═══ */
+    @keyframes fpOnbFadeIn      { to { opacity: 1; } }
+    @keyframes fpOnbSlideIn     { to { opacity: 1; transform: translateX(0); } }
+    @keyframes fpOnbBarGrow     { to { transform: scaleY(1); } }
+    @keyframes fpOnbWidthGrow   { to { width: var(--w, 50%); } }
+    @keyframes fpOnbCardIn      { to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes fpOnbRingDraw    { to { stroke-dashoffset: var(--to, 0); } }
+    @keyframes fpOnbRingDrawSmall { to { stroke-dashoffset: var(--to, 0); } }
+    @keyframes fpOnbCheckDraw   { to { stroke-dashoffset: var(--to, 0); } }
+
     /* ═══ Responsive ═══ */
     @media (max-width: 480px) {
       .fp-onb-card { padding: 24px 20px 18px; border-radius: 28px; }
@@ -742,6 +755,27 @@
     { tint: '#d4a017', eyebrow: 'tour.s6.eyebrow', title: 'tour.s6.title', subtitle: 'tour.s6.subtitle', demo: demoFinancing, cta: 'tour.cta.next' },
     { tint: '#a78bfa', eyebrow: 'tour.s7.eyebrow', title: 'tour.s7.title', subtitle: 'tour.s7.subtitle', demo: demoPhone,   cta: 'tour.cta.next' },
     { tint: '#22c55e', eyebrow: 'tour.s8.eyebrow', title: 'tour.s8.title', subtitle: 'tour.s8.subtitle', demo: demoReady,   cta: 'tour.s8.cta' },
+  ];
+
+  // ═══ TOUR 2 : Business Plan cible pays (7 slides) ══════════════
+  const SLIDES_BP = [
+    { tint: '#d4a017', eyebrow: 'bp.s1.eyebrow', title: 'bp.s1.title', subtitle: 'bp.s1.subtitle', demo: demoBpIntro,     cta: 'tour.s1.cta' },
+    { tint: '#60a5fa', eyebrow: 'bp.s2.eyebrow', title: 'bp.s2.title', subtitle: 'bp.s2.subtitle', demo: demoBpAssumptions, cta: 'tour.cta.next' },
+    { tint: '#34d399', eyebrow: 'bp.s3.eyebrow', title: 'bp.s3.title', subtitle: 'bp.s3.subtitle', demo: demoBpRevenue,   cta: 'tour.cta.next' },
+    { tint: '#f97316', eyebrow: 'bp.s4.eyebrow', title: 'bp.s4.title', subtitle: 'bp.s4.subtitle', demo: demoBpCosts,     cta: 'tour.cta.next' },
+    { tint: '#d4a017', eyebrow: 'bp.s5.eyebrow', title: 'bp.s5.title', subtitle: 'bp.s5.subtitle', demo: demoBpCapex,     cta: 'tour.cta.next' },
+    { tint: '#a78bfa', eyebrow: 'bp.s6.eyebrow', title: 'bp.s6.title', subtitle: 'bp.s6.subtitle', demo: demoBpMonteCarlo, cta: 'tour.cta.next' },
+    { tint: '#22c55e', eyebrow: 'bp.s7.eyebrow', title: 'bp.s7.title', subtitle: 'bp.s7.subtitle', demo: demoBpVerdict,   cta: 'tour.s8.cta' },
+  ];
+
+  // ═══ TOUR 3 : Sources de données (6 slides) ════════════════════
+  const SLIDES_SOURCES = [
+    { tint: '#d4a017', eyebrow: 'data.s1.eyebrow', title: 'data.s1.title', subtitle: 'data.s1.subtitle', demo: demoDataIntro, cta: 'tour.s1.cta' },
+    { tint: '#60a5fa', eyebrow: 'data.s2.eyebrow', title: 'data.s2.title', subtitle: 'data.s2.subtitle', demo: demoDataPop,   cta: 'tour.cta.next' },
+    { tint: '#f87171', eyebrow: 'data.s3.eyebrow', title: 'data.s3.title', subtitle: 'data.s3.subtitle', demo: demoDataComps, cta: 'tour.cta.next' },
+    { tint: '#06b6d4', eyebrow: 'data.s4.eyebrow', title: 'data.s4.title', subtitle: 'data.s4.subtitle', demo: demoDataFlux,  cta: 'tour.cta.next' },
+    { tint: '#a78bfa', eyebrow: 'data.s5.eyebrow', title: 'data.s5.title', subtitle: 'data.s5.subtitle', demo: demoDataImmo,  cta: 'tour.cta.next' },
+    { tint: '#22c55e', eyebrow: 'data.s6.eyebrow', title: 'data.s6.title', subtitle: 'data.s6.subtitle', demo: demoDataRigor, cta: 'tour.s8.cta' },
   ];
 
   // ─── Demo builders ────────────────────────────────────────────
@@ -919,6 +953,238 @@
     `;
   }
 
+  // ═══ TOUR 2 : BP cible pays — demo builders ═══════════════════
+  function demoBpIntro() {
+    const fpLogo = window.FP_LOGO_PNG || '';
+    return `
+      <div class="fp-onb-demo-bp-intro" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0">
+        <img src="${fpLogo}" alt="Fitness Park" style="height:42px;width:auto;filter:drop-shadow(0 4px 12px rgba(212,160,23,.25));opacity:0;animation:fpOnbFadeIn .6s ease .1s forwards">
+        <div style="font-size:11px;letter-spacing:2.5px;color:rgba(212,160,23,.8);font-weight:700">BP V17 · ROMANIA</div>
+        <div class="fp-onb-demo-bp-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:340px">
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="40" data-delay="300">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">clubs A8</div></div>
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€" data-delay="500">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">CA A10</div></div>
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:#34d399"><span data-counter data-target="9.6" data-format="fr-decimal" data-suffix=" M€" data-delay="700">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">EBITDA A10</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function demoBpAssumptions() {
+    const rows = [
+      { lbl: 'Prix mensuel',       val: '28 €',    sub: 'TTC · 23,14 HT',   c: '#d4a017' },
+      { lbl: 'Membres cibles A3',  val: '4 000',   sub: 'par club mature',  c: '#60a5fa' },
+      { lbl: 'Ramp-up A1 / A2',    val: '70% / 90%', sub: 'courbe maturité', c: '#34d399' },
+      { lbl: 'Churn annuel',       val: '45%',     sub: 'standard low-cost EU', c: '#f97316' },
+      { lbl: 'Redevance MF',       val: '6%',      sub: 'du CA HT → FP France', c: '#a78bfa' },
+    ];
+    return `
+      <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+        ${rows.map((r,i)=>`<div class="fp-onb-bp-row" style="display:grid;grid-template-columns:1.2fr auto;gap:10px;align-items:center;padding:8px 12px;background:rgba(24,32,52,.8);border-radius:8px;border-left:3px solid ${r.c};border-right:1px solid rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateX(-10px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.1}s forwards"><div><div style="font-size:11px;font-weight:700;color:#fff">${r.lbl}</div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">${r.sub}</div></div><div style="font-size:14px;font-weight:900;color:${r.c};font-variant-numeric:tabular-nums">${r.val}</div></div>`).join('')}
+      </div>
+    `;
+  }
+
+  function demoBpRevenue() {
+    // Courbe ramp-up CA sur 10 ans (clubs × prix × ramp-up)
+    const years = [0.4, 1.9, 4.9, 11.5, 18.9, 31.0, 40.5, 45.8, 49.0, 51.3];
+    const max = 52;
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:120px;padding:0 2px;border-bottom:1px solid rgba(255,255,255,.1)">
+          ${years.map((v,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:100%;height:${Math.round(v/max*100)}%;background:linear-gradient(180deg, var(--onb-tint), rgba(212,160,23,.4));border-radius:3px 3px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .8s cubic-bezier(.34,1.12,.52,1) ${0.05 + i*0.08}s forwards"></div><div style="font-size:8px;color:rgba(255,255,255,.5);font-weight:600">A${i+1}</div></div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:0 4px;font-size:10px;color:rgba(255,255,255,.65)">
+          <span>CA · M€</span><span style="color:var(--onb-tint);font-weight:700"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€ A10" data-delay="900">0</span></span>
+        </div>
+      </div>
+    `;
+  }
+
+  function demoBpCosts() {
+    // Structure de coûts % CA (benchmark OnAir calibré)
+    const costs = [
+      { lbl: 'Staff',        pct: 9,    c: '#60a5fa' },
+      { lbl: 'Loyer + charges', pct: 12.4, c: '#f97316' },
+      { lbl: 'OPEX ops',     pct: 12,   c: '#34d399' },
+      { lbl: 'Royalties MF', pct: 6,    c: '#a78bfa' },
+      { lbl: 'Fonds pub',    pct: 1,    c: '#fbbf24' },
+    ];
+    const total = costs.reduce((a,c)=>a+c.pct, 0);
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+        ${costs.map((c,i)=>`<div style="opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1+i*0.1}s forwards"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;margin-bottom:3px"><span style="color:#fff;font-weight:700">${c.lbl}</span><span style="color:${c.c};font-weight:800">${c.pct}% du CA</span></div><div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow ${0.8 + i*0.1}s cubic-bezier(.34,1.12,.52,1) ${0.15 + i*0.1}s forwards;--w:${(c.pct/20)*100}%"></div></div></div>`).join('')}
+        <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;font-size:11px;font-weight:800"><span style="color:#fff">Total OPEX</span><span style="color:var(--onb-tint)">${total.toFixed(1)}% · EBITDA 55%+</span></div>
+      </div>
+    `;
+  }
+
+  function demoBpCapex() {
+    // CAPEX 1176k€ = fit-out 840 (71%) + équipement 336 (29%)
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center">
+        <div style="display:flex;align-items:center;gap:16px">
+          <svg viewBox="0 0 120 120" width="120" height="120" style="transform:rotate(-90deg)">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="14"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#d4a017" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" style="animation:fpOnbRingDraw 1.2s cubic-bezier(.34,1.12,.52,1) .3s forwards;--to:91"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#60a5fa" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(260 60 60)" style="animation:fpOnbRingDrawSmall 1.2s cubic-bezier(.34,1.12,.52,1) .6s forwards;--to:223"/>
+          </svg>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#d4a017;border-radius:2px"></span><span style="color:#fff;font-weight:700">Fit-out</span><span style="color:rgba(255,255,255,.55)">840 k€ · 600€/m² × 1 400m²</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#60a5fa;border-radius:2px"></span><span style="color:#fff;font-weight:700">Équipement</span><span style="color:rgba(255,255,255,.55)">336 k€ · 60% en leasing 5 ans</span></div>
+          </div>
+        </div>
+        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.8px;text-transform:uppercase">CAPEX total / club</div><div style="font-size:22px;font-weight:900;color:var(--onb-tint);margin-top:2px"><span data-counter data-target="1176" data-format="fr-thousands" data-suffix=" k€" data-delay="800">0</span></div></div>
+      </div>
+    `;
+  }
+
+  function demoBpMonteCarlo() {
+    // Distribution IRR équité — histogramme simulé 1000 runs
+    // Moyenne ~57%, écart-type ~12%, distribution normale
+    const bars = [3, 8, 16, 28, 44, 58, 72, 88, 95, 92, 78, 60, 42, 26, 14, 6];
+    const maxBar = 100;
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:100px;padding:0 4px;border-bottom:1px solid rgba(255,255,255,.1)">
+          ${bars.map((v,i)=>`<div style="flex:1;height:${Math.round(v/maxBar*100)}%;background:linear-gradient(180deg, #a78bfa, rgba(167,139,250,.3));border-radius:2px 2px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .6s cubic-bezier(.34,1.12,.52,1) ${0.05 + i*0.04}s forwards"></div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.5);padding:0 4px">
+          <span>20%</span><span>40%</span><span style="color:var(--onb-tint);font-weight:800">57% médiane</span><span>80%</span><span>100%</span>
+        </div>
+        <div style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:10px">
+          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P10</div><div style="color:#fff;font-weight:800;margin-top:2px">+38%</div></div>
+          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">Médiane</div><div style="color:#a78bfa;font-weight:800;margin-top:2px">+57%</div></div>
+          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P90</div><div style="color:#fff;font-weight:800;margin-top:2px">+79%</div></div>
+        </div>
+        <div style="font-size:9.5px;color:rgba(255,255,255,.5);text-align:center;font-style:italic">1 000 simulations · variables: prix, membres, loyer, churn, delay ouverture</div>
+      </div>
+    `;
+  }
+
+  function demoBpVerdict() {
+    // Verdict final BP avec IRR/NPV + confetti
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center">
+        <div style="width:100px;height:100px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.2), transparent 70%);display:flex;align-items:center;justify-content:center;position:relative">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="214" stroke-dashoffset="214" stroke-linecap="round" style="animation:fpOnbRingDraw 1s cubic-bezier(.34,1.12,.52,1) .2s forwards;--to:0"/>
+            <path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/>
+          </svg>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:320px">
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #22c55e"><div style="font-size:16px;font-weight:900;color:#22c55e"><span data-counter data-target="57.6" data-format="fr-decimal" data-prefix="+" data-suffix="%" data-delay="1100">+0%</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">IRR équité</div></div>
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #d4a017"><div style="font-size:16px;font-weight:900;color:#d4a017"><span data-counter data-target="3.9" data-format="fr-decimal" data-suffix=" M€" data-delay="1300">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">NPV 5 ans</div></div>
+          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #60a5fa"><div style="font-size:16px;font-weight:900;color:#60a5fa"><span data-counter data-target="38" data-suffix=" mois" data-delay="1500">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">Payback</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ═══ TOUR 3 : Sources de données — demo builders ══════════════
+  function demoDataIntro() {
+    const srcs = [
+      { icon: '🏠', name: 'OSM',        desc: '397k bâtiments' },
+      { icon: '📊', name: 'INS Census', desc: 'Recensement 2021' },
+      { icon: '🏋️', name: 'Overpass',   desc: '92 clubs' },
+      { icon: '🚇', name: 'Metrorex',   desc: '53 stations' },
+      { icon: '🏢', name: 'Cushman',    desc: '340k bureaux' },
+      { icon: '🗺️', name: 'Google',     desc: 'Routes + Places' },
+    ];
+    return `
+      <div style="width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${srcs.map((s,i)=>`<div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 6px;text-align:center;opacity:0;transform:translateY(10px) scale(.95);animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:22px;margin-bottom:4px">${s.icon}</div><div style="font-size:11px;font-weight:800;color:#fff">${s.name}</div><div style="font-size:9px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.3">${s.desc}</div></div>`).join('')}
+      </div>
+    `;
+  }
+
+  function demoDataPop() {
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .1s forwards">
+          <div style="font-size:10px;letter-spacing:.6px;color:#60a5fa;text-transform:uppercase;font-weight:800">INS Census 2021</div>
+          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff"><span data-counter data-target="1716961" data-format="fr-thousands" data-delay="200">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">habitants recensés</span></div>
+          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px">6 secteurs · 83 quartiers (cartiere)</div>
+        </div>
+        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .35s forwards">
+          <div style="font-size:10px;letter-spacing:.6px;color:#34d399;text-transform:uppercase;font-weight:800">+ Navetteurs Ilfov</div>
+          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff">×<span data-counter data-target="1.7" data-format="fr-decimal" data-delay="400">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">pop réelle estimée</span></div>
+          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px"><span data-counter data-target="2.9" data-format="fr-decimal" data-suffix=" M" data-delay="600">0</span> hab. effective (census + non-déclarés + expats)</div>
+        </div>
+        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .6s forwards">
+          <div style="font-size:10px;letter-spacing:.6px;color:#a78bfa;text-transform:uppercase;font-weight:800">Volumétrie OSM</div>
+          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff"><span data-counter data-target="397009" data-format="fr-thousands" data-delay="700">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">bâtiments</span></div>
+          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px">Pondération volumétrique · emprise × étages</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function demoDataComps() {
+    const clubs = [
+      { name: 'World Class', n: 36, c: '#ef4444' },
+      { name: 'Stay Fit', n: 28, c: '#f97316' },
+      { name: '18GYM', n: 6, c: '#eab308' },
+      { name: 'Downtown', n: 5, c: '#22c55e' },
+      { name: 'Nr1', n: 5, c: '#a78bfa' },
+      { name: 'Autres', n: 12, c: '#64748b' },
+    ];
+    const total = clubs.reduce((a,c)=>a+c.n,0);
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+        ${clubs.map((c,i)=>`<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .4s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:10.5px;color:#fff;font-weight:700">${c.name}</div><div style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow .7s cubic-bezier(.34,1.12,.52,1) ${0.2 + i*0.08}s forwards;--w:${Math.round(c.n/40*100)}%"></div></div><div style="font-size:10.5px;color:${c.c};font-weight:800;text-align:right">${c.n}</div></div>`).join('')}
+        <div style="margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;font-size:10.5px"><span style="color:rgba(255,255,255,.6)">Total vérifié</span><span style="color:var(--onb-tint);font-weight:800">${total} clubs · Overpass API + check manuel</span></div>
+      </div>
+    `;
+  }
+
+  function demoDataFlux() {
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+          <div style="background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .1s forwards"><div style="font-size:20px;margin-bottom:3px">🚇</div><div style="font-size:10px;letter-spacing:.4px;color:#06b6d4;font-weight:800;text-transform:uppercase">Métro Metrorex</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="53" data-suffix=" stations" data-delay="300">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">M1-M5 · 750k pax/jour</div></div>
+          <div style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .25s forwards"><div style="font-size:20px;margin-bottom:3px">🚋</div><div style="font-size:10px;letter-spacing:.4px;color:#34d399;font-weight:800;text-transform:uppercase">Tram/bus STB</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="2.7" data-format="fr-decimal" data-suffix=" M" data-delay="450">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">pax/jour · 7 corridors</div></div>
+          <div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .4s forwards"><div style="font-size:20px;margin-bottom:3px">🛍️</div><div style="font-size:10px;letter-spacing:.4px;color:#f97316;font-weight:800;text-transform:uppercase">12 malls</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="60000" data-format="fr-thousands" data-delay="600">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">AFI Cotroceni / jour</div></div>
+          <div style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .55s forwards"><div style="font-size:20px;margin-bottom:3px">🏢</div><div style="font-size:10px;letter-spacing:.4px;color:#a78bfa;font-weight:800;text-transform:uppercase">Bureaux CBRE</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="340000" data-format="fr-thousands" data-delay="750">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">employés modernes</div></div>
+        </div>
+        <div style="font-size:9.5px;color:rgba(255,255,255,.55);text-align:center;font-style:italic">Google Routes API · isochrones 10 min marche/voiture/métro</div>
+      </div>
+    `;
+  }
+
+  function demoDataImmo() {
+    const hoods = [
+      { name: 'Primaverii', price: 3200, c: '#ef4444' },
+      { name: 'Aviatorilor', price: 3000, c: '#f97316' },
+      { name: 'Floreasca', price: 2600, c: '#d4a017' },
+      { name: 'Dorobanti', price: 2800, c: '#f97316' },
+      { name: 'Titan', price: 1400, c: '#22c55e' },
+      { name: 'Ferentari', price: 700, c: '#64748b' },
+    ];
+    const max = 3500;
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:6px">
+        ${hoods.map((h,i)=>`<div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;align-items:center;opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .4s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:10.5px;color:#fff;font-weight:700">${h.name}</div><div style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><div style="height:100%;background:${h.c};width:0;animation:fpOnbWidthGrow .7s cubic-bezier(.34,1.12,.52,1) ${0.2 + i*0.08}s forwards;--w:${Math.round(h.price/max*100)}%"></div></div><div style="font-size:10.5px;color:${h.c};font-weight:800;text-align:right">${h.price} €/m²</div></div>`).join('')}
+        <div style="margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:9.5px;color:rgba(255,255,255,.55);text-align:center">Source : imobiliare.ro · investropa.com 2025 · proxy revenu/quartier</div>
+      </div>
+    `;
+  }
+
+  function demoDataRigor() {
+    return `
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div style="width:90px;height:90px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.2), transparent 70%);display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 80 80" width="70" height="70"><circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="214" stroke-dashoffset="214" stroke-linecap="round" style="animation:fpOnbRingDraw 1s cubic-bezier(.34,1.12,.52,1) .2s forwards;--to:0"/><path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/></svg>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.1s forwards"><span style="color:#22c55e">✓</span>Cross-référence OSM × INS × Google</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.3s forwards"><span style="color:#22c55e">✓</span>92 clubs validés manuellement</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.5s forwards"><span style="color:#22c55e">✓</span>Modèle calibré OnAir Montreuil (Fiteco)</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.7s forwards"><span style="color:#f97316">⚠</span>Limites assumées · onglet Sources</div>
+        </div>
+      </div>
+    `;
+  }
+
   // ─── Counter animation ────────────────────────────────────────
   // Format la valeur selon data-format: 'fr-decimal' (virgule, 1 décimale),
   // 'fr-thousands' (espace thousands, 0 décimale), par défaut point décimal anglais.
@@ -1012,7 +1278,7 @@
     progressBar = overlay.querySelector('.fp-onb-progress-bar');
 
     // Slides
-    SLIDES.forEach((s, i) => {
+    activeSlides.forEach((s, i) => {
       const slide = document.createElement('div');
       slide.className = 'fp-onb-slide';
       slide.dataset.idx = i;
@@ -1061,7 +1327,7 @@
     actionsRow.innerHTML = `
       <button class="fp-onb-btn-skip" type="button">${tr('tour.skip')}</button>
       <button class="fp-onb-btn-next" type="button">
-        <span>${tr(SLIDES[currentIdx]?.cta || 'tour.cta.next')}</span>
+        <span>${tr(activeSlides[currentIdx]?.cta || 'tour.cta.next')}</span>
         ${isLast ? '' : '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>'}
       </button>
     `;
@@ -1159,7 +1425,7 @@
     progressBar.style.width = pct + '%';
 
     // Update tint via CSS custom prop on overlay
-    overlay.style.setProperty('--onb-tint', SLIDES[newIdx].tint);
+    overlay.style.setProperty('--onb-tint', activeSlides[newIdx].tint);
 
     // Tilt the background radial positions for dynamism
     const bg1x = 30 + Math.cos(newIdx / SLIDE_COUNT * Math.PI * 2) * 20;
@@ -1202,8 +1468,24 @@
   }
 
   // ─── Public API ───────────────────────────────────────────────
-  function startOnboardingTour() {
-    if (overlay && overlay.classList.contains('open')) return;
+  // customSlides optionnel: si fourni, lance un tour avec ce set de slides
+  // au lieu du tour principal. Utilisé pour BP cible pays et Sources data.
+  // Si un tour est déjà ouvert, il est fermé et remplacé par le nouveau.
+  function startOnboardingTour(customSlides) {
+    // Si un tour déjà ouvert avec les mêmes slides, no-op (évite double-click)
+    const nextSlides = (Array.isArray(customSlides) && customSlides.length) ? customSlides : SLIDES;
+    if (overlay && overlay.classList.contains('open') && activeSlides === nextSlides) return;
+    // Nettoie l'overlay existant (d'un autre tour ou ancien instance) avant rebuild
+    if (overlay) {
+      try { overlay.remove(); } catch {}
+      overlay = null; card = null; slidesWrap = null; dotsEl = null;
+      progressBar = null; skipBtn = null; nextBtn = null; actionsRow = null;
+      counterCache.clear();
+      if (keyHandler) { try { window.removeEventListener('keydown', keyHandler); } catch {} keyHandler = null; }
+      try { unlockScroll(); } catch {}
+    }
+    activeSlides = nextSlides;
+    SLIDE_COUNT = activeSlides.length;
     buildOverlay();
     currentIdx = 0;
 
@@ -1211,7 +1493,7 @@
     const first = slidesWrap.querySelectorAll('.fp-onb-slide')[0];
     first.classList.add('active');
     dotsEl.querySelectorAll('.fp-onb-dot')[0].classList.add('active');
-    overlay.style.setProperty('--onb-tint', SLIDES[0].tint);
+    overlay.style.setProperty('--onb-tint', activeSlides[0].tint);
     progressBar.style.width = (1 / SLIDE_COUNT * 100) + '%';
 
     lockScroll();
@@ -1251,6 +1533,10 @@
   window.startOnboardingTour = startOnboardingTour;
   window.maybeStartOnboardingTour = maybeStartOnboardingTour;
   window.resetOnboardingTour = resetOnboardingTour;
+  // Tours secondaires: BP cible pays et Sources de données (même infrastructure,
+  // slides différents). Accessibles depuis showDemoPanel.
+  window.startBpTour = () => startOnboardingTour(SLIDES_BP);
+  window.startSourcesTour = () => startOnboardingTour(SLIDES_SOURCES);
 
   // ─── Auto-trigger on login events ─────────────────────────────
   // The app dispatches `fp:login-success` from doLogin() and checkAuth() (see index.html).
