@@ -2823,32 +2823,12 @@
     setTimeout(() => tryBuildPins(tries + 1), 400);
   }
 
-  // ─── DESKTOP: also add numbered pins (brand element, same UX) ──
-  // Not gated by isMobile so the 5 target pins show on desktop too.
-  function initDesktopPins() {
-    if (isMobile()) return; // mobile is handled by main init()
-    const waitMap = (tries = 0) => {
-      if (window._fpMap && typeof TARGETS !== 'undefined' && typeof L !== 'undefined') {
-        buildTargetPins();
-        return;
-      }
-      if (tries > 40) return;
-      setTimeout(() => waitMap(tries + 1), 400);
-    };
-    // Wait for app to show (post-login)
-    const waitApp = (tries = 0) => {
-      const app = qs('#app');
-      if (app && app.style.display !== 'none') { waitMap(); return; }
-      if (tries > 60) return;
-      setTimeout(() => waitApp(tries + 1), 500);
-    };
-    waitApp();
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDesktopPins);
-  } else {
-    initDesktopPins();
-  }
+  // ─── DESKTOP: numbered pins retirés ─────────────────────────────
+  // Les pins numérotés (1-5 targets dorés, 6+ customs violets) sont un pattern
+  // mobile (le carousel bottom-sheet mappe numéro → site). Sur desktop sans
+  // carousel, les numéros n'ont aucun contexte et se superposent aux markers
+  // étoilés natifs des custom sites (`addCustomSiteMarker`). Désactivé.
+  // Desktop : TARGETS dans la sidebar (flyTarget au click) + customs via étoiles Leaflet.
 
   // Wait for the app to appear post-login
   function waitForApp(cb, tries = 0) {
