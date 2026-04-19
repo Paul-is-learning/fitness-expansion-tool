@@ -273,6 +273,19 @@
     .fp-onb-slides-wrap { position: relative; flex: 1; min-height: 340px; }
 
     /* ═══ DEMO: Welcome logo stroke-draw + sparks ═══ */
+    /* Logo slide BIENVENUE: fade-in + scale à l'entrée */
+    .fp-onb-demo-welcome .fp-onb-welcome-stack img {
+      opacity: 0;
+      transform: translateY(6px) scale(.94);
+      transition: opacity .6s ease, transform .7s cubic-bezier(.34,1.56,.52,1);
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-welcome .fp-onb-welcome-stack img {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-welcome .fp-onb-welcome-stack img:nth-of-type(2) {
+      transition-delay: .18s;
+    }
     .fp-onb-demo-welcome svg { width: 160px; height: 160px; overflow: visible; }
     .fp-onb-demo-welcome .logo-stroke {
       stroke-dasharray: 420;
@@ -355,14 +368,48 @@
     .fp-onb-demo-sliders .fill {
       position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px;
       background: var(--onb-tint,#d4a017);
-      width: var(--fill-target, 40%);
+      /* Animation: slide from 0% to target à l'entrée du slide */
+      width: 0%;
     }
     .fp-onb-demo-sliders .thumb {
       position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
       background: white;
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--onb-tint,#d4a017) 40%, transparent), 0 2px 6px rgba(0,0,0,.4);
       transform: translate(-50%, -50%);
-      left: var(--fill-target, 40%);
+      left: 0%;
+    }
+    /* Play animation quand le slide est actif + ready */
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .fill {
+      animation: fpOnbSliderFill 1s cubic-bezier(.34,1.12,.52,1) forwards;
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .thumb {
+      animation: fpOnbSliderThumb 1s cubic-bezier(.34,1.12,.52,1) forwards;
+    }
+    /* Stagger entre les 3 sliders pour un effet cascade (120ms delta) */
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(1) .fill,
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(1) .thumb { animation-delay: .0s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(2) .fill,
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(2) .thumb { animation-delay: .12s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(3) .fill,
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .row:nth-child(3) .thumb { animation-delay: .24s; }
+    @keyframes fpOnbSliderFill {
+      0%   { width: 0%; }
+      100% { width: var(--fill-target, 40%); }
+    }
+    @keyframes fpOnbSliderThumb {
+      0%   { left: 0%; }
+      100% { left: var(--fill-target, 40%); }
+    }
+    /* "Pulse" subtil sur le thumb juste après le passage (valeur verrouillée) */
+    .fp-onb-slide.active.ready .fp-onb-demo-sliders .thumb::before {
+      content: ''; position: absolute; inset: -4px; border-radius: 50%;
+      border: 2px solid var(--onb-tint,#d4a017);
+      opacity: 0;
+      animation: fpOnbThumbPulse 1s ease-out 1.1s 2 both;
+    }
+    @keyframes fpOnbThumbPulse {
+      0%   { opacity: .6; transform: scale(.8); }
+      100% { opacity: 0;  transform: scale(2); }
     }
     .fp-onb-demo-sliders .val {
       font-weight: 800; color: color-mix(in srgb, var(--onb-tint,#d4a017) 70%, white 30%);
@@ -387,9 +434,16 @@
       fill: none;
       stroke-width: 9;
       stroke-linecap: round;
-      stroke-dasharray: 1000;
+      /* Ring full au repos, se "dessine" vers --dashoffset quand .ready */
+      stroke-dashoffset: var(--perim, 1000);
+      transition: stroke-dashoffset 1.1s cubic-bezier(.34,1.12,.52,1);
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-saz .ring {
       stroke-dashoffset: var(--dashoffset, 400);
     }
+    .fp-onb-slide.active.ready .fp-onb-demo-saz .ring.r1 { transition-delay: .0s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-saz .ring.r2 { transition-delay: .15s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-saz .ring.r3 { transition-delay: .3s; }
     .fp-onb-demo-saz .score {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
@@ -433,7 +487,18 @@
     .fp-onb-demo-pnl .s .fill {
       height: 100%;
       background: var(--c, #d4a017);
-      width: var(--fill, 50%);
+      width: 0%;
+    }
+    /* Anim: fill bars grandissent de 0 à target en cascade à l'entrée du slide */
+    .fp-onb-slide.active.ready .fp-onb-demo-pnl .s .fill {
+      animation: fpOnbPnlBar 1.1s cubic-bezier(.34,1.12,.52,1) forwards;
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-pnl .s:nth-child(1) .fill { animation-delay: .0s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-pnl .s:nth-child(2) .fill { animation-delay: .15s; }
+    .fp-onb-slide.active.ready .fp-onb-demo-pnl .s:nth-child(3) .fill { animation-delay: .3s; }
+    @keyframes fpOnbPnlBar {
+      0%   { width: 0%; }
+      100% { width: var(--fill, 50%); }
     }
 
     /* ═══ DEMO: Financing equity/loan ═══ */
@@ -450,12 +515,22 @@
     .fp-onb-demo-fin .eq {
       background: linear-gradient(90deg, #34d399, #10b981);
       color: #052e1c;
-      width: 30%;
+      width: 0%;
     }
     .fp-onb-demo-fin .ln {
       background: linear-gradient(90deg, #60a5fa, #3b82f6);
-      width: 70%;
+      width: 0%;
     }
+    /* Anim: equity et loan grandissent simultanément jusqu'à leur part finale */
+    .fp-onb-slide.active.ready .fp-onb-demo-fin .eq {
+      animation: fpOnbFinEq 1s cubic-bezier(.34,1.12,.52,1) forwards;
+    }
+    .fp-onb-slide.active.ready .fp-onb-demo-fin .ln {
+      animation: fpOnbFinLn 1s cubic-bezier(.34,1.12,.52,1) forwards;
+      animation-delay: .15s;
+    }
+    @keyframes fpOnbFinEq { 0% { width: 0%; } 100% { width: 30%; } }
+    @keyframes fpOnbFinLn { 0% { width: 0%; } 100% { width: 70%; } }
     .fp-onb-demo-fin .stats {
       margin-top: 14px;
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
@@ -649,7 +724,7 @@
       tint: '#d4a017',
       eyebrow: 'BIENVENUE',
       title: 'FP Romania Expansion Intelligence',
-      subtitle: 'L\'outil qui transforme 5 sites en décisions chiffrées. En 30 secondes par site, tu as un go / no-go défendable.',
+      subtitle: "L'outil d'expansion qui transforme une opportunité foncière en BP. En 30 secondes par site, tu as un go / no-go défendable et un pitch banquier prêt.",
       demo: demoWelcome,
       cta: 'Découvrir'
     },
@@ -758,43 +833,47 @@
   }
 
   function demoSliders() {
+    // Les 3 barres fill animent de 0% -> target via CSS keyframes à l'entrée.
+    // Les valeurs textuelles s'animent via data-counter (compte de 0 -> target).
+    // L'IRR recalcule en parallèle après un petit delay (effet "recalc live").
     return `
       <div class="fp-onb-demo-sliders" aria-hidden="true">
         <div class="row">
           <span>Loyer</span>
           <div class="track" style="--fill-target:55%"><div class="fill"></div><div class="thumb"></div></div>
-          <span class="val">11,5 €/m²</span>
+          <span class="val"><span data-counter data-target="11.5" data-format="fr-decimal" data-suffix=" €/m²">0 €/m²</span></span>
         </div>
         <div class="row">
           <span>Charges</span>
           <div class="track" style="--fill-target:44%"><div class="fill"></div><div class="thumb"></div></div>
-          <span class="val">5,5 €/m²</span>
+          <span class="val"><span data-counter data-target="5.5" data-format="fr-decimal" data-suffix=" €/m²" data-delay="120">0 €/m²</span></span>
         </div>
         <div class="row">
           <span>Surface</span>
           <div class="track" style="--fill-target:38%"><div class="fill"></div><div class="thumb"></div></div>
-          <span class="val">1 449 m²</span>
+          <span class="val"><span data-counter data-target="1449" data-format="fr-thousands" data-suffix=" m²" data-delay="240">0 m²</span></span>
         </div>
         <div class="irr-card">
           <div><div class="l">IRR projet · recalc live</div></div>
-          <div class="v" data-counter data-target="57.6" data-suffix="%">0%</div>
+          <div class="v" data-counter data-target="57.6" data-suffix="%" data-delay="600">0%</div>
         </div>
       </div>
     `;
   }
 
   function demoSaz() {
-    // 3 rings concentric with different radius + stroke-dashoffset target
-    // Perimeter = 2πr : r1=72 → P=452, r2=58 → P=364, r3=44 → P=276
+    // 3 rings concentric with different radius + stroke-dashoffset target.
+    // Perimeter = 2πr : r1=72 → P=452, r2=58 → P=364, r3=44 → P=276.
+    // --perim = perim complet (dashoffset au repos = ring caché), --dashoffset = cible animée.
     return `
       <div class="fp-onb-demo-saz" aria-hidden="true">
         <svg viewBox="0 0 180 180" width="180" height="180">
           <circle class="ring r1" cx="90" cy="90" r="72" stroke="#06b6d4"
-                  stroke-dasharray="452" style="--dashoffset:${Math.round(452 * (1 - 0.65))}"/>
+                  stroke-dasharray="452" style="--perim:452;--dashoffset:${Math.round(452 * (1 - 0.65))}"/>
           <circle class="ring r2" cx="90" cy="90" r="58" stroke="#22c55e"
-                  stroke-dasharray="364" style="--dashoffset:${Math.round(364 * (1 - 0.69))}"/>
+                  stroke-dasharray="364" style="--perim:364;--dashoffset:${Math.round(364 * (1 - 0.69))}"/>
           <circle class="ring r3" cx="90" cy="90" r="44" stroke="#fbbf24"
-                  stroke-dasharray="276" style="--dashoffset:${Math.round(276 * (1 - 0.37))}"/>
+                  stroke-dasharray="276" style="--perim:276;--dashoffset:${Math.round(276 * (1 - 0.37))}"/>
         </svg>
         <div class="score">
           <div class="n" data-counter data-target="70" data-suffix="">0</div>
@@ -805,17 +884,18 @@
   }
 
   function demoPnl() {
+    // Fill bars + IRR comptent en cascade (stagger 150ms) à l'entrée du slide.
     const data = [
-      { lbl: 'Conservateur', c: '#f87171', irr: '+36%',  fill: '36%' },
-      { lbl: 'Base',         c: '#d4a017', irr: '+57%',  fill: '57%' },
-      { lbl: 'Optimiste',    c: '#34d399', irr: '+86%',  fill: '86%' },
+      { lbl: 'Conservateur', c: '#f87171', irr: 36, fill: '36%', delay: 0 },
+      { lbl: 'Base',         c: '#d4a017', irr: 57, fill: '57%', delay: 150 },
+      { lbl: 'Optimiste',    c: '#34d399', irr: 86, fill: '86%', delay: 300 },
     ];
     return `
       <div class="fp-onb-demo-pnl" aria-hidden="true">
         ${data.map(s => `
           <div class="s" style="--c:${s.c};--fill:${s.fill}">
             <div class="lbl">${s.lbl}</div>
-            <div class="irr">${s.irr}</div>
+            <div class="irr"><span data-counter data-target="${s.irr}" data-prefix="+" data-suffix="%" data-delay="${s.delay}">+0%</span></div>
             <div class="bar"><div class="fill"></div></div>
           </div>
         `).join('')}
@@ -882,30 +962,48 @@
   }
 
   // ─── Counter animation ────────────────────────────────────────
+  // Format la valeur selon data-format: 'fr-decimal' (virgule, 1 décimale),
+  // 'fr-thousands' (espace thousands, 0 décimale), par défaut point décimal anglais.
+  function formatCounterValue(v, target, format) {
+    if (format === 'fr-decimal') {
+      return v.toFixed(1).replace('.', ',');
+    }
+    if (format === 'fr-thousands') {
+      return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+    return v.toFixed(target % 1 === 0 ? 0 : 1);
+  }
+
   const counterCache = new Map();  // slideIdx-elemIdx-target → done
   function animateCounters(slide, slideIdx) {
     const counters = slide.querySelectorAll('[data-counter]');
     counters.forEach((el, i) => {
       const target = parseFloat(el.dataset.target || '0');
       const suffix = el.dataset.suffix || '';
+      const prefix = el.dataset.prefix || '';
+      const format = el.dataset.format || '';
+      const delay = parseInt(el.dataset.delay || '0', 10);
       const key = slideIdx + '-' + i + '-' + target;
       if (counterCache.has(key)) {
-        el.textContent = target.toFixed(target % 1 === 0 ? 0 : 1) + suffix;
+        el.textContent = prefix + formatCounterValue(target, target, format) + suffix;
         return;
       }
       counterCache.set(key, true);
-      // setInterval-based ease-out cubic (reliable across preview/headless where rAF can throttle).
       const duration = 950;
       const fps = 30;
       const tickMs = 1000 / fps;
-      const start = Date.now();
-      const timer = setInterval(() => {
-        const t = Math.min(1, (Date.now() - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        const v = target * eased;
-        el.textContent = v.toFixed(target % 1 === 0 ? 0 : 1) + suffix;
-        if (t >= 1) clearInterval(timer);
-      }, tickMs);
+      const kick = () => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          const t = Math.min(1, (Date.now() - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const v = target * eased;
+          el.textContent = prefix + formatCounterValue(v, target, format) + suffix;
+          if (t >= 1) clearInterval(timer);
+        }, tickMs);
+      };
+      if (delay > 0) setTimeout(kick, delay);
+      else kick();
     });
   }
 
