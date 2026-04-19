@@ -675,13 +675,23 @@
       .fp-onb-card { padding: 24px 20px 18px; border-radius: 28px; }
       .fp-onb-title { font-size: 22px; }
       .fp-onb-subtitle { font-size: 13px; }
-      .fp-onb-slides-wrap { min-height: 280px; }
-      .fp-onb-demo { min-height: 150px; }
+      /* min-height augmenté pour accommoder sliders + IRR card sans chevaucher dots */
+      .fp-onb-slides-wrap { min-height: 340px; }
+      .fp-onb-demo { min-height: 150px; margin-bottom: 16px; }
       .fp-onb-demo-pins { height: 148px; }
       .fp-onb-demo-phone { width: 104px; height: 168px; }
       .fp-onb-demo-saz { width: 150px; height: 150px; }
       .fp-onb-demo-ready { width: 140px; height: 140px; }
       .fp-onb-btn-next { min-height: 44px; font-size: 14px; }
+      /* Sliders demo: labels + values compacts pour ne pas déborder sur 375px */
+      .fp-onb-demo-sliders { max-width: 100%; }
+      .fp-onb-demo-sliders .row {
+        grid-template-columns: 56px 1fr minmax(60px, auto);
+        gap: 8px; font-size: 10px;
+      }
+      .fp-onb-demo-sliders .val { min-width: 0; font-size: 10.5px; }
+      .fp-onb-demo-sliders .irr-card { padding: 10px 12px; }
+      .fp-onb-demo-sliders .irr-card .v { font-size: 18px; }
     }
 
     /* ═══ Reduced motion ═══ */

@@ -7618,8 +7618,19 @@ function showDemoPanel() {
           #demoPanel .hiw-sources-grid { grid-template-columns: 1fr; }
           #demoPanel .hiw-saz { grid-template-columns: 1fr; }
           #demoPanel .hiw-pnl { grid-template-columns: 1fr; }
-          #demoPanel .hiw-stage { min-height: 460px; }
+          /* MOBILE: slides en block relatif au lieu d'absolute.
+             Desktop: carousel horizontal avec transitions translateX.
+             Mobile: 1 slide visible à la fois, stack qui pousse la hauteur -> tout le contenu accessible via scroll parent. */
+          #demoPanel .hiw-stage { min-height: 0; }
+          #demoPanel .hiw-slide {
+            position: relative; inset: auto;
+            display: none;
+            transform: none;
+            padding: 0 14px;
+          }
+          #demoPanel .hiw-slide.active { display: flex; }
           #demoPanel .hiw-row { grid-template-columns: 1.4fr .5fr .8fr .8fr .8fr; font-size: 10px; }
+          #demoPanel .hiw-nav { position: sticky; bottom: 0; background: linear-gradient(180deg, rgba(10,13,23,0) 0%, rgba(10,13,23,.95) 30%); padding-top: 20px; }
         }
       </style>
 
