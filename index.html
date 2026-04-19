@@ -7187,13 +7187,22 @@ function showUserPanel() {
         </div>
       </div>
       ${adminBtns}
-      <div style="margin-top:16px;display:flex;gap:8px">
-        <button class="btn" style="flex:1;color:var(--red)" onclick="doLogout()">Deconnexion</button>
-        <button class="btn" style="flex:1" onclick="document.getElementById('userPanel').remove()">Fermer</button>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" style="flex:1;min-width:130px;color:var(--accent)" onclick="replayOnboardingTour()">&#9835; Revoir la presentation</button>
+        <button class="btn" style="flex:1;min-width:100px;color:var(--red)" onclick="doLogout()">Deconnexion</button>
+        <button class="btn" style="flex:1;min-width:80px" onclick="document.getElementById('userPanel').remove()">Fermer</button>
       </div>
     </div>
   `;
   document.body.appendChild(panel);
+}
+
+// Ferme le user panel + reset le compteur de tours pour l'user courant + lance le tour.
+// Accessible depuis le bouton "Revoir la presentation" dans showUserPanel().
+function replayOnboardingTour() {
+  try { document.getElementById('userPanel')?.remove(); } catch {}
+  try { window.resetOnboardingTour?.(currentUser?.email); } catch {}
+  try { window.startOnboardingTour?.(); } catch {}
 }
 
 function inviteUser() {
