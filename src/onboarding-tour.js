@@ -270,7 +270,7 @@
     .fp-onb-slide.entering-left  { opacity: 0; transform: translateX(-34px); pointer-events: none; }
     .fp-onb-slide.entering-right { opacity: 0; transform: translateX(34px); pointer-events: none; }
 
-    .fp-onb-slides-wrap { position: relative; flex: 1; min-height: 280px; }
+    .fp-onb-slides-wrap { position: relative; flex: 1; min-height: 340px; }
 
     /* ═══ DEMO: Welcome logo stroke-draw + sparks ═══ */
     .fp-onb-demo-welcome svg { width: 160px; height: 160px; overflow: visible; }
@@ -480,13 +480,15 @@
 
     /* ═══ DEMO: Phone mockup (add site) ═══ */
     .fp-onb-demo-phone {
-      width: 136px; height: 230px;
+      /* Taille réduite: l'ancien 136×230 dépassait la slides-wrap (280px)
+         et recouvrait visuellement les boutons Passer/Suivant. */
+      width: 112px; height: 180px;
       background: #0a0d17;
       border: 2px solid rgba(255,255,255,.12);
-      border-radius: 22px;
-      padding: 8px;
+      border-radius: 20px;
+      padding: 7px;
       transform: perspective(700px) rotateY(-12deg) rotateX(4deg);
-      box-shadow: -15px 20px 50px rgba(0,0,0,.6),
+      box-shadow: -12px 16px 40px rgba(0,0,0,.55),
                   0 0 0 1px rgba(255,255,255,.05) inset;
       position: relative;
     }
@@ -498,19 +500,19 @@
     .fp-onb-demo-phone-screen {
       width: 100%; height: 100%;
       background: linear-gradient(135deg, #0f1422, #0a0d17);
-      border-radius: 14px;
-      padding: 18px 10px 10px;
-      display: flex; flex-direction: column; gap: 10px;
+      border-radius: 13px;
+      padding: 14px 8px 8px;
+      display: flex; flex-direction: column; gap: 8px;
       position: relative;
       overflow: hidden;
     }
     .fp-onb-demo-phone .search {
       background: rgba(30,41,59,.7);
       border: 1px solid rgba(212,160,23,.3);
-      border-radius: 9px;
-      padding: 7px 9px;
-      font-size: 10px; color: rgba(255,255,255,.85);
-      min-height: 22px;
+      border-radius: 8px;
+      padding: 5px 7px;
+      font-size: 9px; color: rgba(255,255,255,.85);
+      min-height: 18px;
       font-variant-numeric: tabular-nums;
       position: relative;
     }
@@ -523,19 +525,19 @@
     }
     @keyframes fpOnbCaret { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
     .fp-onb-demo-phone .hit {
-      padding: 8px 9px;
+      padding: 6px 7px;
       background: rgba(212,160,23,.1);
       border: 1px solid rgba(212,160,23,.35);
-      border-radius: 9px;
-      font-size: 10px; color: rgba(255,255,255,.9);
+      border-radius: 8px;
+      font-size: 9px; color: rgba(255,255,255,.9);
       font-weight: 600;
     }
     .fp-onb-demo-phone .drop {
-      width: 14px; height: 14px; border-radius: 50%;
+      width: 12px; height: 12px; border-radius: 50%;
       background: var(--onb-tint,#d4a017);
       /* Positionné dans .phone-screen (overflow:hidden, position:relative).
          Reste toujours à l'intérieur de l'écran même avec la perspective 3D du phone. */
-      position: absolute; bottom: 18px; left: 50%;
+      position: absolute; bottom: 16px; left: 50%;
       transform: translate(-50%, 0);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--onb-tint,#d4a017) 30%, transparent);
     }
@@ -601,7 +603,7 @@
       .fp-onb-slides-wrap { min-height: 280px; }
       .fp-onb-demo { min-height: 150px; }
       .fp-onb-demo-pins { height: 148px; }
-      .fp-onb-demo-phone { width: 118px; height: 200px; }
+      .fp-onb-demo-phone { width: 104px; height: 168px; }
       .fp-onb-demo-saz { width: 150px; height: 150px; }
       .fp-onb-demo-ready { width: 140px; height: 140px; }
       .fp-onb-btn-next { min-height: 44px; font-size: 14px; }
