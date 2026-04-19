@@ -1859,6 +1859,24 @@ function init() {
   initTabs();
   initSearch();
 
+  // ─── Pre-compute Monte Carlo pour Hala Laminor (~200ms, idle-time) ─────
+  // Utilisé par le tour BP (slide Monte Carlo) pour afficher des chiffres
+  // réels (pas inventés). Mis en cache dans window._fpMonteCarloHL.
+  // Requête idle pour ne pas bloquer le boot critique.
+  const _runHlMonteCarlo = () => {
+    try {
+      if (typeof TARGETS === 'undefined' || !TARGETS[0]) return;
+      const hl = TARGETS[0]; // Hala Laminor = flagship
+      const result = runCaptageAnalysis(hl.lat, hl.lng, 3000);
+      if (result && result.monteCarlo) {
+        window._fpMonteCarloHL = { siteName: hl.name, ...result.monteCarlo };
+        console.log('[FP] Monte Carlo Hala Laminor ready:', window._fpMonteCarloHL.irr?.p50 + '% médian');
+      }
+    } catch(e) { console.warn('[FP] Monte Carlo HL failed:', e); }
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(_runHlMonteCarlo, { timeout: 3000 });
+  else setTimeout(_runHlMonteCarlo, 1500);
+
   // Calibrate initial zoom: fitBounds over all TARGETS + padding that accounts
   // for mobile chrome (top bar 56px, peek sheet 168px) vs desktop sidebar.
   // This guarantees the 5 sites are always visible without user action.

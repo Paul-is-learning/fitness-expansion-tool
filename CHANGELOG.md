@@ -1,5 +1,46 @@
 # Changelog
 
+## [v6.20-mobile-tours-2027] — 2026-04-19
+
+### Fix mobile + effets "2027 ultra-moderne" sur les tours BP et Sources
+
+**Contexte** : les démos 2 (BP cible pays) et 3 (Sources data) étaient complètement illisibles sur mobile 375px — le CTA bouton chevauchait les 2 dernières lignes de contenu (cost structure 6 rows, assumptions 5 rows, pop cards 3 niveaux, 4 flux cards). Root cause : `.fp-onb-slide { position:absolute }` dans un wrap à `min-height:340px` fixe → le contenu dense débordait sous les dots/CTA.
+
+**Fix structurel — auto-height du slides-wrap**
+- Nouveau `syncWrapHeight(slide)` : mesure `slide.scrollHeight` et l'applique à `slidesWrap.style.height` (immédiat + T+30ms + T+420ms pour ré-mesurer après `.ready`).
+- Mobile CSS : `.fp-onb-slides-wrap { flex: 0 0 auto }` — empêche le flex layout d'écraser la hauteur JS.
+- Appelé au `buildOverlay` initial + à chaque `goToSlide` + sur resize (rotation, clavier virtuel).
+
+**Fix robustesse — double-RAF + fallback setTimeout**
+- `goToSlide` promouvait `.active` via `requestAnimationFrame` seul → dans les navigateurs qui throttlent RAF sur tab inactive, les slides restaient coincées en `entering-right`/`leaving-left` sans jamais devenir `active`. Ajout d'un `setTimeout(50ms)` fallback qui promeut `.active` si RAF n'a pas tiré.
+- `replayInlineAnimations()` : quand un slide devient actif, re-déclenche les animations inline (bars, cards) qui peuvent avoir été "consommées" au boot quand le slide était invisible.
+
+**Compactage typo mobile tours BP + Sources**
+- 15 nouvelles règles `@media (max-width:480px)` ciblant les classes sémantiques : `.fp-onb-bp-row`, `.fp-onb-bp-cost-row`, `.fp-onb-data-grid`, `.fp-onb-data-pop`, `.fp-onb-data-list`, `.fp-onb-data-flux`, `.fp-onb-bp-mc`.
+- Paddings serrés (6-11px vs 10-14px), font-sizes réduits (8-10.5px vs 10-12px) pour 6 cost rows, 5 assumptions, 3 pop cards, 6 comp clubs, 6 immo neighborhoods, 4 flux cards, histogram Monte Carlo.
+- Subtitle mobile : 12.5px / line-height 1.45. Title mobile : 21px line-height 1.15.
+
+**Effets 2027 "waouhhh" (nouvelles classes utilitaires)**
+- `.fp-onb-wow-glass` — glassmorphism dark avec `backdrop-filter: blur(12px) saturate(1.3)` + double inset border.
+- `.fp-onb-wow-frame` — bordure iridescente animée (gradient gold × purple × gold qui oscille via `fpOnbIridescent` 4.5s).
+- `.fp-onb-wow-bar` — shine sweep blanc 90° qui glisse de gauche à droite dans les progress bars (infinite, delay étalé).
+- `.fp-onb-sparkles` — particules radiales qui apparaissent/explosent depuis le centre vers des positions `--sx`/`--sy` custom (keyframe `fpOnbSparkle` 1.8s).
+- `.fp-onb-blur-in` — entrée avec blur(8px) → blur(0) + translateY + opacity (keyframe `fpOnbBlurIn` 0.55s, per-row delay).
+- `fpOnbBreathe` — "respiration" subtile (scale 1.002 + translateY -1px) sur les check icons verdict.
+- Spring curves : `cubic-bezier(.34,1.36,.4,1)` sur bars growth et `cubic-bezier(.34,1.56,.52,1)` sur card-in.
+
+**Redesign visuel des 12 demos (6 BP + 6 Sources)**
+- BP : Intro (3 stat tiles glassy + sparkles), Assumptions (rows blur-in stagger), Revenue (bars spring overshoot + radial glow ambient + shine sweep), Costs (bars gradient + glow + EBITDA banner glassy), Capex (gradients SVG + drop-shadow), Monte Carlo (bars purple/gold + median glow + stats P5/P50/P95 glassy + sparkles), Verdict (ring breathing + 5 sparkles + 3 KPI tiles glassy).
+- Sources : Intro (6 source cards glassy + frame iridescent), Pop (3 cards glassy avec radial corner glow), Comps (bars gradient + shine staggered), Flux (4 metric cards radial corner + icons drop-shadow), Immo (bars color-coded), Rigor (ring breathing + 4 items frame iridescent + sparkles).
+
+**Fichiers touchés**
+- `src/onboarding-tour.js` : +100 lignes CSS (wow effects + mobile responsive), +30 lignes JS (syncWrapHeight + replayInlineAnimations + double-RAF fallback + resize handler), 12 fonctions demo redesignées.
+- `config.js` : bump `MODEL_VERSION` → `v6.20-mobile-tours-2027`.
+
+**Tests** : 197/197 PASS (changements purement UI/CSS/layout, aucun impact modèle financier).
+
+---
+
 ## [v6.10-hardening] — 2026-04-18
 
 ### Audit complet + 3 fix de fiabilité (cible 100/100 fonctionnalité)

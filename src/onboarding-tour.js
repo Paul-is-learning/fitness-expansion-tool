@@ -683,19 +683,147 @@
     @keyframes fpOnbRingDrawSmall { to { stroke-dashoffset: var(--to, 0); } }
     @keyframes fpOnbCheckDraw   { to { stroke-dashoffset: var(--to, 0); } }
 
+    /* ═══ 2027 WOW : shimmer, sparkles, iridescent glass ═══ */
+    @keyframes fpOnbShineSweep {
+      0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+      30%  { opacity: 1; }
+      70%  { opacity: 1; }
+      100% { transform: translateX(260%) skewX(-18deg); opacity: 0; }
+    }
+    @keyframes fpOnbIridescent {
+      0%,100% { background-position: 0% 50%; }
+      50%     { background-position: 100% 50%; }
+    }
+    @keyframes fpOnbBreathe {
+      0%,100% { transform: translateY(0) scale(1); }
+      50%     { transform: translateY(-1px) scale(1.002); }
+    }
+    @keyframes fpOnbSparkle {
+      0%   { opacity: 0; transform: translate(var(--sx,0), var(--sy,0)) scale(.2) rotate(0deg); }
+      40%  { opacity: 1; transform: translate(calc(var(--sx,0) * .6), calc(var(--sy,0) * .6)) scale(1.1) rotate(120deg); }
+      100% { opacity: 0; transform: translate(var(--sx,0), var(--sy,0)) scale(0) rotate(240deg); }
+    }
+    @keyframes fpOnbGlowPulse {
+      0%,100% { box-shadow: 0 0 0 0 var(--glow-color, rgba(212,160,23,.45)); }
+      50%     { box-shadow: 0 0 18px 4px var(--glow-color, rgba(212,160,23,.45)); }
+    }
+    @keyframes fpOnbBarShine {
+      0%   { transform: translateX(-100%); opacity: 0; }
+      30%  { opacity: .9; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+    @keyframes fpOnbBlurIn {
+      0%   { opacity: 0; filter: blur(8px); transform: translateY(6px); }
+      100% { opacity: 1; filter: blur(0); transform: translateY(0); }
+    }
+
+    /* Shimmer gold sweep on key numbers */
+    .fp-onb-wow-num {
+      position: relative;
+      display: inline-block;
+      background: linear-gradient(100deg, currentColor 0%, color-mix(in srgb, currentColor 60%, #fff 40%) 45%, currentColor 55%, currentColor 100%);
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: fpOnbIridescent 3.2s ease-in-out infinite;
+    }
+    /* Iridescent border frame — subtle animated gradient */
+    .fp-onb-wow-frame {
+      position: relative;
+      isolation: isolate;
+    }
+    .fp-onb-wow-frame::before {
+      content: '';
+      position: absolute; inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(120deg,
+        color-mix(in srgb, var(--onb-tint,#d4a017) 55%, transparent) 0%,
+        rgba(255,255,255,.4) 30%,
+        color-mix(in srgb, var(--onb-tint,#d4a017) 40%, transparent) 55%,
+        rgba(167,139,250,.45) 80%,
+        color-mix(in srgb, var(--onb-tint,#d4a017) 55%, transparent) 100%);
+      background-size: 280% 100%;
+      animation: fpOnbIridescent 4.5s ease-in-out infinite;
+      -webkit-mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      pointer-events: none;
+      opacity: 0; transition: opacity .6s ease;
+    }
+    .fp-onb-slide.ready .fp-onb-wow-frame::before { opacity: 1; }
+    /* Bar shine overlay — sweeps left→right inside a filled bar */
+    .fp-onb-wow-bar { position: relative; overflow: hidden; }
+    .fp-onb-wow-bar::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%);
+      transform: translateX(-100%);
+      pointer-events: none;
+    }
+    .fp-onb-slide.ready .fp-onb-wow-bar::after {
+      animation: fpOnbBarShine 1.6s ease-out var(--shine-delay, 1s) infinite;
+    }
+    /* Glassy card with inner gloss */
+    .fp-onb-wow-glass {
+      background: linear-gradient(155deg,
+        rgba(255,255,255,.07) 0%,
+        rgba(255,255,255,.02) 50%,
+        rgba(255,255,255,.05) 100%),
+        rgba(24,30,46,.75);
+      backdrop-filter: blur(12px) saturate(1.3);
+      -webkit-backdrop-filter: blur(12px) saturate(1.3);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow:
+        0 12px 28px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.08),
+        inset 0 -1px 0 rgba(0,0,0,.25);
+    }
+    /* Sparkle particle layer — positioned absolute inside its parent */
+    .fp-onb-sparkles {
+      position: absolute; inset: 0; pointer-events: none; overflow: visible;
+    }
+    .fp-onb-sparkles span {
+      position: absolute; top: 50%; left: 50%;
+      width: 6px; height: 6px;
+      background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--onb-tint,#d4a017) 80%, transparent) 55%, transparent 70%);
+      border-radius: 50%;
+      opacity: 0;
+      filter: drop-shadow(0 0 4px color-mix(in srgb, var(--onb-tint,#d4a017) 80%, transparent));
+    }
+    .fp-onb-slide.ready .fp-onb-sparkles span {
+      animation: fpOnbSparkle 1.8s cubic-bezier(.2,.9,.3,1.2) forwards;
+    }
+    /* Blur-in entrance for rows / cards when slide becomes ready */
+    .fp-onb-blur-in { opacity: 0; transform: translateY(6px); filter: blur(6px); }
+    .fp-onb-slide.ready .fp-onb-blur-in {
+      animation: fpOnbBlurIn .55s cubic-bezier(.22,.96,.36,1) var(--blur-delay,0s) forwards;
+    }
+
     /* ═══ Responsive ═══ */
     @media (max-width: 480px) {
-      .fp-onb-card { padding: 24px 20px 18px; border-radius: 28px; }
-      .fp-onb-title { font-size: 22px; }
-      .fp-onb-subtitle { font-size: 13px; }
-      /* min-height augmenté pour accommoder sliders + IRR card sans chevaucher dots */
-      .fp-onb-slides-wrap { min-height: 340px; }
-      .fp-onb-demo { min-height: 150px; margin-bottom: 16px; }
+      .fp-onb-card {
+        padding: 22px 18px 16px;
+        border-radius: 28px;
+        /* Pas d'overflow:auto — on préfère que la carte grandisse pour le CTA
+           reste toujours visible. La hauteur du wrap est sync par JS à scrollHeight
+           du slide actif (voir syncWrapHeight). */
+      }
+      .fp-onb-title { font-size: 21px; line-height: 1.15; }
+      .fp-onb-subtitle { font-size: 12.5px; line-height: 1.45; }
+      .fp-onb-slide { gap: 11px; }
+      /* Wrap auto-height : JS sync wrap.style.height sur scrollHeight du slide actif.
+         flex:0 0 auto empêche le flex layout du card d'écraser la hauteur JS. */
+      .fp-onb-slides-wrap { min-height: 260px; flex: 0 0 auto; }
+      .fp-onb-demo { min-height: 130px; margin: 6px 0 4px; }
       .fp-onb-demo-pins { height: 148px; }
       .fp-onb-demo-phone { width: 104px; height: 168px; }
       .fp-onb-demo-saz { width: 150px; height: 150px; }
       .fp-onb-demo-ready { width: 140px; height: 140px; }
       .fp-onb-btn-next { min-height: 44px; font-size: 14px; }
+      .fp-onb-actions { margin-top: 12px; }
+      .fp-onb-dots { margin-top: 8px; }
       /* Sliders demo: labels + values compacts pour ne pas déborder sur 375px */
       .fp-onb-demo-sliders { max-width: 100%; }
       .fp-onb-demo-sliders .row {
@@ -705,6 +833,55 @@
       .fp-onb-demo-sliders .val { min-width: 0; font-size: 10.5px; }
       .fp-onb-demo-sliders .irr-card { padding: 10px 12px; }
       .fp-onb-demo-sliders .irr-card .v { font-size: 18px; }
+
+      /* ═══ Mobile density pour tours BP + Sources ═══ */
+      /* BP assumptions rows */
+      .fp-onb-bp-row {
+        padding: 6px 10px !important;
+        grid-template-columns: 1fr auto !important;
+      }
+      .fp-onb-bp-row .lbl { font-size: 10.5px !important; }
+      .fp-onb-bp-row .sub { font-size: 8.5px !important; }
+      .fp-onb-bp-row .val { font-size: 12.5px !important; }
+      /* BP costs rows */
+      .fp-onb-bp-cost-row .name { font-size: 10px !important; }
+      .fp-onb-bp-cost-row .pct { font-size: 10px !important; }
+      .fp-onb-bp-cost-row .note { font-size: 7.5px !important; line-height: 1.25 !important; }
+      .fp-onb-bp-cost-row .bar { height: 3.5px !important; }
+      /* Sources demo cards : grid 2x3 au lieu de 3x2 sur très petit écran */
+      .fp-onb-data-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
+      .fp-onb-data-grid .card { padding: 8px 4px !important; }
+      .fp-onb-data-grid .icon { font-size: 18px !important; }
+      .fp-onb-data-grid .name { font-size: 9.5px !important; }
+      .fp-onb-data-grid .desc { font-size: 8px !important; line-height: 1.2 !important; }
+      /* Sources pop cards stack compact */
+      .fp-onb-data-pop .card { padding: 9px 11px !important; }
+      .fp-onb-data-pop .eyebrow { font-size: 8.5px !important; }
+      .fp-onb-data-pop .val { font-size: 18px !important; }
+      .fp-onb-data-pop .unit { font-size: 10px !important; }
+      .fp-onb-data-pop .sub { font-size: 8.5px !important; }
+      /* Concurrents list + Immo list */
+      .fp-onb-data-list .row { grid-template-columns: 72px 1fr 36px !important; gap: 6px !important; }
+      .fp-onb-data-list .name { font-size: 10px !important; }
+      .fp-onb-data-list .n { font-size: 10px !important; }
+      .fp-onb-data-list .bar { height: 8px !important; }
+      /* Flux cards 2x2 → tighter */
+      .fp-onb-data-flux .card { padding: 8px !important; }
+      .fp-onb-data-flux .eyebrow { font-size: 8.5px !important; }
+      .fp-onb-data-flux .val { font-size: 14px !important; }
+      /* Monte Carlo histogram — réduire cap */
+      .fp-onb-bp-mc .hist { height: 88px !important; }
+      .fp-onb-bp-mc .stats { padding: 7px 9px !important; }
+      .fp-onb-bp-mc .stats .lbl { font-size: 8px !important; }
+      .fp-onb-bp-mc .stats .v { font-size: 12px !important; }
+      .fp-onb-bp-mc .cap { font-size: 8.5px !important; line-height: 1.3 !important; }
+      /* Intro BP stats grid */
+      .fp-onb-demo-bp-stats > div { padding: 8px 4px !important; }
+      .fp-onb-demo-bp-stats > div > div:first-child { font-size: 16px !important; }
+      .fp-onb-demo-bp-stats > div > div:last-child { font-size: 7.5px !important; }
+      /* Capex stats compact */
+      .fp-onb-bp-capex-legend { font-size: 10px !important; }
+      .fp-onb-bp-capex-legend .sub { font-size: 8.5px !important; }
     }
 
     /* ═══ Reduced motion ═══ */
@@ -957,13 +1134,19 @@
   function demoBpIntro() {
     const fpLogo = window.FP_LOGO_PNG || '';
     return `
-      <div class="fp-onb-demo-bp-intro" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0">
-        <img src="${fpLogo}" alt="Fitness Park" style="height:42px;width:auto;filter:drop-shadow(0 4px 12px rgba(212,160,23,.25));opacity:0;animation:fpOnbFadeIn .6s ease .1s forwards">
-        <div style="font-size:11px;letter-spacing:2.5px;color:rgba(212,160,23,.8);font-weight:700">BP V17 · ROMANIA</div>
+      <div class="fp-onb-demo-bp-intro" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:-60px;--sy:-40px;animation-delay:.6s"></span>
+          <span style="--sx:55px;--sy:-30px;animation-delay:.9s"></span>
+          <span style="--sx:-40px;--sy:50px;animation-delay:1.2s"></span>
+          <span style="--sx:70px;--sy:45px;animation-delay:1.5s"></span>
+        </div>
+        <img src="${fpLogo}" alt="Fitness Park" style="height:42px;width:auto;filter:drop-shadow(0 4px 16px rgba(212,160,23,.35));opacity:0;animation:fpOnbFadeIn .6s ease .1s forwards">
+        <div style="font-size:11px;letter-spacing:2.5px;font-weight:800" class="fp-onb-wow-num" data-wow-color="#d4a017">BP V17 · ROMANIA</div>
         <div class="fp-onb-demo-bp-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:340px">
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="40" data-delay="300">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">clubs A8</div></div>
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€" data-delay="500">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">CA A10</div></div>
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08)"><div style="font-size:18px;font-weight:900;color:#34d399"><span data-counter data-target="9.6" data-format="fr-decimal" data-suffix=" M€" data-delay="700">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">EBITDA A10</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;--blur-delay:.2s"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="40" data-delay="300">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">clubs A8</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;--blur-delay:.35s"><div style="font-size:18px;font-weight:900;color:var(--onb-tint)"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€" data-delay="500">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">CA A10</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;--blur-delay:.5s"><div style="font-size:18px;font-weight:900;color:#34d399"><span data-counter data-target="9.6" data-format="fr-decimal" data-suffix=" M€" data-delay="700">0</span></div><div style="font-size:8.5px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">EBITDA A10</div></div>
         </div>
       </div>
     `;
@@ -978,8 +1161,8 @@
       { lbl: 'Redevance MF',       val: '6%',      sub: 'du CA HT → FP France', c: '#a78bfa' },
     ];
     return `
-      <div style="display:flex;flex-direction:column;gap:6px;width:100%">
-        ${rows.map((r,i)=>`<div class="fp-onb-bp-row" style="display:grid;grid-template-columns:1.2fr auto;gap:10px;align-items:center;padding:8px 12px;background:rgba(24,32,52,.8);border-radius:8px;border-left:3px solid ${r.c};border-right:1px solid rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateX(-10px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.1}s forwards"><div><div style="font-size:11px;font-weight:700;color:#fff">${r.lbl}</div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">${r.sub}</div></div><div style="font-size:14px;font-weight:900;color:${r.c};font-variant-numeric:tabular-nums">${r.val}</div></div>`).join('')}
+      <div style="display:flex;flex-direction:column;gap:5px;width:100%">
+        ${rows.map((r,i)=>`<div class="fp-onb-bp-row fp-onb-blur-in" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:7px 11px;background:linear-gradient(135deg, rgba(24,32,52,.95) 0%, rgba(16,22,38,.95) 100%);border-radius:10px;border-left:3px solid ${r.c};border-right:1px solid rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 2px 6px rgba(0,0,0,.18);--blur-delay:${0.1 + i*0.08}s"><div><div class="lbl" style="font-size:11px;font-weight:700;color:#fff">${r.lbl}</div><div class="sub" style="font-size:9px;color:rgba(255,255,255,.55);margin-top:2px">${r.sub}</div></div><div class="val" style="font-size:14px;font-weight:900;color:${r.c};font-variant-numeric:tabular-nums;text-shadow:0 0 14px color-mix(in srgb, ${r.c} 40%, transparent)">${r.val}</div></div>`).join('')}
       </div>
     `;
   }
@@ -989,9 +1172,14 @@
     const years = [0.4, 1.9, 4.9, 11.5, 18.9, 31.0, 40.5, 45.8, 49.0, 51.3];
     const max = 52;
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:120px;padding:0 2px;border-bottom:1px solid rgba(255,255,255,.1)">
-          ${years.map((v,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:100%;height:${Math.round(v/max*100)}%;background:linear-gradient(180deg, var(--onb-tint), rgba(212,160,23,.4));border-radius:3px 3px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .8s cubic-bezier(.34,1.12,.52,1) ${0.05 + i*0.08}s forwards"></div><div style="font-size:8px;color:rgba(255,255,255,.5);font-weight:600">A${i+1}</div></div>`).join('')}
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:80px;--sy:-50px;animation-delay:1.1s"></span>
+          <span style="--sx:-70px;--sy:-30px;animation-delay:1.4s"></span>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:120px;padding:0 2px;border-bottom:1px solid rgba(255,255,255,.1);position:relative">
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at bottom, rgba(212,160,23,.08), transparent 70%);pointer-events:none"></div>
+          ${years.map((v,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative"><div class="fp-onb-wow-bar" style="width:100%;height:${Math.round(v/max*100)}%;background:linear-gradient(180deg, var(--onb-tint), rgba(212,160,23,.35));border-radius:3px 3px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .85s cubic-bezier(.34,1.36,.4,1) ${0.05 + i*0.08}s forwards;box-shadow:0 0 8px color-mix(in srgb, var(--onb-tint,#d4a017) 30%, transparent);--shine-delay:${1 + i*0.08}s"></div><div style="font-size:8px;color:rgba(255,255,255,.5);font-weight:600">A${i+1}</div></div>`).join('')}
         </div>
         <div style="display:flex;justify-content:space-between;padding:0 4px;font-size:10px;color:rgba(255,255,255,.65)">
           <span>CA · M€</span><span style="color:var(--onb-tint);font-weight:700"><span data-counter data-target="51.3" data-format="fr-decimal" data-suffix=" M€ A10" data-delay="900">0</span></span>
@@ -1015,9 +1203,9 @@
     ];
     const total = costs.reduce((a,c)=>a+c.pct, 0);
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:5px">
-        ${costs.map((c,i)=>`<div style="opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .5s cubic-bezier(.34,1.12,.52,1) ${0.1+i*0.08}s forwards"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10px;margin-bottom:1px"><span style="color:#fff;font-weight:700">${c.lbl}</span><span style="color:${c.c};font-weight:800">${c.pct}% CA</span></div><div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow ${0.8 + i*0.08}s cubic-bezier(.34,1.12,.52,1) ${0.15 + i*0.08}s forwards;--w:${Math.min((c.pct/16)*100, 100)}%"></div></div><div style="font-size:8px;color:rgba(255,255,255,.45);margin-top:1px;font-style:italic;line-height:1.3">${c.note}</div></div>`).join('')}
-        <div style="margin-top:4px;padding:6px 9px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:7px"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800"><span style="color:#fff">EBITDA cible Y5+</span><span style="color:#34d399">~44-55%</span></div><div style="font-size:8.5px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.35">OnAir 44,7% (audit Fiteco) · FP Romania +10pp buffer prudent</div></div>
+      <div style="width:100%;display:flex;flex-direction:column;gap:4px">
+        ${costs.map((c,i)=>`<div class="fp-onb-bp-cost-row fp-onb-blur-in" style="--blur-delay:${0.1+i*0.07}s"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10px;margin-bottom:1px"><span class="name" style="color:#fff;font-weight:700">${c.lbl}</span><span class="pct" style="color:${c.c};font-weight:800;text-shadow:0 0 10px color-mix(in srgb, ${c.c} 40%, transparent)">${c.pct}% CA</span></div><div class="bar fp-onb-wow-bar" style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;--shine-delay:${1.2 + i*0.1}s"><div style="height:100%;background:linear-gradient(90deg, ${c.c}, color-mix(in srgb, ${c.c} 70%, #fff 30%));width:0;animation:fpOnbWidthGrow ${0.85 + i*0.08}s cubic-bezier(.34,1.36,.4,1) ${0.2 + i*0.08}s forwards;--w:${Math.min((c.pct/16)*100, 100)}%;box-shadow:0 0 6px color-mix(in srgb, ${c.c} 50%, transparent)"></div></div><div class="note" style="font-size:8px;color:rgba(255,255,255,.45);margin-top:1px;font-style:italic;line-height:1.3">${c.note}</div></div>`).join('')}
+        <div class="fp-onb-wow-glass fp-onb-wow-frame" style="margin-top:4px;padding:7px 10px;background:linear-gradient(135deg, rgba(34,197,94,.14), rgba(34,197,94,.06));border:1px solid rgba(34,197,94,.3);border-radius:10px;position:relative;overflow:hidden"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;position:relative;z-index:1"><span style="color:#fff">EBITDA cible Y5+</span><span style="color:#34d399">~44-55%</span></div><div style="font-size:8.5px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.35;position:relative;z-index:1">OnAir 44,7% (audit Fiteco) · FP Romania +10pp buffer prudent</div></div>
       </div>
     `;
   }
@@ -1025,42 +1213,82 @@
   function demoBpCapex() {
     // CAPEX 1176k€ = fit-out 840 (71%) + équipement 336 (29%)
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center">
-        <div style="display:flex;align-items:center;gap:16px">
-          <svg viewBox="0 0 120 120" width="120" height="120" style="transform:rotate(-90deg)">
+      <div style="width:100%;display:flex;flex-direction:column;gap:12px;align-items:center;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:-70px;--sy:-30px;animation-delay:1.4s"></span>
+          <span style="--sx:75px;--sy:-20px;animation-delay:1.6s"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center">
+          <svg viewBox="0 0 120 120" width="108" height="108" style="transform:rotate(-90deg);filter:drop-shadow(0 0 12px rgba(212,160,23,.25))">
+            <defs>
+              <linearGradient id="fpCapexGoldGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stop-color="#d4a017"/>
+                <stop offset="100%" stop-color="#f3c44f"/>
+              </linearGradient>
+              <linearGradient id="fpCapexBlueGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stop-color="#60a5fa"/>
+                <stop offset="100%" stop-color="#93c5fd"/>
+              </linearGradient>
+            </defs>
             <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="14"/>
-            <circle cx="60" cy="60" r="50" fill="none" stroke="#d4a017" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" style="animation:fpOnbRingDraw 1.2s cubic-bezier(.34,1.12,.52,1) .3s forwards;--to:91"/>
-            <circle cx="60" cy="60" r="50" fill="none" stroke="#60a5fa" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(260 60 60)" style="animation:fpOnbRingDrawSmall 1.2s cubic-bezier(.34,1.12,.52,1) .6s forwards;--to:223"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="url(#fpCapexGoldGrad)" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" style="animation:fpOnbRingDraw 1.2s cubic-bezier(.34,1.12,.52,1) .3s forwards;--to:91"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="url(#fpCapexBlueGrad)" stroke-width="14" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" transform="rotate(260 60 60)" style="animation:fpOnbRingDrawSmall 1.2s cubic-bezier(.34,1.12,.52,1) .6s forwards;--to:223"/>
           </svg>
-          <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
-            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#d4a017;border-radius:2px"></span><span style="color:#fff;font-weight:700">Fit-out</span><span style="color:rgba(255,255,255,.55)">840 k€ · 600€/m² × 1 400m²</span></div>
-            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:#60a5fa;border-radius:2px"></span><span style="color:#fff;font-weight:700">Équipement</span><span style="color:rgba(255,255,255,.55)">336 k€ · 60% en leasing 5 ans</span></div>
+          <div class="fp-onb-bp-capex-legend" style="display:flex;flex-direction:column;gap:6px;font-size:11px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:linear-gradient(135deg,#d4a017,#f3c44f);border-radius:3px;box-shadow:0 0 6px rgba(212,160,23,.5)"></span><span style="color:#fff;font-weight:700">Fit-out</span><span class="sub" style="color:rgba(255,255,255,.6)">840 k€ · 600€/m² × 1 400m²</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:linear-gradient(135deg,#60a5fa,#93c5fd);border-radius:3px;box-shadow:0 0 6px rgba(96,165,250,.5)"></span><span style="color:#fff;font-weight:700">Équipement</span><span class="sub" style="color:rgba(255,255,255,.6)">336 k€ · 60% leasing 5 ans</span></div>
           </div>
         </div>
-        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.8px;text-transform:uppercase">CAPEX total / club</div><div style="font-size:22px;font-weight:900;color:var(--onb-tint);margin-top:2px"><span data-counter data-target="1176" data-format="fr-thousands" data-suffix=" k€" data-delay="800">0</span></div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.8px;text-transform:uppercase">CAPEX total / club</div><div style="font-size:24px;font-weight:900;color:var(--onb-tint);margin-top:2px;text-shadow:0 0 20px rgba(212,160,23,.4)"><span data-counter data-target="1176" data-format="fr-thousands" data-suffix=" k€" data-delay="800">0</span></div></div>
       </div>
     `;
   }
 
   function demoBpMonteCarlo() {
-    // Distribution IRR équité — histogramme simulé 1000 runs
-    // Moyenne ~57%, écart-type ~12%, distribution normale
-    const bars = [3, 8, 16, 28, 44, 58, 72, 88, 95, 92, 78, 60, 42, 26, 14, 6];
-    const maxBar = 100;
+    // Utilise les résultats Monte Carlo réels calculés au boot pour Hala Laminor
+    // (window._fpMonteCarloHL). Fallback sur distribution illustrative si pas prêt.
+    const mc = window._fpMonteCarloHL;
+    let bins, p5, p50, p95, siteName, irrMin, irrMax, iterations;
+    if (mc && mc.bins && mc.irr) {
+      // Vrais chiffres
+      bins = mc.bins.map(b => b.count);
+      p5 = Math.round(mc.irr.p5);
+      p50 = Math.round(mc.irr.p50);
+      p95 = Math.round(mc.irr.p95);
+      irrMin = Math.round(mc.irr.min);
+      irrMax = Math.round(mc.irr.max);
+      siteName = mc.siteName || 'Hala Laminor';
+      iterations = mc.iterations || 1000;
+    } else {
+      // Fallback illustratif si le MC n'est pas encore calculé
+      bins = [3, 8, 16, 28, 44, 58, 72, 88, 95, 92, 78, 60, 42, 26, 14, 6];
+      p5 = 38; p50 = 57; p95 = 79; irrMin = 20; irrMax = 100;
+      siteName = 'Hala Laminor';
+      iterations = 1000;
+    }
+    const maxBar = Math.max(...bins, 1);
+    // Position de la médiane dans les bars (pour label centré)
+    const medianBinIdx = bins.length > 0 ? Math.floor(bins.length * (p50 - irrMin) / Math.max(irrMax - irrMin, 1)) : bins.length / 2;
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:flex-end;gap:2px;height:100px;padding:0 4px;border-bottom:1px solid rgba(255,255,255,.1)">
-          ${bars.map((v,i)=>`<div style="flex:1;height:${Math.round(v/maxBar*100)}%;background:linear-gradient(180deg, #a78bfa, rgba(167,139,250,.3));border-radius:2px 2px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .6s cubic-bezier(.34,1.12,.52,1) ${0.05 + i*0.04}s forwards"></div>`).join('')}
+      <div class="fp-onb-bp-mc" style="width:100%;display:flex;flex-direction:column;gap:9px;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:0px;--sy:-35px;animation-delay:1.6s"></span>
+          <span style="--sx:30px;--sy:-60px;animation-delay:1.9s"></span>
+          <span style="--sx:-40px;--sy:-50px;animation-delay:2.1s"></span>
+        </div>
+        <div class="hist" style="display:flex;align-items:flex-end;gap:2px;height:100px;padding:0 4px;border-bottom:1px solid rgba(255,255,255,.1);position:relative">
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%, rgba(167,139,250,.12), transparent 70%);pointer-events:none"></div>
+          ${bins.map((v,i)=>{ const isMed = i === medianBinIdx; const topC = isMed ? '#f3c44f' : '#c4b5fd'; const botC = isMed ? 'rgba(212,160,23,.25)' : 'rgba(167,139,250,.22)'; return `<div class="fp-onb-wow-bar" style="flex:1;height:${Math.round(v/maxBar*100)}%;background:linear-gradient(180deg, ${topC}, ${botC});border-radius:2px 2px 0 0;transform:scaleY(0);transform-origin:bottom;animation:fpOnbBarGrow .55s cubic-bezier(.34,1.36,.4,1) ${0.05 + i*0.035}s forwards;${isMed ? 'box-shadow:0 -1px 12px rgba(212,160,23,.55);' : ''}--shine-delay:${1.3 + i*0.04}s"></div>`; }).join('')}
         </div>
         <div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.5);padding:0 4px">
-          <span>20%</span><span>40%</span><span style="color:var(--onb-tint);font-weight:800">57% médiane</span><span>80%</span><span>100%</span>
+          <span>${irrMin}%</span><span style="color:var(--onb-tint);font-weight:800;text-shadow:0 0 10px rgba(212,160,23,.4)">médiane ${p50}%</span><span>${irrMax}%</span>
         </div>
-        <div style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:10px">
-          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P10</div><div style="color:#fff;font-weight:800;margin-top:2px">+38%</div></div>
-          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">Médiane</div><div style="color:#a78bfa;font-weight:800;margin-top:2px">+57%</div></div>
-          <div><div style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P90</div><div style="color:#fff;font-weight:800;margin-top:2px">+79%</div></div>
+        <div class="stats fp-onb-wow-glass fp-onb-wow-frame" style="border-radius:10px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:10px;position:relative">
+          <div class="fp-onb-blur-in" style="--blur-delay:.3s"><div class="lbl" style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P5</div><div class="v" style="color:#fff;font-weight:800;margin-top:2px">+${p5}%</div></div>
+          <div class="fp-onb-blur-in" style="--blur-delay:.45s;position:relative"><div class="lbl" style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">Médiane</div><div class="v" style="color:#d4a017;font-weight:900;margin-top:2px;text-shadow:0 0 14px rgba(212,160,23,.5)">+${p50}%</div></div>
+          <div class="fp-onb-blur-in" style="--blur-delay:.6s"><div class="lbl" style="color:rgba(255,255,255,.5);font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">P95</div><div class="v" style="color:#fff;font-weight:800;margin-top:2px">+${p95}%</div></div>
         </div>
-        <div style="font-size:9.5px;color:rgba(255,255,255,.5);text-align:center;font-style:italic">1 000 simulations · variables: prix, membres, loyer, churn, delay ouverture</div>
+        <div class="cap" style="font-size:9.5px;color:rgba(255,255,255,.55);text-align:center;font-style:italic;line-height:1.4">${iterations.toLocaleString('fr-FR')} simulations · ${siteName} · variables stochastiques : captage, ARPU, churn, CAPEX, loyer, OPEX, ramp-up${mc ? ' (temps réel)' : ' (illustratif)'}</div>
       </div>
     `;
   }
@@ -1068,17 +1296,24 @@
   function demoBpVerdict() {
     // Verdict final BP avec IRR/NPV + confetti
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center">
-        <div style="width:100px;height:100px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.2), transparent 70%);display:flex;align-items:center;justify-content:center;position:relative">
-          <svg viewBox="0 0 80 80" width="80" height="80">
+      <div style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:-90px;--sy:-45px;animation-delay:1.1s"></span>
+          <span style="--sx:85px;--sy:-50px;animation-delay:1.3s"></span>
+          <span style="--sx:-65px;--sy:40px;animation-delay:1.5s"></span>
+          <span style="--sx:75px;--sy:35px;animation-delay:1.7s"></span>
+          <span style="--sx:0px;--sy:-90px;animation-delay:1.9s"></span>
+        </div>
+        <div style="width:100px;height:100px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.25), transparent 70%);display:flex;align-items:center;justify-content:center;position:relative;animation:fpOnbBreathe 3s ease-in-out infinite">
+          <svg viewBox="0 0 80 80" width="80" height="80" style="filter:drop-shadow(0 0 12px rgba(34,197,94,.4))">
             <circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="214" stroke-dashoffset="214" stroke-linecap="round" style="animation:fpOnbRingDraw 1s cubic-bezier(.34,1.12,.52,1) .2s forwards;--to:0"/>
             <path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/>
           </svg>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:320px">
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #22c55e"><div style="font-size:16px;font-weight:900;color:#22c55e"><span data-counter data-target="57.6" data-format="fr-decimal" data-prefix="+" data-suffix="%" data-delay="1100">+0%</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">IRR équité</div></div>
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #d4a017"><div style="font-size:16px;font-weight:900;color:#d4a017"><span data-counter data-target="3.9" data-format="fr-decimal" data-suffix=" M€" data-delay="1300">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">NPV 5 ans</div></div>
-          <div style="background:rgba(24,32,52,.85);border-radius:10px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,.08);border-top:2px solid #60a5fa"><div style="font-size:16px;font-weight:900;color:#60a5fa"><span data-counter data-target="38" data-suffix=" mois" data-delay="1500">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">Payback</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #22c55e;--blur-delay:1.2s"><div style="font-size:16px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,.5)"><span data-counter data-target="57.6" data-format="fr-decimal" data-prefix="+" data-suffix="%" data-delay="1300">+0%</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">IRR équité</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #d4a017;--blur-delay:1.4s"><div style="font-size:16px;font-weight:900;color:#d4a017;text-shadow:0 0 14px rgba(212,160,23,.5)"><span data-counter data-target="3.9" data-format="fr-decimal" data-suffix=" M€" data-delay="1500">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">NPV 5 ans</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #60a5fa;--blur-delay:1.6s"><div style="font-size:16px;font-weight:900;color:#60a5fa;text-shadow:0 0 14px rgba(96,165,250,.5)"><span data-counter data-target="38" data-suffix=" mois" data-delay="1700">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">Payback</div></div>
         </div>
       </div>
     `;
@@ -1095,30 +1330,25 @@
       { icon: '🗺️', name: 'Google',     desc: 'Routes + Places' },
     ];
     return `
-      <div style="width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${srcs.map((s,i)=>`<div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 6px;text-align:center;opacity:0;transform:translateY(10px) scale(.95);animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:22px;margin-bottom:4px">${s.icon}</div><div style="font-size:11px;font-weight:800;color:#fff">${s.name}</div><div style="font-size:9px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.3">${s.desc}</div></div>`).join('')}
+      <div class="fp-onb-data-grid" style="width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:relative">
+        ${srcs.map((s,i)=>`<div class="card fp-onb-wow-glass fp-onb-wow-frame" style="border-radius:12px;padding:10px 6px;text-align:center;opacity:0;transform:translateY(10px) scale(.95);animation:fpOnbCardIn .55s cubic-bezier(.34,1.56,.52,1) ${0.1 + i*0.08}s forwards"><div class="icon" style="font-size:22px;margin-bottom:4px;filter:drop-shadow(0 0 6px color-mix(in srgb, var(--onb-tint,#d4a017) 50%, transparent))">${s.icon}</div><div class="name" style="font-size:11px;font-weight:800;color:#fff">${s.name}</div><div class="desc" style="font-size:9px;color:rgba(255,255,255,.6);margin-top:2px;line-height:1.3">${s.desc}</div></div>`).join('')}
       </div>
     `;
   }
 
   function demoDataPop() {
+    const mk = (color, eyebrow, prefix, counter, unit, sub, delay) => `
+      <div class="card fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:11px 13px;--blur-delay:${delay}s;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:radial-gradient(circle at 0% 0%, color-mix(in srgb, ${color} 15%, transparent), transparent 60%);pointer-events:none"></div>
+        <div class="eyebrow" style="font-size:9.5px;letter-spacing:.6px;color:${color};text-transform:uppercase;font-weight:800;position:relative">${eyebrow}</div>
+        <div style="margin-top:5px;display:flex;align-items:baseline;gap:7px;position:relative"><span class="val" style="font-size:20px;font-weight:900;color:#fff;text-shadow:0 0 14px color-mix(in srgb, ${color} 35%, transparent)">${prefix}${counter}</span><span class="unit" style="font-size:11px;color:rgba(255,255,255,.65)">${unit}</span></div>
+        <div class="sub" style="font-size:9.5px;color:rgba(255,255,255,.55);margin-top:3px;position:relative">${sub}</div>
+      </div>`;
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .1s forwards">
-          <div style="font-size:10px;letter-spacing:.6px;color:#60a5fa;text-transform:uppercase;font-weight:800">INS Census 2021</div>
-          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff"><span data-counter data-target="1716961" data-format="fr-thousands" data-delay="200">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">habitants recensés</span></div>
-          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px">6 secteurs · 83 quartiers (cartiere)</div>
-        </div>
-        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .35s forwards">
-          <div style="font-size:10px;letter-spacing:.6px;color:#34d399;text-transform:uppercase;font-weight:800">+ Navetteurs Ilfov</div>
-          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff">×<span data-counter data-target="1.7" data-format="fr-decimal" data-delay="400">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">pop réelle estimée</span></div>
-          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px"><span data-counter data-target="2.9" data-format="fr-decimal" data-suffix=" M" data-delay="600">0</span> hab. effective (census + non-déclarés + expats)</div>
-        </div>
-        <div style="background:rgba(24,32,52,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;opacity:0;animation:fpOnbFadeIn .5s ease .6s forwards">
-          <div style="font-size:10px;letter-spacing:.6px;color:#a78bfa;text-transform:uppercase;font-weight:800">Volumétrie OSM</div>
-          <div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:900;color:#fff"><span data-counter data-target="397009" data-format="fr-thousands" data-delay="700">0</span></span><span style="font-size:11px;color:rgba(255,255,255,.65)">bâtiments</span></div>
-          <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-top:3px">Pondération volumétrique · emprise × étages</div>
-        </div>
+      <div class="fp-onb-data-pop" style="width:100%;display:flex;flex-direction:column;gap:8px">
+        ${mk('#60a5fa', 'INS Census 2021', '', '<span data-counter data-target="1716961" data-format="fr-thousands" data-delay="200">0</span>', 'habitants recensés', '6 secteurs · 83 quartiers (cartiere)', 0.1)}
+        ${mk('#34d399', '+ Navetteurs Ilfov', '×', '<span data-counter data-target="1.7" data-format="fr-decimal" data-delay="400">0</span>', 'pop réelle estimée', '<span data-counter data-target="2.9" data-format="fr-decimal" data-suffix=" M" data-delay="600">0</span> hab. effective (census + non-déclarés + expats)', 0.25)}
+        ${mk('#a78bfa', 'Volumétrie OSM', '', '<span data-counter data-target="397009" data-format="fr-thousands" data-delay="700">0</span>', 'bâtiments', 'Pondération volumétrique · emprise × étages', 0.4)}
       </div>
     `;
   }
@@ -1134,23 +1364,31 @@
     ];
     const total = clubs.reduce((a,c)=>a+c.n,0);
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:8px">
-        ${clubs.map((c,i)=>`<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .4s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:10.5px;color:#fff;font-weight:700">${c.name}</div><div style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><div style="height:100%;background:${c.c};width:0;animation:fpOnbWidthGrow .7s cubic-bezier(.34,1.12,.52,1) ${0.2 + i*0.08}s forwards;--w:${Math.round(c.n/40*100)}%"></div></div><div style="font-size:10.5px;color:${c.c};font-weight:800;text-align:right">${c.n}</div></div>`).join('')}
-        <div style="margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;font-size:10.5px"><span style="color:rgba(255,255,255,.6)">Total vérifié</span><span style="color:var(--onb-tint);font-weight:800">${total} clubs · Overpass API + check manuel</span></div>
+      <div class="fp-onb-data-list" style="width:100%;display:flex;flex-direction:column;gap:7px">
+        ${clubs.map((c,i)=>`<div class="row fp-onb-blur-in" style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;--blur-delay:${0.1 + i*0.07}s"><div class="name" style="font-size:10.5px;color:#fff;font-weight:700">${c.name}</div><div class="bar fp-onb-wow-bar" style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;--shine-delay:${1 + i*0.1}s"><div style="height:100%;background:linear-gradient(90deg, ${c.c}, color-mix(in srgb, ${c.c} 70%, #fff 30%));width:0;animation:fpOnbWidthGrow .75s cubic-bezier(.34,1.36,.4,1) ${0.2 + i*0.07}s forwards;--w:${Math.round(c.n/40*100)}%;box-shadow:0 0 8px color-mix(in srgb, ${c.c} 40%, transparent)"></div></div><div class="n" style="font-size:10.5px;color:${c.c};font-weight:800;text-align:right;text-shadow:0 0 8px color-mix(in srgb, ${c.c} 40%, transparent)">${c.n}</div></div>`).join('')}
+        <div style="margin-top:5px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;font-size:10px;gap:6px"><span style="color:rgba(255,255,255,.6)">Total vérifié</span><span style="color:var(--onb-tint);font-weight:800;text-align:right">${total} clubs · Overpass + check manuel</span></div>
       </div>
     `;
   }
 
   function demoDataFlux() {
+    const card = (color, icon, eyebrow, counter, sub, delay) => `
+      <div class="card fp-onb-wow-frame" style="background:linear-gradient(135deg, color-mix(in srgb, ${color} 12%, rgba(24,32,52,.85)), rgba(16,22,38,.9));border:1px solid color-mix(in srgb, ${color} 30%, transparent);border-radius:12px;padding:10px;opacity:0;animation:fpOnbCardIn .55s cubic-bezier(.34,1.56,.52,1) ${delay}s forwards;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-20px;right:-20px;width:60px;height:60px;background:radial-gradient(circle, color-mix(in srgb, ${color} 30%, transparent), transparent 70%);pointer-events:none"></div>
+        <div class="icon" style="font-size:20px;margin-bottom:3px;filter:drop-shadow(0 0 6px color-mix(in srgb, ${color} 60%, transparent))">${icon}</div>
+        <div class="eyebrow" style="font-size:9.5px;letter-spacing:.4px;color:${color};font-weight:800;text-transform:uppercase">${eyebrow}</div>
+        <div class="val" style="font-size:16px;font-weight:900;color:#fff;margin-top:4px;text-shadow:0 0 12px color-mix(in srgb, ${color} 40%, transparent)">${counter}</div>
+        <div class="sub" style="font-size:9px;color:rgba(255,255,255,.55);margin-top:2px">${sub}</div>
+      </div>`;
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-          <div style="background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .1s forwards"><div style="font-size:20px;margin-bottom:3px">🚇</div><div style="font-size:10px;letter-spacing:.4px;color:#06b6d4;font-weight:800;text-transform:uppercase">Métro Metrorex</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="53" data-suffix=" stations" data-delay="300">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">M1-M5 · 750k pax/jour</div></div>
-          <div style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .25s forwards"><div style="font-size:20px;margin-bottom:3px">🚋</div><div style="font-size:10px;letter-spacing:.4px;color:#34d399;font-weight:800;text-transform:uppercase">Tram/bus STB</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="2.7" data-format="fr-decimal" data-suffix=" M" data-delay="450">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">pax/jour · 7 corridors</div></div>
-          <div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .4s forwards"><div style="font-size:20px;margin-bottom:3px">🛍️</div><div style="font-size:10px;letter-spacing:.4px;color:#f97316;font-weight:800;text-transform:uppercase">12 malls</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="60000" data-format="fr-thousands" data-delay="600">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">AFI Cotroceni / jour</div></div>
-          <div style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:10px;opacity:0;animation:fpOnbCardIn .5s cubic-bezier(.34,1.56,.52,1) .55s forwards"><div style="font-size:20px;margin-bottom:3px">🏢</div><div style="font-size:10px;letter-spacing:.4px;color:#a78bfa;font-weight:800;text-transform:uppercase">Bureaux CBRE</div><div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px"><span data-counter data-target="340000" data-format="fr-thousands" data-delay="750">0</span></div><div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px">employés modernes</div></div>
+      <div class="fp-onb-data-flux" style="width:100%;display:flex;flex-direction:column;gap:9px">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">
+          ${card('#06b6d4', '🚇', 'Métro Metrorex', '<span data-counter data-target="53" data-suffix=" stations" data-delay="300">0</span>', 'M1-M5 · 750k pax/jour', 0.1)}
+          ${card('#34d399', '🚋', 'Tram/bus STB', '<span data-counter data-target="2.7" data-format="fr-decimal" data-suffix=" M" data-delay="450">0</span>', 'pax/jour · 7 corridors', 0.25)}
+          ${card('#f97316', '🛍️', '12 malls', '<span data-counter data-target="60000" data-format="fr-thousands" data-delay="600">0</span>', 'AFI Cotroceni / jour', 0.4)}
+          ${card('#a78bfa', '🏢', 'Bureaux CBRE', '<span data-counter data-target="340000" data-format="fr-thousands" data-delay="750">0</span>', 'employés modernes', 0.55)}
         </div>
-        <div style="font-size:9.5px;color:rgba(255,255,255,.55);text-align:center;font-style:italic">Google Routes API · isochrones 10 min marche/voiture/métro</div>
+        <div style="font-size:9.5px;color:rgba(255,255,255,.55);text-align:center;font-style:italic;line-height:1.35">Google Routes API · isochrones 10 min marche/voiture/métro</div>
       </div>
     `;
   }
@@ -1166,24 +1404,31 @@
     ];
     const max = 3500;
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:6px">
-        ${hoods.map((h,i)=>`<div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;align-items:center;opacity:0;transform:translateX(-8px);animation:fpOnbSlideIn .4s cubic-bezier(.34,1.12,.52,1) ${0.1 + i*0.08}s forwards"><div style="font-size:10.5px;color:#fff;font-weight:700">${h.name}</div><div style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><div style="height:100%;background:${h.c};width:0;animation:fpOnbWidthGrow .7s cubic-bezier(.34,1.12,.52,1) ${0.2 + i*0.08}s forwards;--w:${Math.round(h.price/max*100)}%"></div></div><div style="font-size:10.5px;color:${h.c};font-weight:800;text-align:right">${h.price} €/m²</div></div>`).join('')}
-        <div style="margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:9.5px;color:rgba(255,255,255,.55);text-align:center">Source : imobiliare.ro · investropa.com 2025 · proxy revenu/quartier</div>
+      <div class="fp-onb-data-list" style="width:100%;display:flex;flex-direction:column;gap:6px">
+        ${hoods.map((h,i)=>`<div class="row fp-onb-blur-in" style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;align-items:center;--blur-delay:${0.1 + i*0.07}s"><div class="name" style="font-size:10.5px;color:#fff;font-weight:700">${h.name}</div><div class="bar fp-onb-wow-bar" style="height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;--shine-delay:${1 + i*0.1}s"><div style="height:100%;background:linear-gradient(90deg, ${h.c}, color-mix(in srgb, ${h.c} 70%, #fff 30%));width:0;animation:fpOnbWidthGrow .75s cubic-bezier(.34,1.36,.4,1) ${0.2 + i*0.07}s forwards;--w:${Math.round(h.price/max*100)}%;box-shadow:0 0 8px color-mix(in srgb, ${h.c} 40%, transparent)"></div></div><div class="n" style="font-size:10.5px;color:${h.c};font-weight:800;text-align:right;text-shadow:0 0 8px color-mix(in srgb, ${h.c} 40%, transparent);white-space:nowrap">${h.price} €/m²</div></div>`).join('')}
+        <div style="margin-top:5px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1);font-size:9.5px;color:rgba(255,255,255,.55);text-align:center;line-height:1.35">Source : imobiliare.ro · investropa.com 2025 · proxy revenu/quartier</div>
       </div>
     `;
   }
 
   function demoDataRigor() {
+    const items = [
+      { c: '#22c55e', sym: '✓', t: 'Cross-référence OSM × INS × Google', d: 1.1 },
+      { c: '#22c55e', sym: '✓', t: '92 clubs validés manuellement',       d: 1.3 },
+      { c: '#22c55e', sym: '✓', t: 'Modèle calibré OnAir Montreuil (Fiteco)', d: 1.5 },
+      { c: '#f97316', sym: '⚠', t: 'Limites assumées · onglet Sources',   d: 1.7 },
+    ];
     return `
-      <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center">
-        <div style="width:90px;height:90px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.2), transparent 70%);display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 80 80" width="70" height="70"><circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="214" stroke-dashoffset="214" stroke-linecap="round" style="animation:fpOnbRingDraw 1s cubic-bezier(.34,1.12,.52,1) .2s forwards;--to:0"/><path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/></svg>
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;position:relative">
+        <div class="fp-onb-sparkles" aria-hidden="true">
+          <span style="--sx:-60px;--sy:-40px;animation-delay:1.3s"></span>
+          <span style="--sx:60px;--sy:-40px;animation-delay:1.5s"></span>
+        </div>
+        <div style="width:90px;height:90px;border-radius:50%;background:radial-gradient(circle, rgba(34,197,94,.25), transparent 70%);display:flex;align-items:center;justify-content:center;animation:fpOnbBreathe 3s ease-in-out infinite">
+          <svg viewBox="0 0 80 80" width="70" height="70" style="filter:drop-shadow(0 0 10px rgba(34,197,94,.4))"><circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="214" stroke-dashoffset="214" stroke-linecap="round" style="animation:fpOnbRingDraw 1s cubic-bezier(.34,1.12,.52,1) .2s forwards;--to:0"/><path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/></svg>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;width:100%">
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.1s forwards"><span style="color:#22c55e">✓</span>Cross-référence OSM × INS × Google</div>
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.3s forwards"><span style="color:#22c55e">✓</span>92 clubs validés manuellement</div>
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.5s forwards"><span style="color:#22c55e">✓</span>Modèle calibré OnAir Montreuil (Fiteco)</div>
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:8px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbFadeIn .4s ease 1.7s forwards"><span style="color:#f97316">⚠</span>Limites assumées · onglet Sources</div>
+          ${items.map(it => `<div class="fp-onb-wow-frame" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:linear-gradient(135deg, color-mix(in srgb, ${it.c} 12%, transparent), color-mix(in srgb, ${it.c} 4%, transparent));border:1px solid color-mix(in srgb, ${it.c} 28%, transparent);border-radius:10px;font-size:10.5px;color:#fff;opacity:0;animation:fpOnbBlurIn .5s cubic-bezier(.22,.96,.36,1) ${it.d}s forwards"><span style="color:${it.c};font-weight:900;text-shadow:0 0 8px color-mix(in srgb, ${it.c} 60%, transparent)">${it.sym}</span>${it.t}</div>`).join('')}
         </div>
       </div>
     `;
@@ -1390,6 +1635,41 @@
     });
   }
 
+  // Sync la hauteur du wrap à la hauteur du slide actif (mobile surtout) pour
+  // éviter que le contenu déborde sous les dots / CTA quand les demos BP /
+  // Sources sont denses (5-6 rows + subtitle long).
+  function syncWrapHeight(slide) {
+    if (!slidesWrap || !slide) return;
+    try {
+      const apply = () => {
+        const h = slide.scrollHeight;
+        if (h > 0) slidesWrap.style.height = h + 'px';
+      };
+      apply();                      // immediate (scrollHeight force layout)
+      setTimeout(apply, 30);        // re-measure après reflow
+      setTimeout(apply, 420);       // re-measure après .ready + animations
+    } catch {}
+  }
+
+  // Relance les animations inline (bars, shine, etc.) sur les slides visités
+  // après le boot. Nécessaire car certains navigateurs (et headless) figent
+  // les animations sur les éléments créés hors viewport (tous les slides sont
+  // créés au boot avec opacity:0). On retire puis rend la règle `animation`
+  // pour forcer un replay.
+  function replayInlineAnimations(slide) {
+    if (!slide) return;
+    const nodes = slide.querySelectorAll('[style*="animation"]');
+    nodes.forEach(n => {
+      const orig = n.style.animation;
+      if (!orig) return;
+      n.style.animation = 'none';
+      // Force reflow pour que 'none' prenne effet
+      // eslint-disable-next-line no-unused-expressions
+      n.offsetWidth;
+      n.style.animation = orig;
+    });
+  }
+
   function goToSlide(newIdx, dir) {
     if (newIdx < 0 || newIdx >= SLIDE_COUNT) return;
     const prev = slidesWrap.querySelectorAll('.fp-onb-slide')[currentIdx];
@@ -1410,16 +1690,29 @@
     // eslint-disable-next-line no-unused-expressions
     next.offsetWidth;
 
-    requestAnimationFrame(() => {
+    // Double-RAF avec setTimeout fallback (certains navigateurs headless
+    // suspendent RAF quand le tab perd le focus — on sécurise avec setTimeout).
+    const promoteActive = () => {
       next.classList.remove('entering-left', 'entering-right');
       next.classList.add('active');
-      // Fire demo after slide-in so animations don't get clipped
+      syncWrapHeight(next);
+      // Relance les animations des demos inline (bars, cards) qui peuvent
+      // avoir été "consommées" au boot quand le slide était invisible.
+      replayInlineAnimations(next);
       setTimeout(() => {
         next.classList.add('ready');
         animateCounters(next, newIdx);
         animateTyping(next);
+        syncWrapHeight(next);
       }, 380);
-    });
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(promoteActive);
+    }
+    // Toujours un fallback setTimeout pour contrer les RAF throttled
+    setTimeout(() => {
+      if (!next.classList.contains('active')) promoteActive();
+    }, 50);
 
     // Update dots
     dotsEl.querySelectorAll('.fp-onb-dot').forEach((d, i) => d.classList.toggle('active', i === newIdx));
@@ -1507,14 +1800,24 @@
     // BEFORE we add the .open class — otherwise the opacity transition
     // can be skipped in certain browser/headless environments.
     void overlay.offsetWidth;
+    syncWrapHeight(first);
     setTimeout(() => {
       overlay.classList.add('open');
       setTimeout(() => {
         first.classList.add('ready');
         animateCounters(first, 0);
         animateTyping(first);
+        syncWrapHeight(first);
       }, 380);
     }, 30);
+    // Resync sur resize (rotation mobile, clavier virtuel, etc.)
+    if (!window.__fpOnbResizeBound) {
+      window.addEventListener('resize', () => {
+        const active = slidesWrap?.querySelector('.fp-onb-slide.active');
+        if (active) syncWrapHeight(active);
+      });
+      window.__fpOnbResizeBound = true;
+    }
     haptic(12);
   }
 
