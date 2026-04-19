@@ -1,5 +1,39 @@
 # Changelog
 
+## [v6.21-persist-kpis-post-slider] — 2026-04-19
+
+### 🔥 Bug critique fixé : KPIs (TRI, NPV, verdict) non persistés après ajustement loyer/charges/surface
+
+**Symptôme** : utilisateur bouge les sliders loyer/charges/surface sur un site → les valeurs s'enregistrent dans `_rentOverrides`/`_chargeOverrides`/`_surfaceOverrides` + localStorage, l'affichage live du P&L/IRR se met bien à jour. **MAIS** quand il navigue vers le Dashboard compare ou lance l'export PDF, le TRI affiché est celui de l'analyse INITIALE, pas celui recalculé après slider.
+
+**Root cause** (diagnostic via audit complet du flow) :
+- `window._siteAnalyses` (source de vérité persistée dans `localStorage.fpSiteAnalyses`) est alimenté par `saveSiteAnalysis(name, lat, lng, r, exec)`.
+- Cette fonction est appelée **uniquement** à 2 endroits : auto-analyse target au launch (ligne 1956) et fin de `renderCaptageAnalysis` (ligne 5433).
+- `recalcPnLWithRent()` (desktop, ligne 4871) et `recomputeCurrentAnalysis()` (mobile.js, ligne 1559) recalculent correctement `r.pnl` + `exec` mais **ne persistaient jamais** le résultat dans `_siteAnalyses`.
+- Conséquence : la matrice comparative (exportPDF ligne 5184) et tout consommateur de `_siteAnalyses` lisait des chiffres figés.
+
+**Fix** :
+1. `recalcPnLWithRent()` (desktop) appelle maintenant `saveSiteAnalysis(loc.siteName, loc.lat, loc.lng, r, exec)` à la fin, avec try/catch défensif.
+2. `recomputeCurrentAnalysis()` (mobile) appelle `window.saveSiteAnalysis(t.name, t.lat, t.lng, r, exec)` après avoir mis à jour le cache local `analyses[activeIdx]`.
+3. `saveSiteAnalysis` est maintenant exposé via `window.saveSiteAnalysis = saveSiteAnalysis` (nécessaire pour mobile.js qui est un module séparé).
+
+**Test runtime (preview mobile Hala Laminor)** :
+- IRR initial = 57,63%
+- Override loyer Y1 = 18 €/m² (vs default 10,5) → IRR _siteAnalyses = 44,86% (delta -12,77 pts ✓)
+- NPV : 3,87 M€ → 2,69 M€ (direction correcte, loyer↑ → NPV↓ ✓)
+- localStorage `fpSiteAnalyses` écrit synchro (lsMatch: true ✓)
+
+**Fichiers touchés** :
+- `index.html` : `recalcPnLWithRent` +8 lignes (persist + guard), +1 ligne `window.saveSiteAnalysis` export.
+- `src/mobile.js` : `recomputeCurrentAnalysis` +7 lignes (persist via window.saveSiteAnalysis + guard).
+- `config.js` : bump `MODEL_VERSION` → `v6.21-persist-kpis-post-slider`.
+
+**Tests** : 197/197 PASS (changements purement couche persistance, aucun impact modèle).
+
+**Impact user** : le Dashboard compare, la matrice comparative de l'export PDF, et tout futur consommateur de `_siteAnalyses` reflètent désormais les KPIs RÉELS après override. Cross-session OK (localStorage persist).
+
+---
+
 ## [v6.20-mobile-tours-2027] — 2026-04-19
 
 ### Fix mobile + effets "2027 ultra-moderne" sur les tours BP et Sources

@@ -1575,6 +1575,15 @@
         a.score    = exec.total;
         a.raw      = r;
       }
+      // ═══ Persist KPIs dans _siteAnalyses (v6.21) ═══
+      // Critical : sans cet appel, le Dashboard compare (desktop) + l'export
+      // PDF matrice comparative gardaient l'IRR initial après override slider.
+      // On sync maintenant TRI / NPV / payback / verdict dans localStorage
+      // `fpSiteAnalyses` (source de vérité cross-session).
+      if (typeof window.saveSiteAnalysis === 'function' && t.name && t.lat != null && t.lng != null) {
+        try { window.saveSiteAnalysis(t.name, t.lat, t.lng, r, exec); }
+        catch (e) { console.warn('[FP mobile] saveSiteAnalysis failed:', e); }
+      }
       // Update the active site card
       refreshCard(activeIdx);
       // Update hero metric cards (top of detail view) with animated counters

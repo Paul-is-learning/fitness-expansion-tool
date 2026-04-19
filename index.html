@@ -4882,6 +4882,16 @@ function recalcPnLWithRent() {
   window._lastExecData = {r, exec};
   // Update DOM
   updatePnLDisplay(pnl, exec);
+  // ═══ Persist KPIs (v6.21) ═══
+  // Les sliders loyer/charges/surface mutent r.pnl. Sans MAJ de _siteAnalyses,
+  // le Dashboard compare + export PDF affichaient l'IRR initial (figé). On
+  // re-save ici pour garantir que TRI / NPV / payback / verdict sont toujours
+  // synchrones avec la dernière valeur slider.
+  const loc = window._lastCaptageLocation;
+  if (loc && loc.siteName && typeof saveSiteAnalysis === 'function') {
+    try { saveSiteAnalysis(loc.siteName, loc.lat, loc.lng, r, exec); }
+    catch(e) { console.warn('[FP] saveSiteAnalysis after slider failed:', e); }
+  }
 }
 
 function updatePnLDisplay(pnl, exec) {
@@ -5001,6 +5011,8 @@ function saveSiteAnalysis(name, lat, lng, r, exec) {
   window._siteAnalyses.sort((a, b) => b.execScore - a.execScore);
   localStorage.setItem('fpSiteAnalyses', JSON.stringify(window._siteAnalyses));
 }
+// Exposé global pour mobile.js (autre module) — v6.21 fix persistance post-slider
+window.saveSiteAnalysis = saveSiteAnalysis;
 
 function renderSiteRanking() {
   const analyses = window._siteAnalyses;
