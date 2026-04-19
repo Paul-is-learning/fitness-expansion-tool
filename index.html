@@ -4250,8 +4250,9 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
     const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
     const fondsPub = Math.round(caAdherents * PNL_DEFAULTS.fondsPubRate);
+    const taxLocal = Math.round(totalCA * PNL_DEFAULTS.taxLocalRate);
     const leasing = yearNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
-    const totalOpex = staffM + rentM + fpCloud + opexOps + redevance + fondsPub;
+    const totalOpex = staffM + rentM + fpCloud + opexOps + redevance + fondsPub + taxLocal;
     const ebitda = margeBrute - totalOpex;
     const cashFlow = ebitda - leasing;
     cumulCashFlow += cashFlow;
@@ -4353,6 +4354,10 @@ const PNL_DEFAULTS = {
   // Fonds publicitaire (pot commun marketing réseau). OnAir réel: 1% du CA.
   // Alignement sur le standard franchise fitness (était 2%).
   fondsPubRate: 0.01,        // % du CA Adherents — calibré OnAir (était 0.02)
+  // Impôts locaux Roumanie (taxa pe clădiri + impozit local activitate). Empirique
+  // OnAir Montreuil 2.2% du CA (CET-équivalent). Décision Paul 2026-04-19: figé à 2%
+  // pour conservatisme investisseur master-franchisé. Charge externe → pèse sur EBITDA.
+  taxLocalRate: 0.02,        // % du CA Total — ajout v6.25 (sourcing OnAir 2.2%, arrondi à 2%)
   ptMonthlyRevenue: 2000,    // EUR/mois — 4 PT × 500€ (BP V17 C48)
   ptGrowth: 0.05,            // +5%/an
   clubSurface: 1449,         // m2 — Hala Laminor (was 1400 in BP V17)
@@ -4523,10 +4528,12 @@ function buildPnL(cohortData, avgQuartierPrice) {
     const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
     // Fonds publicitaire (2% of CA Adherents)
     const fondsPub = Math.round(caAdherents * PNL_DEFAULTS.fondsPubRate);
+    // Impôts locaux RO (taxa pe clădiri + impozit local) — 2% du CA Total (v6.25)
+    const taxLocal = Math.round(totalCA * PNL_DEFAULTS.taxLocalRate);
     // Leasing (Y1-Y5 only)
     const leasing = yearNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
 
-    const totalOpex = staffMonthly + rentMonthly + fpCloud + opexOps + redevance + fondsPub;
+    const totalOpex = staffMonthly + rentMonthly + fpCloud + opexOps + redevance + fondsPub + taxLocal;
     const ebitda = margeBrute - totalOpex;
 
     // --- FINANCING (loan amortization) ---
@@ -4559,7 +4566,7 @@ function buildPnL(cohortData, avgQuartierPrice) {
     monthly.push({
       month: i + 1, year: yearNum,
       ca: totalCA, caAdherents, ptRevenue, costOfSales, margeBrute,
-      staffMonthly, rentMonthly, fpCloud, opexOps, redevance, fondsPub, leasing,
+      staffMonthly, rentMonthly, fpCloud, opexOps, redevance, fondsPub, taxLocal, leasing,
       totalOpex, ebitda, cashFlow, cumulCashFlow,
       // Financing fields
       interestExp, principalPay, loanOutstanding,
@@ -4765,8 +4772,9 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1.01, yearIdx) * pOpex);
       const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
       const redev = Math.round(caAdherents * (PNL_DEFAULTS.redevanceRate + PNL_DEFAULTS.fondsPubRate));
+      const taxLocal = Math.round(totalCA * PNL_DEFAULTS.taxLocalRate);
       const leasing = yearNum <= 5 ? leasingMonthly : 0;
-      const totalOpex = staffM + rentM + fpCloud + opexOps + redev;
+      const totalOpex = staffM + rentM + fpCloud + opexOps + redev + taxLocal;
       const ebitda = margeBrute - totalOpex;
       const cf = ebitda - leasing;
       cumulCF += cf;

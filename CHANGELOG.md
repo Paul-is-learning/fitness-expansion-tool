@@ -1,5 +1,42 @@
 # Changelog
 
+## [v6.25-impots-locaux-2pct] — 2026-04-19
+
+### Conservatisme investisseur : ajout 2% impôts locaux RO dans le P&L
+
+**Décision Paul (master-franchisé)** : intégrer une charge "impôts locaux Roumanie" (taxa pe clădiri + impozit local activitate) à 2% du CA Total, figée dans `PNL_DEFAULTS`. Sourcing : OnAir Montreuil 2.2% du CA (audit Fiteco), arrondi à 2% pour FP Romania.
+
+**Pourquoi** : ligne absente du modèle V17 initial. Pour un BP "décision investisseur" (capital propre engagé), il faut couvrir les charges réelles non-skippables. La taxa pe clădiri RO s'applique sur la valeur cadastrale du local et l'impozit local sur l'activité — incontournables.
+
+**Implémentation** :
+- `PNL_DEFAULTS.taxLocalRate = 0.02` (% du CA Total, pas seulement adhérents)
+- Charge externe → pèse sur EBITDA (avant DAP, intérêts, IS)
+- Intégrée dans les 3 calculs P&L : main `runFinancialModel` (L4529), sensitivity `runSensitivityIRR` (L4254), Monte Carlo `runMonteCarloSimulation` (L4769)
+- Persistée dans le `monthly[]` array pour affichage future
+- Slide BP "Coûts" du tour onboarding mise à jour : ajout ligne "Impôts locaux RO 2% CA · taxa pe clădiri · OnAir 2,2%" + EBITDA cible Y5+ ajusté de "44-55%" → "42-53%"
+
+**Impact KPI sur les 5 TARGETS** (baseline v6.24 → v6.25) :
+
+| Site | IRR Projet | NPV (k€) | Payback (mo) | Score | Verdict |
+|---|---|---|---|---|---|
+| Hala Laminor | 57.63 → **55.43** (-2.2pp) | 3 873 → **3 640** | 41 → 43 | 70 → 69.6 | GO COND ✅ |
+| Baneasa | 60.52 → **58.28** (-2.2pp) | 4 192 → **3 949** | 40 → 41 | 69 → 68.8 | GO COND ✅ |
+| Unirea | 40.64 → **38.61** (-2.0pp) | 2 160 → **1 977** | 54 → 56 | 70.8 → 70.3 | GO COND ✅ |
+| Militari | 8.28 → **6.13** (-2.2pp) | -210 → **-323** | n/a | 57.5 → 56.2 | WATCH ⚠️ |
+| Grand Arena | 3.65 → **1.42** (-2.2pp) | -448 → **-555** | n/a | 54.6 → 53.9 | WATCH ⚠️ |
+
+**Aucun verdict ne bascule** — les 3 GO CONDITIONNEL restent solides, les 2 WATCH s'enfoncent légèrement (mais étaient déjà watch).
+
+**Tests** : `.baseline.json` + `tests/analysis.html BASELINE` régénérés. **197/197 PASS** confirmé en preview.
+
+**Fichiers touchés** :
+- `index.html` : `PNL_DEFAULTS.taxLocalRate` ajouté + 3 spots de calcul P&L + persistance `monthly` array.
+- `src/onboarding-tour.js` : slide `demoBpCosts` étendue (7 lignes au lieu de 6) + EBITDA cible ajusté.
+- `tests/analysis.html` + `.baseline.json` : régénérés avec nouveaux IRR/NPV/PB/Score.
+- `config.js` : bump `MODEL_VERSION` → `v6.25-impots-locaux-2pct`.
+
+---
+
 ## [v6.24-revenue-bars-ready-gated] — 2026-04-19
 
 ### Bug fixé : courbe de revenus A1→A10 (slide REVENUS du tour BP) invisible

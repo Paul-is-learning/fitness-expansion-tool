@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.23-tour-grid-stack-layout (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.25-impots-locaux-2pct (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -30,12 +30,12 @@ docs/MODEL.md           Golden numbers documentation
 docs/ARCHITECTURE.md    Layout fichiers + load order
 ```
 
-## 5 TARGETS (priorité expansion)
-1. **Hala Laminor** (Sec 3) — GO COND, IRR projet 57.6% / equity 89.3% — flagship
-2. **Unirea Shopping Center** (Sec 3) — GO COND, IRR 40.6%
-3. **Militari Shopping** (Sec 6) — WATCH, IRR 8.3%
-4. **Grand Arena** (Sec 4) — WATCH, IRR 3.6%
-5. **Baneasa Shopping City** (Sec 1) — GO COND, IRR 60.5% — destination mall premium
+## 5 TARGETS (priorité expansion — IRR Projet post-v6.25 incluant 2% impôts locaux)
+1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **55.4%** — flagship
+2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **58.3%** — destination mall premium
+3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **38.6%**
+4. **Militari Shopping** (Sec 6) — WATCH, IRR **6.1%**
+5. **Grand Arena** (Sec 4) — WATCH, IRR **1.4%**
 
 Custom sites additionnés via UI mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites`.
 
@@ -54,6 +54,7 @@ opexOpsRateByYear: [0.20, 0.18, 0.16, 0.14, 0.12]  // Y1→Y5+ time-decay
   //                 Paul validé conservateur +1.2pp vs OnAir 10.8%
 redevanceRate: 0.06         // Master-franchise Isseo (vs 4% OnAir classique)
 fondsPubRate:  0.01         // Standard franchise EU
+taxLocalRate:  0.02         // Impôts locaux RO (taxa pe clădiri) — ajout v6.25 (OnAir 2.2%)
 staffRate: 0.09             // BP FP officiel
 staffFloorAnnual: 65000     // 4 ETP Romania +3%/an inflation
 
@@ -165,7 +166,15 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (≤ v6.23)
+## Dernière session (v6.25)
+- **Décision investisseur** (Paul, master-franchisé) : ajout 2% impôts locaux RO (taxa pe clădiri) dans `PNL_DEFAULTS.taxLocalRate`. Sourcing OnAir Montreuil 2.2%.
+- Charge externe → pèse sur EBITDA, intégrée dans 3 spots P&L (sensitivity, main, Monte Carlo).
+- Slide BP "Coûts" du tour étendue à 7 lignes ; EBITDA cible Y5+ ajusté 44-55% → 42-53%.
+- Baselines régénérés : IRR -2.0 à -2.2pp sur tous sites, NPV -100 à -250k€, payback +1-2 mo. **Aucun verdict ne bascule** (3 GO COND, 2 WATCH inchangés).
+- Tests 197/197 PASS confirmé en preview.
+- v6.24 (intermédiaire) : fix courbe revenus A1→A10 invisible (sizing flex `align-self:stretch` + animation gated `.fp-onb-slide.ready`).
+
+## Sessions précédentes (≤ v6.23)
 - Diagnostic : sur desktop 1440×900, ancien CSS persistait à cause du cache navigateur (.js chargés avec `defer`). Mobile était refresh, desktop non. Code lui-même clean (vérifié screenshot).
 - Solutions cache desktop : (1) bouton 🔄 in-app bottom-left, (2) Cmd+Shift+R (Chrome/Arc/Edge) ou Cmd+Option+R (Safari), (3) DevTools → Network → "Disable cache" + Cmd+R.
 - Bump MODEL_VERSION → `v6.23-tour-grid-stack-layout` purge auto les caches internes (`fpSiteAnalyses`, `fpCustomSites.analysisData`, `opCache`) au prochain reload.

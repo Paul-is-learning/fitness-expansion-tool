@@ -26,4 +26,4 @@ const GOOGLE_CACHE_KEY = 'fp_google_cache';
 const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
 
 // Model version — bumped when cached data format changes; triggers cache clear
-const MODEL_VERSION = 'v6.24-revenue-bars-ready-gated';
+const MODEL_VERSION = 'v6.25-impots-locaux-2pct';

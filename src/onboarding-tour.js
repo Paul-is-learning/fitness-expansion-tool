@@ -1224,12 +1224,13 @@
       { lbl: 'OPEX ops Y1→Y5', pct: 16,   c: '#34d399', note: '20% Y1 → 12% Y5+ (time-decay)' },
       { lbl: 'Royalties MF',   pct: 6,    c: '#a78bfa', note: 'master-franchise Isseo · OnAir 4%' },
       { lbl: 'Fonds pub',      pct: 1,    c: '#fbbf24', note: 'standard franchise EU' },
+      { lbl: 'Impôts locaux RO',pct: 2,   c: '#f87171', note: 'taxa pe clădiri · OnAir 2,2%' },
     ];
     const total = costs.reduce((a,c)=>a+c.pct, 0);
     return `
       <div style="width:100%;display:flex;flex-direction:column;gap:4px">
         ${costs.map((c,i)=>`<div class="fp-onb-bp-cost-row fp-onb-blur-in" style="--blur-delay:${0.1+i*0.07}s"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:10px;margin-bottom:1px"><span class="name" style="color:#fff;font-weight:700">${c.lbl}</span><span class="pct" style="color:${c.c};font-weight:800;text-shadow:0 0 10px color-mix(in srgb, ${c.c} 40%, transparent)">${c.pct}% CA</span></div><div class="bar fp-onb-wow-bar" style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;--shine-delay:${1.2 + i*0.1}s"><div style="height:100%;background:linear-gradient(90deg, ${c.c}, color-mix(in srgb, ${c.c} 70%, #fff 30%));width:0;animation:fpOnbWidthGrow ${0.85 + i*0.08}s cubic-bezier(.34,1.36,.4,1) ${0.2 + i*0.08}s forwards;--w:${Math.min((c.pct/16)*100, 100)}%;box-shadow:0 0 6px color-mix(in srgb, ${c.c} 50%, transparent)"></div></div><div class="note" style="font-size:8px;color:rgba(255,255,255,.45);margin-top:1px;font-style:italic;line-height:1.3">${c.note}</div></div>`).join('')}
-        <div class="fp-onb-wow-glass fp-onb-wow-frame" style="margin-top:4px;padding:7px 10px;background:linear-gradient(135deg, rgba(34,197,94,.14), rgba(34,197,94,.06));border:1px solid rgba(34,197,94,.3);border-radius:10px;position:relative;overflow:hidden"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;position:relative;z-index:1"><span style="color:#fff">EBITDA cible Y5+</span><span style="color:#34d399">~44-55%</span></div><div style="font-size:8.5px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.35;position:relative;z-index:1">OnAir 44,7% (audit Fiteco) · FP Romania +10pp buffer prudent</div></div>
+        <div class="fp-onb-wow-glass fp-onb-wow-frame" style="margin-top:4px;padding:7px 10px;background:linear-gradient(135deg, rgba(34,197,94,.14), rgba(34,197,94,.06));border:1px solid rgba(34,197,94,.3);border-radius:10px;position:relative;overflow:hidden"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;position:relative;z-index:1"><span style="color:#fff">EBITDA cible Y5+</span><span style="color:#34d399">~42-53%</span></div><div style="font-size:8.5px;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.35;position:relative;z-index:1">OnAir 44,7% (audit Fiteco) · v6.25 inclut 2% impôts locaux RO</div></div>
       </div>
     `;
   }
