@@ -929,9 +929,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     </div>
   </div>
   <div class="map-overlay-bl">
-    <!-- Bouton Démo : relance l'onboarding tour Apple-like depuis la map desktop.
-         Reset le compteur pour l'user courant, lance immediatement. -->
-    <button id="fpDemoBtn" onclick="replayOnboardingTour()"
+    <!-- Bouton Démo : ouvre un panel dépliable (Visite guidée + 'Comment ça marche ?') -->
+    <button id="fpDemoBtn" onclick="showDemoPanel()"
             style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:8px 14px;background:linear-gradient(135deg, rgba(212,160,23,.18) 0%, rgba(212,160,23,.08) 100%);border:1px solid rgba(212,160,23,.5);border-radius:10px;color:var(--accent);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .15s, box-shadow .2s, background .2s"
             onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(212,160,23,.35)';this.style.background='linear-gradient(135deg, rgba(212,160,23,.28) 0%, rgba(212,160,23,.14) 100%)'"
             onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(0,0,0,.35)';this.style.background='linear-gradient(135deg, rgba(212,160,23,.18) 0%, rgba(212,160,23,.08) 100%)'"
@@ -7215,12 +7214,215 @@ function showUserPanel() {
   try { window.applyI18n?.(panel); } catch {}
 }
 
-// Ferme le user panel + reset le compteur de tours pour l'user courant + lance le tour.
-// Accessible depuis le bouton "Revoir la presentation" dans showUserPanel().
-function replayOnboardingTour() {
+// Lance directement le tour Apple-like (utilise depuis showDemoPanel).
+function launchOnboardingTour() {
+  try { document.getElementById('demoPanel')?.remove(); } catch {}
   try { document.getElementById('userPanel')?.remove(); } catch {}
   try { window.resetOnboardingTour?.(currentUser?.email); } catch {}
   try { window.startOnboardingTour?.(); } catch {}
+}
+
+// Alias conservé pour le bouton "Revoir la présentation" du user panel.
+function replayOnboardingTour() { launchOnboardingTour(); }
+
+// Panel dépliable "Démonstration" : accessible depuis le bouton bottom-left
+// map overlay. Deux sections: (1) Visite guidée → lance le tour, (2) accordion
+// "Comment ça marche ?" didactique avec diagrammes (6 étapes du pipeline).
+function showDemoPanel() {
+  // Toggle: si déjà ouvert, le fermer
+  const existing = document.getElementById('demoPanel');
+  if (existing) { existing.remove(); return; }
+
+  const tr = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+  const panel = document.createElement('div');
+  panel.id = 'demoPanel';
+  panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,8,15,.82);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);padding:20px;overflow-y:auto';
+  panel.addEventListener('click', e => { if (e.target === panel) panel.remove(); });
+
+  // Card titles/labels + steps content
+  panel.innerHTML = `
+    <div style="background:linear-gradient(180deg, #0f1422 0%, #0a0d17 100%);border:1px solid rgba(212,160,23,.2);border-radius:18px;width:780px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);padding:28px;animation:demoFade .3s ease">
+      <style>
+        @keyframes demoFade { from {opacity:0;transform:scale(.96)} to {opacity:1;transform:scale(1)} }
+        #demoPanel .dp-h1 { font-size:20px;font-weight:800;color:#fff;letter-spacing:-.3px;margin:0 }
+        #demoPanel .dp-sub { font-size:12px;color:#94a3b8;margin-top:4px }
+        #demoPanel .dp-closeX { background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .2s }
+        #demoPanel .dp-closeX:hover { background:rgba(255,255,255,.06);color:#fff }
+        #demoPanel .dp-section { background:rgba(15,20,35,.6);border:1px solid rgba(71,85,115,.3);border-radius:12px;padding:18px;margin-bottom:14px }
+        #demoPanel .dp-section-head { display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none }
+        #demoPanel .dp-section-title { font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:10px }
+        #demoPanel .dp-section-chev { color:var(--accent);font-size:12px;transition:transform .25s }
+        #demoPanel .dp-section.open .dp-section-chev { transform:rotate(90deg) }
+        #demoPanel .dp-section-body { display:none;margin-top:16px;padding-top:16px;border-top:1px solid rgba(71,85,115,.25) }
+        #demoPanel .dp-section.open .dp-section-body { display:block;animation:demoFade .3s ease }
+        #demoPanel .dp-cta { background:linear-gradient(135deg, #d4a017 0%, #b8890f 100%);color:#0a0d17;font-weight:800;font-size:13px;padding:12px 20px;border-radius:10px;border:none;cursor:pointer;letter-spacing:.3px;transition:transform .15s, box-shadow .2s;box-shadow:0 4px 14px rgba(212,160,23,.35) }
+        #demoPanel .dp-cta:hover { transform:translateY(-1px);box-shadow:0 6px 18px rgba(212,160,23,.5) }
+        #demoPanel .dp-step { display:flex;gap:14px;margin-bottom:18px }
+        #demoPanel .dp-step-num { flex-shrink:0;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg, rgba(212,160,23,.25), rgba(212,160,23,.08));border:1px solid rgba(212,160,23,.5);color:var(--accent);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center }
+        #demoPanel .dp-step-body h4 { font-size:13px;font-weight:700;color:#fff;margin:2px 0 6px }
+        #demoPanel .dp-step-body p { font-size:11.5px;color:#94a3b8;line-height:1.6;margin:0 0 8px }
+        #demoPanel .dp-step-viz { background:rgba(0,0,0,.3);border:1px solid rgba(71,85,115,.25);border-radius:8px;padding:12px;margin-top:8px;font-size:10.5px;color:#cbd5e1;font-family:ui-monospace, monospace;line-height:1.55;white-space:pre-wrap }
+        #demoPanel .dp-grid-sources { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px }
+        #demoPanel .dp-src { background:rgba(0,0,0,.25);border:1px solid rgba(71,85,115,.3);border-radius:8px;padding:10px }
+        #demoPanel .dp-src-icon { font-size:20px;margin-bottom:6px }
+        #demoPanel .dp-src-title { font-size:11px;font-weight:700;color:#fff;margin-bottom:4px }
+        #demoPanel .dp-src-desc { font-size:10px;color:#94a3b8;line-height:1.5 }
+        #demoPanel .dp-saz { display:flex;gap:8px;margin:10px 0 }
+        #demoPanel .dp-saz-pil { flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(71,85,115,.3);border-radius:8px;padding:10px;text-align:center }
+        #demoPanel .dp-saz-pct { font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-.5px }
+        #demoPanel .dp-saz-name { font-size:10px;font-weight:700;color:#fff;margin-top:2px }
+        #demoPanel .dp-saz-detail { font-size:9px;color:#64748b;margin-top:4px;line-height:1.4 }
+        @media (max-width: 640px) {
+          #demoPanel .dp-grid-sources { grid-template-columns:1fr }
+          #demoPanel .dp-saz { flex-direction:column }
+        }
+      </style>
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div class="dp-h1" data-i18n="demopanel.title">Démonstration de l'outil</div>
+          <div class="dp-sub" data-i18n="demopanel.sub">Comprends en 2 minutes comment on transforme une intuition immobilière en décision chiffrée.</div>
+        </div>
+        <button class="dp-closeX" onclick="document.getElementById('demoPanel').remove()">&times;</button>
+      </div>
+
+      <!-- Section 1: CTA Tour -->
+      <div class="dp-section" style="background:linear-gradient(135deg, rgba(212,160,23,.1), rgba(212,160,23,.02));border-color:rgba(212,160,23,.4)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div class="dp-section-title"><span style="font-size:18px">▶</span> <span data-i18n="demopanel.tour.title">Visite guidée</span></div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.5" data-i18n="demopanel.tour.desc">8 slides Apple-style, animations live. Tu découvres la map, les pins, les sliders, le SAZ, le P&L et le financement. Durée ~90s.</div>
+          </div>
+          <button class="dp-cta" onclick="launchOnboardingTour()" data-i18n="demopanel.tour.cta">▶ Lancer</button>
+        </div>
+      </div>
+
+      <!-- Section 2: Comment ça marche (dépliable) -->
+      <div class="dp-section" id="dpHowItWorks">
+        <div class="dp-section-head" onclick="this.parentElement.classList.toggle('open')">
+          <div class="dp-section-title"><span style="font-size:18px">📖</span> <span data-i18n="demopanel.how.title">Comment ça marche ?</span></div>
+          <div class="dp-section-chev">▶</div>
+        </div>
+        <div class="dp-section-body">
+
+          <!-- Étape 1 -->
+          <div class="dp-step">
+            <div class="dp-step-num">1</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s1.title">Tu cliques sur la carte</h4>
+              <p data-i18n="demopanel.s1.desc.html">Un cercle apparaît autour du site candidat. C'est la <b>zone de chalandise</b> (rayon 1-5 km, slider). Tout ce qui tombe dedans devient ton bassin d'opportunité.</p>
+              <div class="dp-step-viz">        ◯ ← 2 km (confort fitness urbain)
+       ╱ ╲
+      ╱   ╲
+     │ 📍 │   ← ton site candidat
+      ╲   ╱
+       ╲ ╱
+        ◯</div>
+            </div>
+          </div>
+
+          <!-- Étape 2 -->
+          <div class="dp-step">
+            <div class="dp-step-num">2</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s2.title">3 sources de data se croisent</h4>
+              <p data-i18n="demopanel.s2.desc">La plateforme interroge en temps réel ou depuis sa base calibrée les sources publiques les plus fiables pour Bucharest.</p>
+              <div class="dp-grid-sources">
+                <div class="dp-src">
+                  <div class="dp-src-icon">🏠</div>
+                  <div class="dp-src-title" data-i18n="demopanel.s2.src1.title">Population</div>
+                  <div class="dp-src-desc" data-i18n="demopanel.s2.src1.desc">OSM + Census INS 2021. 397k bâtiments volumétriques, 83 quartiers, population réelle ×1.7 (navetteurs Ilfov).</div>
+                </div>
+                <div class="dp-src">
+                  <div class="dp-src-icon">🏋️</div>
+                  <div class="dp-src-title" data-i18n="demopanel.s2.src2.title">Concurrents</div>
+                  <div class="dp-src-desc" data-i18n="demopanel.s2.src2.desc">Overpass API live + base vérifiée 92 clubs (WC, StayFit, 18GYM, Downtown, Nr1…).</div>
+                </div>
+                <div class="dp-src">
+                  <div class="dp-src-icon">🚇</div>
+                  <div class="dp-src-title" data-i18n="demopanel.s2.src3.title">Flux & POI</div>
+                  <div class="dp-src-desc" data-i18n="demopanel.s2.src3.desc">Google Routes + OSM. Isochrones 10min marche/voiture/métro, 14 universités, 13 malls, 5 pôles bureaux.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Étape 3 -->
+          <div class="dp-step">
+            <div class="dp-step-num">3</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s3.title">Le SAZ pondère 3 piliers</h4>
+              <p data-i18n="demopanel.s3.desc">Score d'Attractivité de Zone 0-100, calibré sur les critères clés de succès d'un club fitness urbain à fort traffic. Poids ajustables par slider.</p>
+              <div class="dp-saz">
+                <div class="dp-saz-pil">
+                  <div class="dp-saz-pct">33%</div>
+                  <div class="dp-saz-name" style="color:#06b6d4" data-i18n="demopanel.s3.flux">FLUX</div>
+                  <div class="dp-saz-detail" data-i18n="demopanel.s3.fluxDet">métro · malls · bureaux · universités · piétons</div>
+                </div>
+                <div class="dp-saz-pil">
+                  <div class="dp-saz-pct">33%</div>
+                  <div class="dp-saz-name" style="color:#8b5cf6" data-i18n="demopanel.s3.dens">DENSITÉ</div>
+                  <div class="dp-saz-detail" data-i18n="demopanel.s3.densDet">pop 15-45 · pouvoir d'achat · concurrence inverse</div>
+                </div>
+                <div class="dp-saz-pil">
+                  <div class="dp-saz-pct">34%</div>
+                  <div class="dp-saz-name" style="color:#10b981" data-i18n="demopanel.s3.youth">JEUNESSE</div>
+                  <div class="dp-saz-detail" data-i18n="demopanel.s3.youthDet">universités · âge quartier · nouveaux résidentiels</div>
+                </div>
+              </div>
+              <p style="font-size:10.5px;color:#64748b;margin-top:4px" data-i18n="demopanel.s3.verdict.html"><b>Verdict</b> : GO (70+) · GO COND (45-69) · WATCH (30-44) · NO-GO (&lt;30)</p>
+            </div>
+          </div>
+
+          <!-- Étape 4 -->
+          <div class="dp-step">
+            <div class="dp-step-num">4</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s4.title">Le captage projette les membres</h4>
+              <p data-i18n="demopanel.s4.desc">Pour chaque club concurrent dans le rayon, 4 facteurs calculent combien de membres switchent vers FP.</p>
+              <div class="dp-step-viz">Captifs    = taux_base × decay_distance × note_Google × élasticité_prix
+Natifs     = pop non-inscrite × conversion sectorielle
+Walk-in    = 0,7% × visiteurs mall (si club en centre commercial)
+Dest. bonus = proximité POI premium (malls prestige, bureaux)
+─────────────────────────────────────
+TOTAL      = membres théoriques à maturité A3 (3 ans)</div>
+            </div>
+          </div>
+
+          <!-- Étape 5 -->
+          <div class="dp-step">
+            <div class="dp-step-num">5</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s5.title">Le P&L tombe directement</h4>
+              <p data-i18n="demopanel.s5.desc">Membres × 28€/mois × ramp-up (A1 70% / A2 90% / A3 100%) → CA, EBITDA, IRR projet, IRR equity, NPV, breakeven, payback en 3 scénarios (conservateur / base / optimiste).</p>
+              <div class="dp-step-viz">Modèle calibré OnAir Montreuil (franchise auditée Fiteco)
+CA 2.24M€ · EBITDA 44.7% · Net 25.4% à maturité
+Sliders loyer + charges + surface ajustables par site (persistants)</div>
+            </div>
+          </div>
+
+          <!-- Étape 6 -->
+          <div class="dp-step">
+            <div class="dp-step-num">6</div>
+            <div class="dp-step-body">
+              <h4 data-i18n="demopanel.s6.title">Tu compares et tu décides</h4>
+              <p data-i18n="demopanel.s6.desc.html">Dashboard avec tableau triable · export CSV · comparaison 2 sites côte à côte · détection cannibalisation (&lt;1,5 km = critique). Tu arbitres avec des chiffres, pas avec des intuitions.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  try { window.applyI18n?.(panel); } catch {}
+
+  // Ouvre par défaut la section "Comment ça marche" pour que le contenu soit visible d'entrée
+  panel.querySelector('#dpHowItWorks')?.classList.add('open');
+
+  // Escape pour fermer
+  const onEsc = (e) => { if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onEsc); } };
+  document.addEventListener('keydown', onEsc);
 }
 
 function inviteUser() {
