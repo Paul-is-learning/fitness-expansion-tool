@@ -199,6 +199,84 @@
       'comp.distance.far': '2-3 km (ÉLOIGNÉ)',
       'comp.clubsLabel': 'clubs',
 
+      // ─── Desktop: topbar + tabs ──────────────────────────────────
+      'dtopbar.subtitle.html': 'Expansion Intelligence Platform <span style="font-weight:600;color:var(--gray);letter-spacing:.3px">Romania</span>',
+      'dsearch.placeholder': 'Rechercher une adresse à Bucarest…',
+      'dtab.explore': 'Explorer',
+      'dtab.compete': 'Concurrence',
+      'dtab.mysites': 'Mes Sites',
+      'dtab.dash': 'Dashboard',
+      'dtab.site': 'Fiche',
+      'dtab.sources': 'Sources',
+
+      // ─── Desktop: layers card ────────────────────────────────────
+      'dlayers.title': 'Couches cartographiques',
+      'dlayers.sectors.label': 'Secteurs & SAZ',
+      'dlayers.sectors.hint': "Score d'attractivité par secteur",
+      'dlayers.competitors.label': 'Concurrents',
+      'dlayers.competitors.hint': 'Détection temps réel via Overpass API',
+      'dlayers.heatmap.label': 'Heatmap concurrence',
+      'dlayers.heatmap.hint': 'Zones saturées vs opportunités',
+      'dlayers.transport.label': 'Métro & transports',
+      'dlayers.transport.hint': 'Stations métro M1-M5 Bucharest',
+      'dlayers.pois.label': 'Universités, malls, bureaux',
+      'dlayers.pois.hint': '14 universités, 13 malls, 5 pôles bureaux',
+      'dlayers.cartiere.label': 'Quartiers (cartiere)',
+      'dlayers.cartiere.hint': '50 quartiers colorés par score jeunesse',
+      'dlayers.heatDensity.label': 'Heatmap densité',
+      'dlayers.heatDensity.hint': '397k bâtiments volumétriques, calibré census',
+      'dlayers.dens.combined': 'Combiné',
+      'dlayers.dens.night': 'Nuit',
+      'dlayers.dens.day': 'Jour',
+      'dlayers.youth.label': 'Heatmap jeunesse',
+      'dlayers.youth.hint': 'Universités + quartiers jeunes',
+
+      // ─── Desktop: filter + analysis mode ─────────────────────────
+      'dfilter.title': 'Filtrer concurrents',
+      'common.all': 'Tout',
+      'common.none': 'Aucun',
+      'danalysis.mode': 'Mode analyse',
+      'danalysis.hint': 'Activez puis cliquez sur la carte',
+
+      // ─── Desktop: catchment zone ─────────────────────────────────
+      'dzone.title': 'Zone de chalandise',
+      'diso.walk': '🚶 10min marche',
+      'diso.drive': '🚗 10min voiture',
+      'diso.transit': '🚇 10min métro',
+      'diso.circle': '⚪ Cercle',
+
+      // ─── Desktop: SAZ weights ────────────────────────────────────
+      'dsaz.weights.title': 'Poids SAZ (ajustables)',
+      'dsaz.flux': 'Flux',
+      'dsaz.density': 'Densité',
+      'dsaz.youth': 'Jeunesse',
+      'dsaz.reset': 'Reset 33/33/34',
+      'dsaz.preset.flux': 'Flux-first',
+      'dsaz.preset.density': 'Densité-first',
+
+      // ─── Desktop: sectors + actions + targets ────────────────────
+      'dsectors.title': 'Secteurs Bucarest',
+      'dactions.title': 'Actions',
+      'dactions.demo': 'Mode Démo',
+      'dactions.loadComp': 'Charger concurrents',
+      'dactions.analyzeAll': 'Analyser tout',
+      'dactions.overlap': 'Overlap sites',
+      'dtargets.title': 'Sites cibles BP',
+      'dtargets.badge': 'Phase 1-2',
+
+      // ─── Desktop: user panel + replay ────────────────────────────
+      'duser.title': 'Gestion utilisateurs',
+      'duser.replay': '♫ Revoir la présentation',
+      'duser.logout': 'Déconnexion',
+      'duser.close': 'Fermer',
+
+      // ─── Desktop: map legend ─────────────────────────────────────
+      'dlegend.premium': 'Premium',
+      'dlegend.mid': 'Mid-range',
+      'dlegend.low': 'Low-cost',
+      'dlegend.indep': 'Indépendant',
+      'dlegend.target': 'Site cible FP',
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Oui',
       'common.no': 'Non',
@@ -387,6 +465,84 @@
       'comp.distance.far': '2-3 km (FAR)',
       'comp.clubsLabel': 'clubs',
 
+      // ─── Desktop: topbar + tabs ──────────────────────────────────
+      'dtopbar.subtitle.html': 'Expansion Intelligence Platform <span style="font-weight:600;color:var(--gray);letter-spacing:.3px">Romania</span>',
+      'dsearch.placeholder': 'Search a Bucharest address…',
+      'dtab.explore': 'Explore',
+      'dtab.compete': 'Competition',
+      'dtab.mysites': 'My Sites',
+      'dtab.dash': 'Dashboard',
+      'dtab.site': 'Site Card',
+      'dtab.sources': 'Sources',
+
+      // ─── Desktop: layers card ────────────────────────────────────
+      'dlayers.title': 'Map layers',
+      'dlayers.sectors.label': 'Sectors & SAZ',
+      'dlayers.sectors.hint': 'Attractiveness score per sector',
+      'dlayers.competitors.label': 'Competitors',
+      'dlayers.competitors.hint': 'Real-time via Overpass API',
+      'dlayers.heatmap.label': 'Competition heatmap',
+      'dlayers.heatmap.hint': 'Saturated zones vs opportunities',
+      'dlayers.transport.label': 'Metro & transit',
+      'dlayers.transport.hint': 'Metro stations M1-M5 Bucharest',
+      'dlayers.pois.label': 'Universities, malls, offices',
+      'dlayers.pois.hint': '14 universities, 13 malls, 5 office hubs',
+      'dlayers.cartiere.label': 'Neighbourhoods (cartiere)',
+      'dlayers.cartiere.hint': '50 neighbourhoods colored by youth score',
+      'dlayers.heatDensity.label': 'Density heatmap',
+      'dlayers.heatDensity.hint': '397k volumetric buildings, census-calibrated',
+      'dlayers.dens.combined': 'Combined',
+      'dlayers.dens.night': 'Night',
+      'dlayers.dens.day': 'Day',
+      'dlayers.youth.label': 'Youth heatmap',
+      'dlayers.youth.hint': 'Universities + young neighbourhoods',
+
+      // ─── Desktop: filter + analysis mode ─────────────────────────
+      'dfilter.title': 'Filter competitors',
+      'common.all': 'All',
+      'common.none': 'None',
+      'danalysis.mode': 'Analysis mode',
+      'danalysis.hint': 'Enable then click on the map',
+
+      // ─── Desktop: catchment zone ─────────────────────────────────
+      'dzone.title': 'Catchment zone',
+      'diso.walk': '🚶 10min walk',
+      'diso.drive': '🚗 10min drive',
+      'diso.transit': '🚇 10min transit',
+      'diso.circle': '⚪ Circle',
+
+      // ─── Desktop: SAZ weights ────────────────────────────────────
+      'dsaz.weights.title': 'SAZ weights (adjustable)',
+      'dsaz.flux': 'Flow',
+      'dsaz.density': 'Density',
+      'dsaz.youth': 'Youth',
+      'dsaz.reset': 'Reset 33/33/34',
+      'dsaz.preset.flux': 'Flow-first',
+      'dsaz.preset.density': 'Density-first',
+
+      // ─── Desktop: sectors + actions + targets ────────────────────
+      'dsectors.title': 'Bucharest sectors',
+      'dactions.title': 'Actions',
+      'dactions.demo': 'Demo mode',
+      'dactions.loadComp': 'Load competitors',
+      'dactions.analyzeAll': 'Analyze all',
+      'dactions.overlap': 'Overlap sites',
+      'dtargets.title': 'BP target sites',
+      'dtargets.badge': 'Phase 1-2',
+
+      // ─── Desktop: user panel + replay ────────────────────────────
+      'duser.title': 'User management',
+      'duser.replay': '♫ Replay the intro',
+      'duser.logout': 'Log out',
+      'duser.close': 'Close',
+
+      // ─── Desktop: map legend ─────────────────────────────────────
+      'dlegend.premium': 'Premium',
+      'dlegend.mid': 'Mid-range',
+      'dlegend.low': 'Low-cost',
+      'dlegend.indep': 'Independent',
+      'dlegend.target': 'FP target site',
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Yes',
       'common.no': 'No',
@@ -426,11 +582,80 @@
     setLocale(currentLocale === 'fr' ? 'en' : 'fr');
   }
 
+  // ─── DOM translator ───────────────────────────────────────────────
+  // Applique les traductions à tous les éléments taggés [data-i18n] (textContent
+  // ou innerHTML si clé finit par .html) et [data-i18n-placeholder] (placeholder).
+  // Tagger le HTML : <span data-i18n="key.path">Défaut FR</span>.
+  // Appelé au boot + à chaque fp:locale-changed.
+  function applyI18n(root) {
+    root = root || document;
+    try {
+      root.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (!key) return;
+        const val = t(key);
+        if (key.endsWith('.html')) el.innerHTML = val;
+        else el.textContent = val;
+      });
+      root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (!key) return;
+        el.setAttribute('placeholder', t(key));
+      });
+      root.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (!key) return;
+        el.setAttribute('title', t(key));
+      });
+      root.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+        const key = el.getAttribute('data-i18n-aria-label');
+        if (!key) return;
+        el.setAttribute('aria-label', t(key));
+      });
+    } catch (e) { console.warn('[fp i18n] applyI18n failed', e); }
+  }
+
+  // Triggers re-render pour les contenus générés dynamiquement (fonctions
+  // desktop qui interpolent des strings FR dans innerHTML). Appelés au toggle.
+  // Chaque fn est optionnelle — si elle n'existe pas, skip silencieusement.
+  function triggerDynamicRerenders() {
+    const fns = ['renderSectorList', 'renderTargets', 'renderDash', 'renderCustomSites',
+                 'renderDemoBanner', 'buildBrandFilters', 'runComparison'];
+    fns.forEach(name => {
+      try { if (typeof window[name] === 'function') window[name](); } catch {}
+    });
+  }
+
+  // Listener: au toggle locale, re-applique les tags + re-render dynamiques.
+  window.addEventListener('fp:locale-changed', () => {
+    applyI18n();
+    triggerDynamicRerenders();
+    // Met à jour le label du bouton toggle desktop (EN <-> FR).
+    const pill = document.getElementById('fpDesktopLocale');
+    if (pill) pill.textContent = t('topbar.locale.label');
+    if (pill) pill.setAttribute('title', t('topbar.locale.title'));
+  });
+
   // Expose globally
   window.t = t;
   window.getLocale = getLocale;
   window.setLocale = setLocale;
   window.toggleLocale = toggleLocale;
+  window.applyI18n = applyI18n;
 
   try { document.documentElement.setAttribute('lang', currentLocale); } catch {}
+
+  // Apply une première fois dès que le DOM est prêt (boot en FR par défaut, ou
+  // EN si localStorage stocke déjà la préférence).
+  function bootApply() {
+    applyI18n();
+    const pill = document.getElementById('fpDesktopLocale');
+    if (pill) pill.textContent = t('topbar.locale.label');
+    if (pill) pill.setAttribute('title', t('topbar.locale.title'));
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootApply);
+  } else {
+    bootApply();
+  }
 })();

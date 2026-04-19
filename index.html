@@ -400,21 +400,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div onclick="showUserPanel()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;cursor:pointer;flex-shrink:0" id="userAvatar" title="Gestion utilisateurs">P</div>
       </div>
     </div>
-    <div style="font-size:9.5px;color:var(--gray2);margin-bottom:10px">Expansion Intelligence Platform <span style="font-weight:600;color:var(--gray);letter-spacing:.3px">Romania</span></div>
+    <div style="font-size:9.5px;color:var(--gray2);margin-bottom:10px" data-i18n="dtopbar.subtitle.html">Expansion Intelligence Platform <span style="font-weight:600;color:var(--gray);letter-spacing:.3px">Romania</span></div>
     <div class="search-wrap">
       <div class="search-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div>
-      <input type="text" id="searchInput" placeholder="Rechercher une adresse a Bucarest...">
+      <input type="text" id="searchInput" placeholder="Rechercher une adresse a Bucarest..." data-i18n-placeholder="dsearch.placeholder">
       <div class="search-results" id="searchResults"></div>
     </div>
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="explore">Explorer</div>
-    <div class="tab" data-tab="compete">Concurrence</div>
-    <div class="tab" data-tab="mysites">Mes Sites</div>
-    <div class="tab" data-tab="dash">Dashboard</div>
-    <div class="tab" data-tab="site">Fiche</div>
-    <div class="tab" data-tab="sources">Sources</div>
+    <div class="tab active" data-tab="explore" data-i18n="dtab.explore">Explorer</div>
+    <div class="tab" data-tab="compete" data-i18n="dtab.compete">Concurrence</div>
+    <div class="tab" data-tab="mysites" data-i18n="dtab.mysites">Mes Sites</div>
+    <div class="tab" data-tab="dash" data-i18n="dtab.dash">Dashboard</div>
+    <div class="tab" data-tab="site" data-i18n="dtab.site">Fiche</div>
+    <div class="tab" data-tab="sources" data-i18n="dtab.sources">Sources</div>
   </div>
 
   <div class="sidebar-body">
@@ -428,56 +428,56 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <!-- Layers -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127760;</span> Couches cartographiques</div>
+          <div class="card-title"><span class="icon">&#127760;</span> <span data-i18n="dlayers.title">Couches cartographiques</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglSectors" onclick="toggleLayer('sectors')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('sectors')">Secteurs & SAZ</div><span class="layer-hint">Score d'attractivite par secteur</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('sectors')" data-i18n="dlayers.sectors.label">Secteurs & SAZ</div><span class="layer-hint" data-i18n="dlayers.sectors.hint">Score d'attractivite par secteur</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglCompetitors" onclick="toggleLayer('competitors')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('competitors')">Concurrents</div><span class="layer-hint">Detection temps reel via Overpass API</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('competitors')" data-i18n="dlayers.competitors.label">Concurrents</div><span class="layer-hint" data-i18n="dlayers.competitors.hint">Detection temps reel via Overpass API</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglHeatmap" onclick="toggleLayer('heatmap')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('heatmap')">Heatmap concurrence</div><span class="layer-hint">Zones saturees vs opportunites</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('heatmap')" data-i18n="dlayers.heatmap.label">Heatmap concurrence</div><span class="layer-hint" data-i18n="dlayers.heatmap.hint">Zones saturees vs opportunites</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglTransport" onclick="toggleLayer('transport')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('transport')">Metro & transports</div><span class="layer-hint">Stations metro M1-M5 Bucharest</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('transport')" data-i18n="dlayers.transport.label">Metro & transports</div><span class="layer-hint" data-i18n="dlayers.transport.hint">Stations metro M1-M5 Bucharest</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglPois" onclick="toggleLayer('pois')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('pois')">Universites, malls, bureaux</div><span class="layer-hint">14 universites, 13 malls, 5 poles bureaux</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('pois')" data-i18n="dlayers.pois.label">Universites, malls, bureaux</div><span class="layer-hint" data-i18n="dlayers.pois.hint">14 universites, 13 malls, 5 poles bureaux</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglCartiere" onclick="toggleLayer('cartiere')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('cartiere')">Quartiers (cartiere)</div><span class="layer-hint">50 quartiers colores par score jeunesse</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('cartiere')" data-i18n="dlayers.cartiere.label">Quartiers (cartiere)</div><span class="layer-hint" data-i18n="dlayers.cartiere.hint">50 quartiers colores par score jeunesse</span></div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglHeatDensity" onclick="toggleLayer('heatDensity')"></div>
           <div>
-            <div class="layer-label" onclick="toggleLayer('heatDensity')">Heatmap densite</div>
-            <span class="layer-hint">397k batiments volumetriques, calibre census</span>
+            <div class="layer-label" onclick="toggleLayer('heatDensity')" data-i18n="dlayers.heatDensity.label">Heatmap densite</div>
+            <span class="layer-hint" data-i18n="dlayers.heatDensity.hint">397k batiments volumetriques, calibre census</span>
             <div style="display:flex;gap:3px;margin-top:4px">
-              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px;background:var(--accent)30;border-color:var(--accent)" onclick="setDensityMode('combined')" id="dmC">Combine</button>
-              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px" onclick="setDensityMode('night')" id="dmN">Nuit</button>
-              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px" onclick="setDensityMode('day')" id="dmD">Jour</button>
+              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px;background:var(--accent)30;border-color:var(--accent)" onclick="setDensityMode('combined')" id="dmC" data-i18n="dlayers.dens.combined">Combine</button>
+              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px" onclick="setDensityMode('night')" id="dmN" data-i18n="dlayers.dens.night">Nuit</button>
+              <button class="btn btn-sm" style="font-size:8px;padding:2px 6px" onclick="setDensityMode('day')" id="dmD" data-i18n="dlayers.dens.day">Jour</button>
             </div>
           </div>
         </div>
         <div class="layer-row">
           <div class="toggle" id="tglHeatYouth" onclick="toggleLayer('heatYouth')"></div>
-          <div><div class="layer-label" onclick="toggleLayer('heatYouth')">Heatmap jeunesse</div><span class="layer-hint">Universites + quartiers jeunes</span></div>
+          <div><div class="layer-label" onclick="toggleLayer('heatYouth')" data-i18n="dlayers.youth.label">Heatmap jeunesse</div><span class="layer-hint" data-i18n="dlayers.youth.hint">Universites + quartiers jeunes</span></div>
         </div>
       </div>
 
       <!-- Brand filter (Explorer tab) -->
       <div class="card" id="brandFilterExplorer">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127919;</span> Filtrer concurrents</div>
-          <button class="btn btn-sm" onclick="toggleAllBrands(true)">Tout</button>
-          <button class="btn btn-sm" onclick="toggleAllBrands(false)">Aucun</button>
+          <div class="card-title"><span class="icon">&#127919;</span> <span data-i18n="dfilter.title">Filtrer concurrents</span></div>
+          <button class="btn btn-sm" onclick="toggleAllBrands(true)" data-i18n="common.all">Tout</button>
+          <button class="btn btn-sm" onclick="toggleAllBrands(false)" data-i18n="common.none">Aucun</button>
         </div>
         <div id="brandFiltersExplorer" style="display:flex;flex-wrap:wrap;gap:4px"></div>
       </div>
@@ -487,8 +487,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div class="layer-row" style="margin-bottom:0">
           <div class="toggle" id="tglAnalysis" onclick="toggleAnalysisMode()"></div>
           <div>
-            <div class="layer-label" onclick="toggleAnalysisMode()" style="font-weight:700;color:var(--accent)">Mode analyse</div>
-            <span class="layer-hint">Activez puis cliquez sur la carte</span>
+            <div class="layer-label" onclick="toggleAnalysisMode()" style="font-weight:700;color:var(--accent)" data-i18n="danalysis.mode">Mode analyse</div>
+            <span class="layer-hint" data-i18n="danalysis.hint">Activez puis cliquez sur la carte</span>
           </div>
         </div>
       </div>
@@ -496,7 +496,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <!-- Catchment -->
       <div class="card" id="catchmentCard">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9898;</span> Zone de chalandise</div>
+          <div class="card-title"><span class="icon">&#9898;</span> <span data-i18n="dzone.title">Zone de chalandise</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Zone de chalandise</strong><br>Definit le rayon d'analyse autour du point selectionne. Le rayon standard en fitness urbain est de <strong>2 km</strong> (zone de commodite). Un club premium attire jusqu'a 5 km.<div class="tip-source">Source : Benchmark FP France</div></div></span>
         </div>
         <div class="radius-pills">
@@ -511,10 +511,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         </div>
         <div style="margin-top:8px">
           <div style="display:flex;gap:4px;margin-bottom:4px">
-            <button class="btn btn-sm iso-btn" id="isoWalkBtn" onclick="setIsoMode('walk')" style="font-size:9px">&#128694; 10min marche</button>
-            <button class="btn btn-sm iso-btn" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px">&#128663; 10min voiture</button>
-            <button class="btn btn-sm iso-btn" id="isoTransitBtn" onclick="setIsoMode('transit')" style="font-size:9px">&#128647; 10min métro</button>
-            <button class="btn btn-sm iso-btn" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)">&#9898; Cercle</button>
+            <button class="btn btn-sm iso-btn" id="isoWalkBtn" onclick="setIsoMode('walk')" style="font-size:9px" data-i18n="diso.walk">&#128694; 10min marche</button>
+            <button class="btn btn-sm iso-btn" id="isoDriveBtn" onclick="setIsoMode('drive')" style="font-size:9px" data-i18n="diso.drive">&#128663; 10min voiture</button>
+            <button class="btn btn-sm iso-btn" id="isoTransitBtn" onclick="setIsoMode('transit')" style="font-size:9px" data-i18n="diso.transit">&#128647; 10min métro</button>
+            <button class="btn btn-sm iso-btn" id="isoCircleBtn" onclick="setIsoMode('circle')" style="font-size:9px;background:var(--accent)30;border-color:var(--accent)" data-i18n="diso.circle">&#9898; Cercle</button>
           </div>
           <div style="margin-top:2px;font-size:8px;color:var(--gray2)">Powered by Google Routes API</div>
         </div>
@@ -523,32 +523,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <!-- SAZ Weight Sliders -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9881;</span> Poids SAZ (ajustables)</div>
+          <div class="card-title"><span class="icon">&#9881;</span> <span data-i18n="dsaz.weights.title">Poids SAZ (ajustables)</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>Personnalisation du scoring</strong><br>Ajustez les poids des 3 piliers selon votre strategie. Le total doit faire 100%. Cliquez "Reset" pour revenir a 33/33/34.<div class="tip-source">Modifiez les curseurs et re-cliquez sur la carte pour recalculer</div></div></span>
         </div>
         <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--cyan)">Flux</span><span id="wFluxVal" style="font-weight:700">33%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--cyan)" data-i18n="dsaz.flux">Flux</span><span id="wFluxVal" style="font-weight:700">33%</span></div>
           <input type="range" id="wFlux" min="0" max="80" value="33" style="width:100%;accent-color:#06b6d4" oninput="updateWeights()">
         </div>
         <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--purple)">Densite</span><span id="wDensVal" style="font-weight:700">33%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--purple)" data-i18n="dsaz.density">Densite</span><span id="wDensVal" style="font-weight:700">33%</span></div>
           <input type="range" id="wDens" min="0" max="80" value="33" style="width:100%;accent-color:#8b5cf6" oninput="updateWeights()">
         </div>
         <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--green)">Jeunesse</span><span id="wJeuVal" style="font-weight:700">34%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--green)" data-i18n="dsaz.youth">Jeunesse</span><span id="wJeuVal" style="font-weight:700">34%</span></div>
           <input type="range" id="wJeu" min="0" max="80" value="34" style="width:100%;accent-color:#10b981" oninput="updateWeights()">
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-sm" onclick="resetWeights()">Reset 33/33/34</button>
-          <button class="btn btn-sm" onclick="setPresetWeights(50,25,25)">Flux-first</button>
-          <button class="btn btn-sm" onclick="setPresetWeights(25,50,25)">Densite-first</button>
+          <button class="btn btn-sm" onclick="resetWeights()" data-i18n="dsaz.reset">Reset 33/33/34</button>
+          <button class="btn btn-sm" onclick="setPresetWeights(50,25,25)" data-i18n="dsaz.preset.flux">Flux-first</button>
+          <button class="btn btn-sm" onclick="setPresetWeights(25,50,25)" data-i18n="dsaz.preset.density">Densite-first</button>
         </div>
       </div>
 
       <!-- Sectors -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#127463;</span> Secteurs Bucarest</div>
+          <div class="card-title"><span class="icon">&#127463;</span> <span data-i18n="dsectors.title">Secteurs Bucarest</span></div>
           <span class="info-tip">?<div class="tip-content"><strong>6 secteurs administratifs</strong><br>Bucarest est divise en 6 <em>sectoare</em>, chacun avec sa mairie et ses statistiques propres. La population cible 15-45 ans est estimee a ~43% de la pop. totale (INS 2022).<div class="tip-source">Source : INS Romania / recensamantromania.ro</div></div></span>
         </div>
         <div id="sectorList"></div>
@@ -556,20 +556,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 
       <!-- Quick actions -->
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">&#9889;</span> Actions</div></div>
+        <div class="card-header"><div class="card-title"><span class="icon">&#9889;</span> <span data-i18n="dactions.title">Actions</span></div></div>
         <div class="btn-group">
-          <button class="btn" onclick="toggleDemoMode()">Mode Demo</button>
-          <button class="btn" onclick="loadAllCompetitors()">Charger concurrents</button>
-          <button class="btn btn-primary" onclick="analyzeAllSectors()">Analyser tout</button>
-          <button class="btn" onclick="showOverlapAnalysis()">Overlap sites</button>
+          <button class="btn" onclick="toggleDemoMode()" data-i18n="dactions.demo">Mode Demo</button>
+          <button class="btn" onclick="loadAllCompetitors()" data-i18n="dactions.loadComp">Charger concurrents</button>
+          <button class="btn btn-primary" onclick="analyzeAllSectors()" data-i18n="dactions.analyzeAll">Analyser tout</button>
+          <button class="btn" onclick="showOverlapAnalysis()" data-i18n="dactions.overlap">Overlap sites</button>
         </div>
       </div>
 
       <!-- BP Target Sites -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#128205;</span> Sites cibles BP</div>
-          <span class="badge badge-red">Phase 1-2</span>
+          <div class="card-title"><span class="icon">&#128205;</span> <span data-i18n="dtargets.title">Sites cibles BP</span></div>
+          <span class="badge badge-red" data-i18n="dtargets.badge">Phase 1-2</span>
         </div>
         <div id="targetSites"></div>
       </div>
@@ -930,11 +930,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
   <div class="map-overlay-bl">
     <div class="map-box" style="padding:8px 12px;font-size:10px;color:var(--gray2);min-width:auto">
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px"></span>Premium</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f97316;margin-right:3px"></span>Mid-range</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#eab308;margin-right:3px"></span>Low-cost</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:3px"></span>Independant</span>
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4a017;border:2px solid white;margin-right:3px"></span>Site cible FP</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px"></span><span data-i18n="dlegend.premium">Premium</span></span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f97316;margin-right:3px"></span><span data-i18n="dlegend.mid">Mid-range</span></span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#eab308;margin-right:3px"></span><span data-i18n="dlegend.low">Low-cost</span></span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:3px"></span><span data-i18n="dlegend.indep">Independant</span></span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4a017;border:2px solid white;margin-right:3px"></span><span data-i18n="dlegend.target">Site cible FP</span></span>
       </div>
     </div>
   </div>
@@ -7176,7 +7176,7 @@ function showUserPanel() {
   panel.innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:440px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div style="font-size:14px;font-weight:700">Gestion utilisateurs</div>
+        <div style="font-size:14px;font-weight:700" data-i18n="duser.title">Gestion utilisateurs</div>
         <button onclick="document.getElementById('userPanel').remove()" style="background:none;border:none;color:var(--gray);font-size:18px;cursor:pointer">&times;</button>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">
@@ -7188,13 +7188,14 @@ function showUserPanel() {
       </div>
       ${adminBtns}
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn" style="flex:1;min-width:130px;color:var(--accent)" onclick="replayOnboardingTour()">&#9835; Revoir la presentation</button>
-        <button class="btn" style="flex:1;min-width:100px;color:var(--red)" onclick="doLogout()">Deconnexion</button>
-        <button class="btn" style="flex:1;min-width:80px" onclick="document.getElementById('userPanel').remove()">Fermer</button>
+        <button class="btn" style="flex:1;min-width:130px;color:var(--accent)" onclick="replayOnboardingTour()" data-i18n="duser.replay">&#9835; Revoir la presentation</button>
+        <button class="btn" style="flex:1;min-width:100px;color:var(--red)" onclick="doLogout()" data-i18n="duser.logout">Deconnexion</button>
+        <button class="btn" style="flex:1;min-width:80px" onclick="document.getElementById('userPanel').remove()" data-i18n="duser.close">Fermer</button>
       </div>
     </div>
   `;
   document.body.appendChild(panel);
+  try { window.applyI18n?.(panel); } catch {}
 }
 
 // Ferme le user panel + reset le compteur de tours pour l'user courant + lance le tour.
