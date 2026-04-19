@@ -729,71 +729,19 @@
   }
 
   // ─── Slide definitions ────────────────────────────────────────
+  // Les champs eyebrow/title/subtitle/cta sont des clés i18n résolues via
+  // tr() au moment du render (support FR/EN dynamique). Les dictionnaires
+  // sont dans src/i18n.js sous 'tour.s{1-8}.*'.
+  const tr = (k) => (typeof window.t === 'function' ? window.t(k) : k);
   const SLIDES = [
-    {
-      tint: '#d4a017',
-      eyebrow: 'BIENVENUE',
-      title: 'FP Romania Expansion Intelligence',
-      subtitle: "L'outil d'expansion qui transforme une opportunité foncière en BP. En 30 secondes par site, tu as un go / no-go défendable et un pitch banquier prêt.",
-      demo: demoWelcome,
-      cta: 'Découvrir'
-    },
-    {
-      tint: '#d4a017',
-      eyebrow: 'CARTE LIVE',
-      title: 'Identification des opportunités prioritaires',
-      subtitle: 'Hala Laminor, Unirea, Militari, Grand Arena, Baneasa. Pins numérotés, swipe pour comparer, analyse auto en 1 tap.',
-      demo: demoPins,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#34d399',
-      eyebrow: 'SIMULATION TEMPS RÉEL',
-      title: 'Sliders loyer · charges · surface',
-      subtitle: 'Ajuste les 3 paramètres par site. IRR, NPV, CAF, EBITDA recalculent en 90ms. Persistance par site, survit au reload.',
-      demo: demoSliders,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#60a5fa',
-      eyebrow: 'SCORE ATTRACTIVITÉ',
-      title: 'SAZ · flux · densité · jeunesse',
-      subtitle: '3 anneaux animés qui résument la zone. Population captage 3 km + concurrents + démographie 15-45 ans.',
-      demo: demoSaz,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#f97316',
-      eyebrow: 'P&L 3 SCÉNARIOS',
-      title: 'Conservateur · Base · Optimiste',
-      subtitle: 'CA annuel, EBITDA, IRR projet, NPV, breakeven, payback. Modèle calibré OnAir Montreuil (franchise audité Fiteco).',
-      demo: demoPnl,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#d4a017',
-      eyebrow: 'FINANCEMENT',
-      title: 'IRR Projet vs IRR Equity',
-      subtitle: '30/70 equity/loan, 6,5% sur 7 ans. Effet levier calculé, intérêts cumulés modélisés, pitch banquier ready.',
-      demo: demoFinancing,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#a78bfa',
-      eyebrow: 'SITES CUSTOM',
-      title: 'Ajoute une adresse, analyse auto',
-      subtitle: 'Recherche une adresse → sélectionne → confirme. Captage, P&L, verdict IRR s\'affichent en 2 secondes.',
-      demo: demoPhone,
-      cta: 'Suivant'
-    },
-    {
-      tint: '#22c55e',
-      eyebrow: 'PRÊT',
-      title: 'À toi la décision',
-      subtitle: 'Slide en carousel, ajuste les variables, compare, défends ton dossier. Bon pitch.',
-      demo: demoReady,
-      cta: 'Commencer'
-    },
+    { tint: '#d4a017', eyebrow: 'tour.s1.eyebrow', title: 'tour.s1.title', subtitle: 'tour.s1.subtitle', demo: demoWelcome, cta: 'tour.s1.cta' },
+    { tint: '#d4a017', eyebrow: 'tour.s2.eyebrow', title: 'tour.s2.title', subtitle: 'tour.s2.subtitle', demo: demoPins,    cta: 'tour.cta.next' },
+    { tint: '#34d399', eyebrow: 'tour.s3.eyebrow', title: 'tour.s3.title', subtitle: 'tour.s3.subtitle', demo: demoSliders, cta: 'tour.cta.next' },
+    { tint: '#60a5fa', eyebrow: 'tour.s4.eyebrow', title: 'tour.s4.title', subtitle: 'tour.s4.subtitle', demo: demoSaz,     cta: 'tour.cta.next' },
+    { tint: '#f97316', eyebrow: 'tour.s5.eyebrow', title: 'tour.s5.title', subtitle: 'tour.s5.subtitle', demo: demoPnl,     cta: 'tour.cta.next' },
+    { tint: '#d4a017', eyebrow: 'tour.s6.eyebrow', title: 'tour.s6.title', subtitle: 'tour.s6.subtitle', demo: demoFinancing, cta: 'tour.cta.next' },
+    { tint: '#a78bfa', eyebrow: 'tour.s7.eyebrow', title: 'tour.s7.title', subtitle: 'tour.s7.subtitle', demo: demoPhone,   cta: 'tour.cta.next' },
+    { tint: '#22c55e', eyebrow: 'tour.s8.eyebrow', title: 'tour.s8.title', subtitle: 'tour.s8.subtitle', demo: demoReady,   cta: 'tour.s8.cta' },
   ];
 
   // ─── Demo builders ────────────────────────────────────────────
@@ -1069,9 +1017,9 @@
       slide.className = 'fp-onb-slide';
       slide.dataset.idx = i;
       slide.innerHTML = `
-        <div class="fp-onb-eyebrow">${s.eyebrow}</div>
-        <h2 class="fp-onb-title" ${i === 0 ? 'id="fp-onb-active-title"' : ''}>${s.title}</h2>
-        <p class="fp-onb-subtitle">${s.subtitle}</p>
+        <div class="fp-onb-eyebrow">${tr(s.eyebrow)}</div>
+        <h2 class="fp-onb-title" ${i === 0 ? 'id="fp-onb-active-title"' : ''}>${tr(s.title)}</h2>
+        <p class="fp-onb-subtitle">${tr(s.subtitle)}</p>
         <div class="fp-onb-demo">${s.demo()}</div>
       `;
       slidesWrap.appendChild(slide);
@@ -1099,9 +1047,9 @@
     if (mode === 'skipConfirm') {
       actionsRow.innerHTML = `
         <div class="fp-onb-skip-confirm">
-          <strong>Passer le tour ?</strong>
-          <button class="no" type="button">Non</button>
-          <button class="yes" type="button">Oui</button>
+          <strong>${tr('tour.skipConfirm.question')}</strong>
+          <button class="no" type="button">${tr('tour.skipConfirm.no')}</button>
+          <button class="yes" type="button">${tr('tour.skipConfirm.yes')}</button>
         </div>
       `;
       actionsRow.querySelector('.yes').addEventListener('click', confirmDismiss);
@@ -1111,9 +1059,9 @@
       return;
     }
     actionsRow.innerHTML = `
-      <button class="fp-onb-btn-skip" type="button">Passer</button>
+      <button class="fp-onb-btn-skip" type="button">${tr('tour.skip')}</button>
       <button class="fp-onb-btn-next" type="button">
-        <span>${SLIDES[currentIdx]?.cta || 'Suivant'}</span>
+        <span>${tr(SLIDES[currentIdx]?.cta || 'tour.cta.next')}</span>
         ${isLast ? '' : '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>'}
       </button>
     `;

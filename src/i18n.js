@@ -381,6 +381,47 @@
       'hiw.next': 'Suivant',
       'hiw.restart': 'Rejouer',
 
+      // ─── Onboarding tour (8 slides + nav) ────────────────────────
+      'tour.skip': 'Passer',
+      'tour.cta.next': 'Suivant',
+      'tour.skipConfirm.question': 'Passer le tour ?',
+      'tour.skipConfirm.yes': 'Oui',
+      'tour.skipConfirm.no': 'Non',
+      // Slide 1 BIENVENUE
+      'tour.s1.eyebrow': 'BIENVENUE',
+      'tour.s1.title': 'FP Romania Expansion Intelligence',
+      'tour.s1.subtitle': "L'outil d'expansion qui transforme une opportunité foncière en BP. En 30 secondes par site, tu as un go / no-go défendable et un pitch banquier prêt.",
+      'tour.s1.cta': 'Découvrir',
+      // Slide 2 CARTE LIVE
+      'tour.s2.eyebrow': 'CARTE LIVE',
+      'tour.s2.title': 'Identification des opportunités prioritaires',
+      'tour.s2.subtitle': 'Hala Laminor, Unirea, Militari, Grand Arena, Baneasa. Pins numérotés, swipe pour comparer, analyse auto en 1 tap.',
+      // Slide 3 SIMULATION TEMPS RÉEL
+      'tour.s3.eyebrow': 'SIMULATION TEMPS RÉEL',
+      'tour.s3.title': 'Sliders loyer · charges · surface',
+      'tour.s3.subtitle': 'Ajuste les 3 paramètres par site. IRR, NPV, CAF, EBITDA recalculent en 90ms. Persistance par site, survit au reload.',
+      // Slide 4 SCORE ATTRACTIVITÉ
+      'tour.s4.eyebrow': 'SCORE ATTRACTIVITÉ',
+      'tour.s4.title': 'SAZ · flux · densité · jeunesse',
+      'tour.s4.subtitle': '3 anneaux animés qui résument la zone. Population captage 3 km + concurrents + démographie 15-45 ans.',
+      // Slide 5 P&L 3 SCÉNARIOS
+      'tour.s5.eyebrow': 'P&L 3 SCÉNARIOS',
+      'tour.s5.title': 'Conservateur · Base · Optimiste',
+      'tour.s5.subtitle': 'CA annuel, EBITDA, IRR projet, NPV, breakeven, payback. Modèle calibré OnAir Montreuil (franchise audité Fiteco).',
+      // Slide 6 FINANCEMENT
+      'tour.s6.eyebrow': 'FINANCEMENT',
+      'tour.s6.title': 'IRR Projet vs IRR Equity',
+      'tour.s6.subtitle': '30/70 equity/loan, 6,5% sur 7 ans. Effet levier calculé, intérêts cumulés modélisés, pitch banquier ready.',
+      // Slide 7 SITES CUSTOM
+      'tour.s7.eyebrow': 'SITES CUSTOM',
+      'tour.s7.title': 'Ajoute une adresse, analyse auto',
+      'tour.s7.subtitle': "Recherche une adresse → sélectionne → confirme. Captage, P&L, verdict IRR s'affichent en 2 secondes.",
+      // Slide 8 PRÊT
+      'tour.s8.eyebrow': 'PRÊT',
+      'tour.s8.title': 'À toi la décision',
+      'tour.s8.subtitle': 'Slide en carousel, ajuste les variables, compare, défends ton dossier. Bon pitch.',
+      'tour.s8.cta': 'Commencer',
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Oui',
       'common.no': 'Non',
@@ -750,6 +791,47 @@
       'hiw.s5.footnote': 'Calibrated on OnAir Montreuil (FP franchise audited by Fiteco). Revenue 2.24M€ · EBITDA 44.7% at maturity.',
       'hiw.next': 'Next',
       'hiw.restart': 'Replay',
+
+      // ─── Onboarding tour (8 slides + nav) ────────────────────────
+      'tour.skip': 'Skip',
+      'tour.cta.next': 'Next',
+      'tour.skipConfirm.question': 'Skip the tour?',
+      'tour.skipConfirm.yes': 'Yes',
+      'tour.skipConfirm.no': 'No',
+      // Slide 1 WELCOME
+      'tour.s1.eyebrow': 'WELCOME',
+      'tour.s1.title': 'FP Romania Expansion Intelligence',
+      'tour.s1.subtitle': 'The expansion tool that turns a real-estate opportunity into a BP. In 30 seconds per site, you get a defensible go/no-go and a bank-ready pitch.',
+      'tour.s1.cta': 'Discover',
+      // Slide 2 LIVE MAP
+      'tour.s2.eyebrow': 'LIVE MAP',
+      'tour.s2.title': 'Identify priority opportunities',
+      'tour.s2.subtitle': 'Hala Laminor, Unirea, Militari, Grand Arena, Baneasa. Numbered pins, swipe to compare, auto-analysis in 1 tap.',
+      // Slide 3 LIVE SIMULATION
+      'tour.s3.eyebrow': 'LIVE SIMULATION',
+      'tour.s3.title': 'Rent · charges · surface sliders',
+      'tour.s3.subtitle': 'Tune the 3 params per site. IRR, NPV, CAF, EBITDA recalc in 90ms. Per-site persistence, survives reload.',
+      // Slide 4 ATTRACTIVENESS SCORE
+      'tour.s4.eyebrow': 'ATTRACTIVENESS SCORE',
+      'tour.s4.title': 'SAZ · flow · density · youth',
+      'tour.s4.subtitle': '3 animated rings that summarize the zone. Catchment population 3 km + competitors + demographics 15-45.',
+      // Slide 5 P&L 3 SCENARIOS
+      'tour.s5.eyebrow': 'P&L 3 SCENARIOS',
+      'tour.s5.title': 'Conservative · Base · Optimistic',
+      'tour.s5.subtitle': 'Annual revenue, EBITDA, project IRR, NPV, breakeven, payback. Calibrated on OnAir Montreuil (franchise audited by Fiteco).',
+      // Slide 6 FINANCING
+      'tour.s6.eyebrow': 'FINANCING',
+      'tour.s6.title': 'Project IRR vs Equity IRR',
+      'tour.s6.subtitle': '30/70 equity/loan, 6.5% over 7 years. Leverage effect computed, cumulative interest modeled, bank-pitch ready.',
+      // Slide 7 CUSTOM SITES
+      'tour.s7.eyebrow': 'CUSTOM SITES',
+      'tour.s7.title': 'Add an address, auto-analysis',
+      'tour.s7.subtitle': 'Search an address → select → confirm. Catchment, P&L, IRR verdict appear in 2 seconds.',
+      // Slide 8 READY
+      'tour.s8.eyebrow': 'READY',
+      'tour.s8.title': 'Your call',
+      'tour.s8.subtitle': 'Swipe the carousel, tune the variables, compare, defend your case. Have a great pitch.',
+      'tour.s8.cta': 'Start',
 
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Yes',
