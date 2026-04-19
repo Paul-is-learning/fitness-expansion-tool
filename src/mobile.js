@@ -1730,7 +1730,7 @@
     sh.className = 'fp-secondary-sheet';
     sh.innerHTML = `
       <div class="head">
-        <div class="title">${_t('fab.layers').replace('🗺️ ','') + ' & ' + _t('fab.competitors').replace('👥 ','')}</div>
+        <div class="title">${_t('fab.layers') + ' & ' + _t('fab.competitors')}</div>
         <div class="close-btn" id="fpSecondaryClose">&times;</div>
       </div>
       <div class="fp-secondary-tabs" id="fpSecondaryTabs">

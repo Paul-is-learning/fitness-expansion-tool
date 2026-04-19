@@ -157,10 +157,12 @@
       'bp.perMonth': '€/mois',
 
       // ─── FAB secondary sheet ─────────────────────────────────────
-      'fab.layers': '🗺️ Couches',
-      'fab.competitors': '👥 Concurrence',
-      'fab.mySites': '📍 Mes sites',
-      'fab.dashboard': '📊 Dashboard',
+      // Pas d'emojis ici : évite troncature ellipsis sur viewport mobile 375px
+      // (les 4 tabs partagent équitablement la largeur dispo).
+      'fab.layers': 'Couches',
+      'fab.competitors': 'Concurrence',
+      'fab.mySites': 'Mes sites',
+      'fab.dashboard': 'Dashboard',
       'fab.back': 'Retour',
       'fab.close': 'Fermer',
 
@@ -345,10 +347,10 @@
       'bp.perMonth': '€/mo',
 
       // ─── FAB secondary sheet ─────────────────────────────────────
-      'fab.layers': '🗺️ Layers',
-      'fab.competitors': '👥 Competition',
-      'fab.mySites': '📍 My sites',
-      'fab.dashboard': '📊 Dashboard',
+      'fab.layers': 'Layers',
+      'fab.competitors': 'Competition',
+      'fab.mySites': 'My sites',
+      'fab.dashboard': 'Dashboard',
       'fab.back': 'Back',
       'fab.close': 'Close',
 
