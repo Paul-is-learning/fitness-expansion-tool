@@ -7272,9 +7272,354 @@ function showDemoPanel() {
         #demoPanel .dp-saz-pct { font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-.5px }
         #demoPanel .dp-saz-name { font-size:10px;font-weight:700;color:#fff;margin-top:2px }
         #demoPanel .dp-saz-detail { font-size:9px;color:#64748b;margin-top:4px;line-height:1.4 }
+
+        /* ═══════════════════════════════════════════════════════
+           Carousel "Comment ça marche ?" — Apple-like dynamique
+           ═══════════════════════════════════════════════════════ */
+        #demoPanel .hiw-section {
+          padding: 0; overflow: hidden;
+          background: linear-gradient(180deg, rgba(15,20,35,.7), rgba(10,13,23,.9));
+          border: 1px solid rgba(212,160,23,.18);
+        }
+        #demoPanel .hiw-head {
+          padding: 16px 18px 0; position: relative;
+        }
+        #demoPanel .hiw-progress {
+          position: absolute; left: 0; right: 0; top: 0; height: 3px;
+          background: rgba(255,255,255,.05);
+          overflow: hidden;
+        }
+        #demoPanel .hiw-progress-bar {
+          height: 100%; width: 16.66%;
+          background: linear-gradient(90deg, #d4a017, #fbbf24);
+          transition: width .5s cubic-bezier(.34,1.12,.52,1);
+          box-shadow: 0 0 8px rgba(212,160,23,.5);
+        }
+        #demoPanel .hiw-stage {
+          position: relative; min-height: 360px; margin-top: 12px;
+        }
+        #demoPanel .hiw-slide {
+          position: absolute; inset: 0; padding: 0 18px 0;
+          opacity: 0; pointer-events: none;
+          transform: translateX(20px);
+          transition: opacity .45s ease, transform .5s cubic-bezier(.34,1.12,.52,1);
+          display: flex; flex-direction: column; gap: 12px;
+        }
+        #demoPanel .hiw-slide.active {
+          opacity: 1; pointer-events: auto; transform: translateX(0);
+        }
+        #demoPanel .hiw-step-head {
+          display: flex; align-items: center; gap: 12px;
+        }
+        #demoPanel .hiw-step-num {
+          flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+          background: linear-gradient(135deg, rgba(212,160,23,.25), rgba(212,160,23,.08));
+          border: 1px solid rgba(212,160,23,.55);
+          color: var(--accent); font-weight: 800; font-size: 14px;
+          display: flex; align-items: center; justify-content: center;
+        }
+        #demoPanel .hiw-eyebrow {
+          font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
+          text-transform: uppercase; margin-bottom: 4px;
+        }
+        #demoPanel .hiw-title {
+          font-size: 18px; font-weight: 800; color: #fff;
+          letter-spacing: -.3px; margin: 0; line-height: 1.2;
+        }
+        #demoPanel .hiw-desc {
+          font-size: 12px; color: #94a3b8; line-height: 1.55;
+          margin: 0;
+        }
+        #demoPanel .hiw-desc b { color: var(--accent); }
+        #demoPanel .hiw-anim {
+          flex: 1; min-height: 180px;
+          background: rgba(8,11,20,.65); border: 1px solid rgba(255,255,255,.06);
+          border-radius: 12px; padding: 14px;
+          display: flex; align-items: center; justify-content: center;
+          position: relative; overflow: hidden;
+        }
+
+        /* ─── Slide 1 : Cercle chalandise SVG ─── */
+        #demoPanel .hiw-catch-svg { width: 220px; height: 220px; }
+        #demoPanel .hiw-catch-c {
+          stroke-dasharray: var(--l, 500);
+          stroke-dashoffset: var(--l, 500);
+          transform-origin: center;
+        }
+        #demoPanel .hiw-catch-c.c1 { --l: 251; }
+        #demoPanel .hiw-catch-c.c2 { --l: 377; }
+        #demoPanel .hiw-catch-c.c3 { --l: 502; }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-c.c1 {
+          animation: hiwDrawCircle 1s cubic-bezier(.34,1.12,.52,1) .1s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-c.c2 {
+          animation: hiwDrawCircle 1s cubic-bezier(.34,1.12,.52,1) .35s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-c.c3 {
+          animation: hiwDrawCircle 1s cubic-bezier(.34,1.12,.52,1) .6s forwards;
+        }
+        @keyframes hiwDrawCircle { to { stroke-dashoffset: 0; } }
+        #demoPanel .hiw-catch-pin {
+          transform-origin: center;
+          animation: hiwPinPulse 2s ease-in-out infinite;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-glow {
+          animation: hiwPinGlow 2s ease-out infinite;
+        }
+        @keyframes hiwPinPulse {
+          0%,100% { r: 5; }
+          50%     { r: 6.5; }
+        }
+        @keyframes hiwPinGlow {
+          0%   { opacity: .8; r: 6; }
+          100% { opacity: 0;  r: 28; }
+        }
+        #demoPanel .hiw-catch-lbl {
+          opacity: 0;
+          font-family: var(--font);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-lbl:nth-of-type(1) {
+          animation: hiwFadeIn .4s ease .6s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-lbl:nth-of-type(2) {
+          animation: hiwFadeIn .4s ease .85s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-catch-lbl:nth-of-type(3) {
+          animation: hiwFadeIn .4s ease 1.1s forwards;
+        }
+        @keyframes hiwFadeIn { to { opacity: 1; } }
+
+        /* ─── Slide 2 : 3 sources grid ─── */
+        #demoPanel .hiw-sources-grid {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+          width: 100%; align-items: stretch;
+        }
+        #demoPanel .hiw-src {
+          background: rgba(20,28,48,.75); border: 1px solid rgba(255,255,255,.12);
+          border-radius: 10px; padding: 12px 10px;
+          box-shadow: 0 2px 8px rgba(0,0,0,.25);
+          opacity: 0; transform: translateY(16px) scale(.96);
+          transition: opacity .5s ease, transform .6s cubic-bezier(.34,1.56,.52,1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-src:nth-child(1) {
+          transition-delay: .1s; opacity: 1; transform: translateY(0) scale(1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-src:nth-child(2) {
+          transition-delay: .25s; opacity: 1; transform: translateY(0) scale(1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-src:nth-child(3) {
+          transition-delay: .4s; opacity: 1; transform: translateY(0) scale(1);
+        }
+        #demoPanel .hiw-src-icon { font-size: 24px; margin-bottom: 6px; }
+        #demoPanel .hiw-src-title { font-size: 12px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        #demoPanel .hiw-src-desc { font-size: 10px; color: #94a3b8; line-height: 1.5; }
+
+        /* ─── Slide 3 : SAZ 3 piliers avec rings ─── */
+        #demoPanel .hiw-saz {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+          width: 100%;
+        }
+        #demoPanel .hiw-saz-pil {
+          background: rgba(20,28,48,.75); border: 1px solid rgba(255,255,255,.12);
+          border-radius: 10px; padding: 10px 8px;
+          display: flex; flex-direction: column; align-items: center; text-align: center;
+          box-shadow: 0 2px 8px rgba(0,0,0,.25);
+          opacity: 0; transform: translateY(16px);
+          transition: opacity .5s ease, transform .6s cubic-bezier(.34,1.12,.52,1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(1) {
+          transition-delay: .1s; opacity: 1; transform: translateY(0);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(2) {
+          transition-delay: .25s; opacity: 1; transform: translateY(0);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(3) {
+          transition-delay: .4s; opacity: 1; transform: translateY(0);
+        }
+        #demoPanel .hiw-saz-ring { width: 50px; height: 50px; transform: rotate(-90deg); }
+        #demoPanel .hiw-saz-ring-fg {
+          stroke-dashoffset: var(--perim, 163);
+          transition: stroke-dashoffset 1.1s cubic-bezier(.34,1.12,.52,1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(1) .hiw-saz-ring-fg {
+          stroke-dashoffset: var(--dashoffset, 55);
+          transition-delay: .3s;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(2) .hiw-saz-ring-fg {
+          stroke-dashoffset: var(--dashoffset, 55);
+          transition-delay: .45s;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-saz-pil:nth-child(3) .hiw-saz-ring-fg {
+          stroke-dashoffset: var(--dashoffset, 54);
+          transition-delay: .6s;
+        }
+        #demoPanel .hiw-saz-pct { font-size: 16px; font-weight: 900; margin-top: 4px; letter-spacing: -.5px; }
+        #demoPanel .hiw-saz-name { font-size: 9px; font-weight: 800; letter-spacing: .8px; margin-top: 2px; }
+        #demoPanel .hiw-saz-detail { font-size: 8.5px; color: #64748b; margin-top: 4px; line-height: 1.4; }
+        #demoPanel .hiw-verdict {
+          font-size: 10.5px; color: #64748b; margin: 6px 0 0; text-align: center;
+        }
+        #demoPanel .hiw-verdict b { color: var(--accent); }
+
+        /* ─── Slide 4 : Formule captage ─── */
+        #demoPanel .hiw-formula {
+          display: flex; flex-direction: column; gap: 8px;
+          width: 100%; font-family: ui-monospace, monospace;
+        }
+        #demoPanel .hiw-fline {
+          display: grid; grid-template-columns: 100px 18px 1fr; gap: 8px;
+          align-items: baseline;
+          font-size: 11px; color: #cbd5e1;
+          opacity: 0; transform: translateX(-12px);
+          transition: opacity .4s ease, transform .5s cubic-bezier(.34,1.12,.52,1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-fline:nth-child(1) { transition-delay: .1s; opacity: 1; transform: translateX(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-fline:nth-child(2) { transition-delay: .3s; opacity: 1; transform: translateX(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-fline:nth-child(3) { transition-delay: .5s; opacity: 1; transform: translateX(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-fline:nth-child(4) { transition-delay: .7s; opacity: 1; transform: translateX(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-fline:nth-child(5) { transition-delay: .95s; opacity: 1; transform: translateX(0); }
+        #demoPanel .hiw-fk { color: #94a3b8; font-weight: 700; }
+        #demoPanel .hiw-feq { color: var(--accent); font-weight: 800; text-align: center; }
+        #demoPanel .hiw-fv { color: #cbd5e1; font-size: 10.5px; }
+        #demoPanel .hiw-ftotal { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+        #demoPanel .hiw-ftotal .hiw-fk,
+        #demoPanel .hiw-ftotal .hiw-fv { color: #fff; font-size: 13px; font-weight: 800; }
+        #demoPanel .hiw-ftotal .hiw-total-v { color: #34d399; }
+
+        /* ─── Slide 5 : P&L 3 scénarios ─── */
+        #demoPanel .hiw-pnl {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+          width: 100%;
+        }
+        #demoPanel .hiw-pnl-s {
+          background: linear-gradient(180deg, rgba(42,52,78,.95) 0%, rgba(28,36,56,.95) 100%);
+          border-radius: 10px;
+          border-top: 3px solid var(--c, #d4a017);
+          border-left: 1px solid rgba(255,255,255,.12);
+          border-right: 1px solid rgba(255,255,255,.12);
+          border-bottom: 1px solid rgba(255,255,255,.12);
+          padding: 12px 10px 14px;
+          box-shadow: 0 4px 12px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);
+          opacity: 0; transform: translateY(14px);
+          transition: opacity .5s ease, transform .6s cubic-bezier(.34,1.56,.52,1);
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(1) { transition-delay: .1s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(2) { transition-delay: .25s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(3) { transition-delay: .4s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-pnl-lbl {
+          font-size: 8px; font-weight: 800; letter-spacing: .6px;
+          text-transform: uppercase; color: var(--c, #d4a017);
+        }
+        #demoPanel .hiw-pnl-lbl.hiw-pnl-base { color: #d4a017; }
+        #demoPanel .hiw-pnl-irr {
+          margin-top: 6px; font-size: 20px; font-weight: 900;
+          color: #fff; font-variant-numeric: tabular-nums;
+        }
+        #demoPanel .hiw-pnl-bar {
+          margin-top: 8px; height: 4px; border-radius: 2px;
+          background: rgba(255,255,255,.08); overflow: hidden;
+        }
+        #demoPanel .hiw-pnl-fill {
+          height: 100%; background: var(--c, #d4a017); width: 0%;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(1) .hiw-pnl-fill {
+          animation: hiwPnlBar 1s cubic-bezier(.34,1.12,.52,1) .3s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(2) .hiw-pnl-fill {
+          animation: hiwPnlBar 1s cubic-bezier(.34,1.12,.52,1) .45s forwards;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-pnl-s:nth-child(3) .hiw-pnl-fill {
+          animation: hiwPnlBar 1s cubic-bezier(.34,1.12,.52,1) .6s forwards;
+        }
+        @keyframes hiwPnlBar {
+          0% { width: 0%; } 100% { width: var(--fill, 50%); }
+        }
+        #demoPanel .hiw-footnote {
+          font-size: 10px; color: #64748b; margin: 6px 0 0; text-align: center;
+        }
+
+        /* ─── Slide 6 : Dashboard ─── */
+        #demoPanel .hiw-dashboard {
+          display: flex; flex-direction: column; gap: 4px;
+          width: 100%;
+        }
+        #demoPanel .hiw-row {
+          display: grid; grid-template-columns: 1.6fr .6fr 1fr .9fr .9fr;
+          gap: 6px; align-items: center;
+          padding: 8px 10px;
+          background: linear-gradient(180deg, rgba(42,52,78,.85) 0%, rgba(28,36,56,.85) 100%);
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,.1);
+          box-shadow: 0 1px 3px rgba(0,0,0,.25);
+          font-size: 11px; color: #e2e8f0;
+          font-variant-numeric: tabular-nums;
+          opacity: 0; transform: translateY(8px);
+          transition: opacity .4s ease, transform .5s cubic-bezier(.34,1.12,.52,1);
+        }
+        #demoPanel .hiw-row-header {
+          background: rgba(212,160,23,.08); color: var(--accent);
+          font-size: 10px; font-weight: 800; letter-spacing: .5px;
+          text-transform: uppercase;
+        }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(1) { transition-delay: .0s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(2) { transition-delay: .15s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(3) { transition-delay: .3s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(4) { transition-delay: .45s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(5) { transition-delay: .6s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-slide.active.ready .hiw-row:nth-child(6) { transition-delay: .75s; opacity: 1; transform: translateY(0); }
+        #demoPanel .hiw-v {
+          font-size: 9px; font-weight: 800; letter-spacing: .4px;
+          padding: 3px 6px; border-radius: 4px; text-align: center;
+        }
+        #demoPanel .hiw-v.go    { background: rgba(52,211,153,.18); color: #34d399; }
+        #demoPanel .hiw-v.cond  { background: rgba(212,160,23,.18); color: #d4a017; }
+        #demoPanel .hiw-v.watch { background: rgba(249,115,22,.18); color: #f97316; }
+
+        /* ─── Navigation footer ─── */
+        #demoPanel .hiw-nav {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 12px; padding: 14px 18px 18px;
+          border-top: 1px solid rgba(255,255,255,.05);
+          margin-top: 8px;
+        }
+        #demoPanel .hiw-nav-btn {
+          flex: 0 0 auto; min-width: 44px; height: 36px; padding: 0 14px;
+          background: rgba(212,160,23,.12);
+          border: 1px solid rgba(212,160,23,.35);
+          border-radius: 10px;
+          color: var(--accent); font-size: 12px; font-weight: 700;
+          cursor: pointer; transition: background .2s, transform .15s, opacity .2s;
+          font-family: var(--font);
+        }
+        #demoPanel .hiw-nav-btn:hover:not(:disabled) {
+          background: rgba(212,160,23,.22);
+          transform: translateY(-1px);
+        }
+        #demoPanel .hiw-nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+        #demoPanel .hiw-next { background: linear-gradient(135deg, #d4a017, #b8890f); color: #0a0d17; }
+        #demoPanel .hiw-next:hover:not(:disabled) { background: linear-gradient(135deg, #e0b020, #c49512); }
+        #demoPanel .hiw-dots {
+          display: flex; gap: 6px; align-items: center;
+        }
+        #demoPanel .hiw-dot {
+          width: 6px; height: 6px; border-radius: 3px;
+          background: rgba(255,255,255,.2);
+          cursor: pointer;
+          transition: width .35s cubic-bezier(.34,1.6,.52,1), background .3s;
+        }
+        #demoPanel .hiw-dot.active {
+          width: 20px; background: var(--accent);
+          box-shadow: 0 0 8px rgba(212,160,23,.6);
+        }
+
         @media (max-width: 640px) {
           #demoPanel .dp-grid-sources { grid-template-columns:1fr }
           #demoPanel .dp-saz { flex-direction:column }
+          #demoPanel .hiw-sources-grid { grid-template-columns: 1fr; }
+          #demoPanel .hiw-saz { grid-template-columns: 1fr; }
+          #demoPanel .hiw-pnl { grid-template-columns: 1fr; }
+          #demoPanel .hiw-stage { min-height: 460px; }
+          #demoPanel .hiw-row { grid-template-columns: 1.4fr .5fr .8fr .8fr .8fr; font-size: 10px; }
         }
       </style>
 
@@ -7297,119 +7642,184 @@ function showDemoPanel() {
         </div>
       </div>
 
-      <!-- Section 2: Comment ça marche (dépliable) -->
-      <div class="dp-section" id="dpHowItWorks">
-        <div class="dp-section-head" onclick="this.parentElement.classList.toggle('open')">
+      <!-- Section 2: Comment ça marche (carousel Apple-like dynamique) -->
+      <div class="dp-section hiw-section" id="dpHowItWorks">
+        <div class="hiw-head">
           <div class="dp-section-title"><span style="font-size:18px">📖</span> <span data-i18n="demopanel.how.title">Comment ça marche ?</span></div>
-          <div class="dp-section-chev">▶</div>
+          <div class="hiw-progress"><div class="hiw-progress-bar"></div></div>
         </div>
-        <div class="dp-section-body">
 
-          <!-- Étape 1 -->
-          <div class="dp-step">
-            <div class="dp-step-num">1</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s1.title">Tu cliques sur la carte</h4>
-              <p data-i18n="demopanel.s1.desc.html">Un cercle apparaît autour du site candidat. C'est la <b>zone de chalandise</b> (rayon 1-5 km, slider). Tout ce qui tombe dedans devient ton bassin d'opportunité.</p>
-              <div class="dp-step-viz">        ◯ ← 2 km (confort fitness urbain)
-       ╱ ╲
-      ╱   ╲
-     │ 📍 │   ← ton site candidat
-      ╲   ╱
-       ╲ ╱
-        ◯</div>
+        <div class="hiw-stage">
+          <!-- SLIDE 1 : Cercle de chalandise (SVG) -->
+          <div class="hiw-slide active" data-hiw-idx="0">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">1</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#d4a017" data-i18n="hiw.s1.eyebrow">ÉTAPE 1 · CHALANDISE</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s1.title">Tu cliques sur la carte</h3>
+              </div>
+            </div>
+            <p class="hiw-desc" data-i18n="demopanel.s1.desc.html">Un cercle apparaît autour du site candidat. C'est la <b>zone de chalandise</b> (rayon 1-5 km, slider). Tout ce qui tombe dedans devient ton bassin d'opportunité.</p>
+            <div class="hiw-anim">
+              <svg class="hiw-catch-svg" viewBox="0 0 200 200" aria-hidden="true">
+                <!-- Cercles de chalandise en layers -->
+                <circle class="hiw-catch-c c3" cx="100" cy="100" r="80" fill="none" stroke="rgba(212,160,23,.08)" stroke-width="1.5" stroke-dasharray="3 4"/>
+                <circle class="hiw-catch-c c2" cx="100" cy="100" r="60" fill="none" stroke="rgba(212,160,23,.22)" stroke-width="1.5" stroke-dasharray="3 4"/>
+                <circle class="hiw-catch-c c1" cx="100" cy="100" r="40" fill="none" stroke="#d4a017" stroke-width="2"/>
+                <circle class="hiw-catch-glow" cx="100" cy="100" r="6" fill="#d4a017" opacity="0"/>
+                <circle class="hiw-catch-pin" cx="100" cy="100" r="5" fill="#d4a017"/>
+                <!-- Labels radii -->
+                <text class="hiw-catch-lbl" x="100" y="55" text-anchor="middle" fill="rgba(212,160,23,.6)" font-size="9" font-weight="700">2 km</text>
+                <text class="hiw-catch-lbl" x="100" y="35" text-anchor="middle" fill="rgba(212,160,23,.45)" font-size="8" font-weight="600">3 km</text>
+                <text class="hiw-catch-lbl" x="100" y="15" text-anchor="middle" fill="rgba(212,160,23,.3)" font-size="7" font-weight="600">5 km</text>
+              </svg>
             </div>
           </div>
 
-          <!-- Étape 2 -->
-          <div class="dp-step">
-            <div class="dp-step-num">2</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s2.title">3 sources de data se croisent</h4>
-              <p data-i18n="demopanel.s2.desc">La plateforme interroge en temps réel ou depuis sa base calibrée les sources publiques les plus fiables pour Bucharest.</p>
-              <div class="dp-grid-sources">
-                <div class="dp-src">
-                  <div class="dp-src-icon">🏠</div>
-                  <div class="dp-src-title" data-i18n="demopanel.s2.src1.title">Population</div>
-                  <div class="dp-src-desc" data-i18n="demopanel.s2.src1.desc">OSM + Census INS 2021. 397k bâtiments volumétriques, 83 quartiers, population réelle ×1.7 (navetteurs Ilfov).</div>
-                </div>
-                <div class="dp-src">
-                  <div class="dp-src-icon">🏋️</div>
-                  <div class="dp-src-title" data-i18n="demopanel.s2.src2.title">Concurrents</div>
-                  <div class="dp-src-desc" data-i18n="demopanel.s2.src2.desc">Overpass API live + base vérifiée 92 clubs (WC, StayFit, 18GYM, Downtown, Nr1…).</div>
-                </div>
-                <div class="dp-src">
-                  <div class="dp-src-icon">🚇</div>
-                  <div class="dp-src-title" data-i18n="demopanel.s2.src3.title">Flux & POI</div>
-                  <div class="dp-src-desc" data-i18n="demopanel.s2.src3.desc">Google Routes + OSM. Isochrones 10min marche/voiture/métro, 14 universités, 13 malls, 5 pôles bureaux.</div>
-                </div>
+          <!-- SLIDE 2 : 3 sources de data -->
+          <div class="hiw-slide" data-hiw-idx="1">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">2</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#60a5fa" data-i18n="hiw.s2.eyebrow">ÉTAPE 2 · DATA</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s2.title">3 sources de data se croisent</h3>
+              </div>
+            </div>
+            <p class="hiw-desc" data-i18n="demopanel.s2.desc">La plateforme interroge en temps réel ou depuis sa base calibrée les sources publiques les plus fiables pour Bucharest.</p>
+            <div class="hiw-anim hiw-sources-grid">
+              <div class="hiw-src">
+                <div class="hiw-src-icon">🏠</div>
+                <div class="hiw-src-title" data-i18n="demopanel.s2.src1.title">Population</div>
+                <div class="hiw-src-desc" data-i18n="demopanel.s2.src1.desc">OSM + Census INS 2021. 397k bâtiments, 83 quartiers, pop ×1.7 (navetteurs Ilfov).</div>
+              </div>
+              <div class="hiw-src">
+                <div class="hiw-src-icon">🏋️</div>
+                <div class="hiw-src-title" data-i18n="demopanel.s2.src2.title">Concurrents</div>
+                <div class="hiw-src-desc" data-i18n="demopanel.s2.src2.desc">Overpass live + base 92 clubs (WC, StayFit, 18GYM, Downtown, Nr1…).</div>
+              </div>
+              <div class="hiw-src">
+                <div class="hiw-src-icon">🚇</div>
+                <div class="hiw-src-title" data-i18n="demopanel.s2.src3.title">Flux & POI</div>
+                <div class="hiw-src-desc" data-i18n="demopanel.s2.src3.desc">Google Routes + OSM. Isochrones 10min, 14 universités, 13 malls, 5 pôles bureaux.</div>
               </div>
             </div>
           </div>
 
-          <!-- Étape 3 -->
-          <div class="dp-step">
-            <div class="dp-step-num">3</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s3.title">Le SAZ pondère 3 piliers</h4>
-              <p data-i18n="demopanel.s3.desc">Score d'Attractivité de Zone 0-100, calibré sur les critères clés de succès d'un club fitness urbain à fort traffic. Poids ajustables par slider.</p>
-              <div class="dp-saz">
-                <div class="dp-saz-pil">
-                  <div class="dp-saz-pct">33%</div>
-                  <div class="dp-saz-name" style="color:#06b6d4" data-i18n="demopanel.s3.flux">FLUX</div>
-                  <div class="dp-saz-detail" data-i18n="demopanel.s3.fluxDet">métro · malls · bureaux · universités · piétons</div>
-                </div>
-                <div class="dp-saz-pil">
-                  <div class="dp-saz-pct">33%</div>
-                  <div class="dp-saz-name" style="color:#8b5cf6" data-i18n="demopanel.s3.dens">DENSITÉ</div>
-                  <div class="dp-saz-detail" data-i18n="demopanel.s3.densDet">pop 15-45 · pouvoir d'achat · concurrence inverse</div>
-                </div>
-                <div class="dp-saz-pil">
-                  <div class="dp-saz-pct">34%</div>
-                  <div class="dp-saz-name" style="color:#10b981" data-i18n="demopanel.s3.youth">JEUNESSE</div>
-                  <div class="dp-saz-detail" data-i18n="demopanel.s3.youthDet">universités · âge quartier · nouveaux résidentiels</div>
-                </div>
+          <!-- SLIDE 3 : SAZ 3 piliers -->
+          <div class="hiw-slide" data-hiw-idx="2">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">3</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#8b5cf6" data-i18n="hiw.s3.eyebrow">ÉTAPE 3 · SCORE</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s3.title">Le SAZ pondère 3 piliers</h3>
               </div>
-              <p style="font-size:10.5px;color:#64748b;margin-top:4px" data-i18n="demopanel.s3.verdict.html"><b>Verdict</b> : GO (70+) · GO COND (45-69) · WATCH (30-44) · NO-GO (&lt;30)</p>
+            </div>
+            <p class="hiw-desc" data-i18n="demopanel.s3.desc">Score d'Attractivité de Zone 0-100, calibré sur les critères clés de succès d'un club fitness urbain à fort traffic. Poids ajustables par slider.</p>
+            <div class="hiw-anim hiw-saz">
+              <div class="hiw-saz-pil">
+                <svg class="hiw-saz-ring" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="4"/><circle class="hiw-saz-ring-fg" cx="30" cy="30" r="26" fill="none" stroke="#06b6d4" stroke-width="4" stroke-linecap="round" stroke-dasharray="163" style="--perim:163;--dashoffset:55"/></svg>
+                <div class="hiw-saz-pct" style="color:#06b6d4"><span data-counter data-target="33" data-suffix="%" data-format="integer">0%</span></div>
+                <div class="hiw-saz-name" style="color:#06b6d4" data-i18n="demopanel.s3.flux">FLUX</div>
+                <div class="hiw-saz-detail" data-i18n="demopanel.s3.fluxDet">métro · malls · bureaux · universités · piétons</div>
+              </div>
+              <div class="hiw-saz-pil">
+                <svg class="hiw-saz-ring" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="4"/><circle class="hiw-saz-ring-fg" cx="30" cy="30" r="26" fill="none" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round" stroke-dasharray="163" style="--perim:163;--dashoffset:55"/></svg>
+                <div class="hiw-saz-pct" style="color:#8b5cf6"><span data-counter data-target="33" data-suffix="%" data-format="integer" data-delay="180">0%</span></div>
+                <div class="hiw-saz-name" style="color:#8b5cf6" data-i18n="demopanel.s3.dens">DENSITÉ</div>
+                <div class="hiw-saz-detail" data-i18n="demopanel.s3.densDet">pop 15-45 · pouvoir d'achat · concurrence inverse</div>
+              </div>
+              <div class="hiw-saz-pil">
+                <svg class="hiw-saz-ring" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="4"/><circle class="hiw-saz-ring-fg" cx="30" cy="30" r="26" fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-dasharray="163" style="--perim:163;--dashoffset:54"/></svg>
+                <div class="hiw-saz-pct" style="color:#10b981"><span data-counter data-target="34" data-suffix="%" data-format="integer" data-delay="360">0%</span></div>
+                <div class="hiw-saz-name" style="color:#10b981" data-i18n="demopanel.s3.youth">JEUNESSE</div>
+                <div class="hiw-saz-detail" data-i18n="demopanel.s3.youthDet">universités · âge quartier · nouveaux résidentiels</div>
+              </div>
+            </div>
+            <p class="hiw-verdict" data-i18n="demopanel.s3.verdict.html"><b>Verdict</b> : GO (70+) · GO COND (45-69) · WATCH (30-44) · NO-GO (&lt;30)</p>
+          </div>
+
+          <!-- SLIDE 4 : Captage formule -->
+          <div class="hiw-slide" data-hiw-idx="3">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">4</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#f97316" data-i18n="hiw.s4.eyebrow">ÉTAPE 4 · CAPTAGE</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s4.title">Le captage projette les membres</h3>
+              </div>
+            </div>
+            <p class="hiw-desc" data-i18n="demopanel.s4.desc">Pour chaque club concurrent dans le rayon, 4 facteurs calculent combien de membres switchent vers FP.</p>
+            <div class="hiw-anim hiw-formula">
+              <div class="hiw-fline"><span class="hiw-fk">Captifs</span><span class="hiw-feq">=</span><span class="hiw-fv">taux_base × decay_distance × note_Google × élasticité_prix</span></div>
+              <div class="hiw-fline"><span class="hiw-fk">Natifs</span><span class="hiw-feq">=</span><span class="hiw-fv">pop non-inscrite × conversion sectorielle</span></div>
+              <div class="hiw-fline"><span class="hiw-fk">Walk-in</span><span class="hiw-feq">=</span><span class="hiw-fv">0,7% × visiteurs mall (si en CC)</span></div>
+              <div class="hiw-fline"><span class="hiw-fk">Dest. bonus</span><span class="hiw-feq">=</span><span class="hiw-fv">proximité POI premium (malls prestige, bureaux)</span></div>
+              <div class="hiw-fline hiw-ftotal"><span class="hiw-fk">TOTAL</span><span class="hiw-feq">=</span><span class="hiw-fv hiw-total-v"><span data-counter data-target="4823" data-format="fr-thousands" data-delay="1000">0</span> membres théoriques A3</span></div>
             </div>
           </div>
 
-          <!-- Étape 4 -->
-          <div class="dp-step">
-            <div class="dp-step-num">4</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s4.title">Le captage projette les membres</h4>
-              <p data-i18n="demopanel.s4.desc">Pour chaque club concurrent dans le rayon, 4 facteurs calculent combien de membres switchent vers FP.</p>
-              <div class="dp-step-viz">Captifs    = taux_base × decay_distance × note_Google × élasticité_prix
-Natifs     = pop non-inscrite × conversion sectorielle
-Walk-in    = 0,7% × visiteurs mall (si club en centre commercial)
-Dest. bonus = proximité POI premium (malls prestige, bureaux)
-─────────────────────────────────────
-TOTAL      = membres théoriques à maturité A3 (3 ans)</div>
+          <!-- SLIDE 5 : P&L scénarios -->
+          <div class="hiw-slide" data-hiw-idx="4">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">5</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#34d399" data-i18n="hiw.s5.eyebrow">ÉTAPE 5 · P&L</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s5.title">Le P&L tombe directement</h3>
+              </div>
             </div>
+            <p class="hiw-desc" data-i18n="demopanel.s5.desc">Membres × 28€/mois × ramp-up (A1 70% / A2 90% / A3 100%) → CA, EBITDA, IRR projet, IRR equity, NPV, breakeven, payback en 3 scénarios.</p>
+            <div class="hiw-anim hiw-pnl">
+              <div class="hiw-pnl-s" style="--c:#f87171;--fill:36%">
+                <div class="hiw-pnl-lbl" data-i18n="hiw.s5.conservative">CONSERVATEUR</div>
+                <div class="hiw-pnl-irr"><span data-counter data-target="36" data-prefix="+" data-suffix="%" data-delay="0">+0%</span></div>
+                <div class="hiw-pnl-bar"><div class="hiw-pnl-fill"></div></div>
+              </div>
+              <div class="hiw-pnl-s" style="--c:#d4a017;--fill:57%">
+                <div class="hiw-pnl-lbl hiw-pnl-base" data-i18n="hiw.s5.base">BASE</div>
+                <div class="hiw-pnl-irr"><span data-counter data-target="57.6" data-prefix="+" data-suffix="%" data-format="fr-decimal" data-delay="150">+0%</span></div>
+                <div class="hiw-pnl-bar"><div class="hiw-pnl-fill"></div></div>
+              </div>
+              <div class="hiw-pnl-s" style="--c:#34d399;--fill:86%">
+                <div class="hiw-pnl-lbl" data-i18n="hiw.s5.optimistic">OPTIMISTE</div>
+                <div class="hiw-pnl-irr"><span data-counter data-target="86" data-prefix="+" data-suffix="%" data-delay="300">+0%</span></div>
+                <div class="hiw-pnl-bar"><div class="hiw-pnl-fill"></div></div>
+              </div>
+            </div>
+            <p class="hiw-footnote" data-i18n="hiw.s5.footnote">Modèle calibré OnAir Montreuil (franchise FP auditée Fiteco). CA 2,24 M€ · EBITDA 44,7% à maturité.</p>
           </div>
 
-          <!-- Étape 5 -->
-          <div class="dp-step">
-            <div class="dp-step-num">5</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s5.title">Le P&L tombe directement</h4>
-              <p data-i18n="demopanel.s5.desc">Membres × 28€/mois × ramp-up (A1 70% / A2 90% / A3 100%) → CA, EBITDA, IRR projet, IRR equity, NPV, breakeven, payback en 3 scénarios (conservateur / base / optimiste).</p>
-              <div class="dp-step-viz">Modèle calibré OnAir Montreuil (franchise auditée Fiteco)
-CA 2.24M€ · EBITDA 44.7% · Net 25.4% à maturité
-Sliders loyer + charges + surface ajustables par site (persistants)</div>
+          <!-- SLIDE 6 : Dashboard comparaison -->
+          <div class="hiw-slide" data-hiw-idx="5">
+            <div class="hiw-step-head">
+              <div class="hiw-step-num">6</div>
+              <div>
+                <div class="hiw-eyebrow" style="color:#a78bfa" data-i18n="hiw.s6.eyebrow">ÉTAPE 6 · DÉCISION</div>
+                <h3 class="hiw-title" data-i18n="demopanel.s6.title">Tu compares et tu décides</h3>
+              </div>
+            </div>
+            <p class="hiw-desc" data-i18n="demopanel.s6.desc.html">Dashboard avec tableau triable · export CSV · comparaison 2 sites côte à côte · détection cannibalisation (&lt;1,5 km = critique). Tu arbitres avec des chiffres, pas avec des intuitions.</p>
+            <div class="hiw-anim hiw-dashboard">
+              <div class="hiw-row hiw-row-header"><span>Site</span><span>SAZ</span><span>Membres</span><span>IRR</span><span>Verdict</span></div>
+              <div class="hiw-row" data-verdict="go"><span>Hala Laminor</span><span>78</span><span>7 093</span><span style="color:#34d399">+57,6%</span><span class="hiw-v go">GO</span></div>
+              <div class="hiw-row" data-verdict="go"><span>Baneasa</span><span>74</span><span>8 762</span><span style="color:#34d399">+60,5%</span><span class="hiw-v go">GO</span></div>
+              <div class="hiw-row" data-verdict="cond"><span>Unirea</span><span>68</span><span>5 810</span><span style="color:#d4a017">+40,6%</span><span class="hiw-v cond">COND</span></div>
+              <div class="hiw-row" data-verdict="watch"><span>Militari</span><span>52</span><span>3 339</span><span style="color:#f97316">+8,3%</span><span class="hiw-v watch">WATCH</span></div>
+              <div class="hiw-row" data-verdict="watch"><span>Grand Arena</span><span>48</span><span>3 135</span><span style="color:#f87171">+3,6%</span><span class="hiw-v watch">WATCH</span></div>
             </div>
           </div>
+        </div>
 
-          <!-- Étape 6 -->
-          <div class="dp-step">
-            <div class="dp-step-num">6</div>
-            <div class="dp-step-body">
-              <h4 data-i18n="demopanel.s6.title">Tu compares et tu décides</h4>
-              <p data-i18n="demopanel.s6.desc.html">Dashboard avec tableau triable · export CSV · comparaison 2 sites côte à côte · détection cannibalisation (&lt;1,5 km = critique). Tu arbitres avec des chiffres, pas avec des intuitions.</p>
-            </div>
+        <!-- Navigation footer -->
+        <div class="hiw-nav">
+          <button class="hiw-nav-btn hiw-prev" type="button" disabled>◀</button>
+          <div class="hiw-dots">
+            <div class="hiw-dot active"></div>
+            <div class="hiw-dot"></div>
+            <div class="hiw-dot"></div>
+            <div class="hiw-dot"></div>
+            <div class="hiw-dot"></div>
+            <div class="hiw-dot"></div>
           </div>
-
+          <button class="hiw-nav-btn hiw-next" type="button"><span data-i18n="hiw.next">Suivant</span> ▶</button>
         </div>
       </div>
     </div>
@@ -7417,8 +7827,94 @@ Sliders loyer + charges + surface ajustables par site (persistants)</div>
   document.body.appendChild(panel);
   try { window.applyI18n?.(panel); } catch {}
 
-  // Ouvre par défaut la section "Comment ça marche" pour que le contenu soit visible d'entrée
-  panel.querySelector('#dpHowItWorks')?.classList.add('open');
+  // ─── Logique du carousel "Comment ça marche ?" ─────────────────────
+  // 6 slides, navigation prev/next, dots, animations stagger via .ready class.
+  (function initHiwCarousel() {
+    const stage = panel.querySelector('.hiw-stage');
+    const slides = panel.querySelectorAll('.hiw-slide');
+    const dots = panel.querySelectorAll('.hiw-dot');
+    const prevBtn = panel.querySelector('.hiw-prev');
+    const nextBtn = panel.querySelector('.hiw-next');
+    const progressBar = panel.querySelector('.hiw-progress-bar');
+    if (!stage || !slides.length) return;
+    let idx = 0;
+    const total = slides.length;
+
+    // Animation des counters via window.fpOnbAnimateCounters (exposée par onboarding-tour.js).
+    // Fallback: animation inline si l'API n'est pas disponible.
+    function runCounters(slide) {
+      const counters = slide.querySelectorAll('[data-counter]');
+      counters.forEach(el => {
+        const target = parseFloat(el.dataset.target || '0');
+        const suffix = el.dataset.suffix || '';
+        const prefix = el.dataset.prefix || '';
+        const format = el.dataset.format || '';
+        const delay = parseInt(el.dataset.delay || '0', 10);
+        const duration = 950;
+        const kick = () => {
+          const start = Date.now();
+          const timer = setInterval(() => {
+            const t = Math.min(1, (Date.now() - start) / duration);
+            const eased = 1 - Math.pow(1 - t, 3);
+            const v = target * eased;
+            let s;
+            if (format === 'fr-decimal') s = v.toFixed(1).replace('.', ',');
+            else if (format === 'fr-thousands') s = Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            else if (format === 'integer') s = Math.round(v).toString();
+            else s = v.toFixed(target % 1 === 0 ? 0 : 1);
+            el.textContent = prefix + s + suffix;
+            if (t >= 1) clearInterval(timer);
+          }, 33);
+        };
+        el.textContent = prefix + (format === 'fr-decimal' ? '0,0' : '0') + suffix;
+        if (delay > 0) setTimeout(kick, delay);
+        else kick();
+      });
+    }
+
+    function goTo(newIdx) {
+      if (newIdx < 0 || newIdx >= total) return;
+      const prev = slides[idx];
+      const next = slides[newIdx];
+      prev.classList.remove('active', 'ready');
+      next.classList.remove('leaving-left','leaving-right');
+      next.classList.add('active');
+      // Force reflow pour que la transition joue
+      void next.offsetWidth;
+      setTimeout(() => {
+        next.classList.add('ready');
+        runCounters(next);
+      }, 50);
+      dots.forEach((d, i) => d.classList.toggle('active', i === newIdx));
+      prevBtn.disabled = newIdx === 0;
+      nextBtn.innerHTML = newIdx === total - 1
+        ? '<span data-i18n="hiw.restart">Rejouer</span> ↻'
+        : '<span data-i18n="hiw.next">Suivant</span> ▶';
+      try { window.applyI18n?.(nextBtn); } catch {}
+      if (progressBar) progressBar.style.width = ((newIdx + 1) / total * 100) + '%';
+      idx = newIdx;
+    }
+
+    prevBtn.addEventListener('click', () => goTo(idx - 1));
+    nextBtn.addEventListener('click', () => {
+      if (idx === total - 1) goTo(0);  // Rejouer
+      else goTo(idx + 1);
+    });
+    dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+
+    // Keyboard inside the panel
+    panel.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' && idx < total - 1) { e.preventDefault(); goTo(idx + 1); }
+      else if (e.key === 'ArrowLeft' && idx > 0) { e.preventDefault(); goTo(idx - 1); }
+    });
+
+    // Initial: slide 0 déjà en .active. Lance ready + counters après petit delay.
+    setTimeout(() => {
+      slides[0].classList.add('ready');
+      runCounters(slides[0]);
+      if (progressBar) progressBar.style.width = (100 / total) + '%';
+    }, 150);
+  })();
 
   // Escape pour fermer
   const onEsc = (e) => { if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onEsc); } };

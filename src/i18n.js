@@ -367,6 +367,20 @@
       'demopanel.s6.title': "Tu compares et tu décides",
       'demopanel.s6.desc.html': "Dashboard avec tableau triable · export CSV · comparaison 2 sites côte à côte · détection cannibalisation (&lt;1,5 km = critique). Tu arbitres avec des chiffres, pas avec des intuitions.",
 
+      // ─── Desktop: HIW carousel (How It Works) eyebrows + nav ─────
+      'hiw.s1.eyebrow': 'ÉTAPE 1 · CHALANDISE',
+      'hiw.s2.eyebrow': 'ÉTAPE 2 · DATA',
+      'hiw.s3.eyebrow': 'ÉTAPE 3 · SCORE',
+      'hiw.s4.eyebrow': 'ÉTAPE 4 · CAPTAGE',
+      'hiw.s5.eyebrow': 'ÉTAPE 5 · P&L',
+      'hiw.s6.eyebrow': 'ÉTAPE 6 · DÉCISION',
+      'hiw.s5.conservative': 'CONSERVATEUR',
+      'hiw.s5.base': 'BASE',
+      'hiw.s5.optimistic': 'OPTIMISTE',
+      'hiw.s5.footnote': 'Modèle calibré OnAir Montreuil (franchise FP auditée Fiteco). CA 2,24 M€ · EBITDA 44,7% à maturité.',
+      'hiw.next': 'Suivant',
+      'hiw.restart': 'Rejouer',
+
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Oui',
       'common.no': 'Non',
@@ -722,6 +736,20 @@
       'demopanel.s5.desc': 'Members × 28€/mo × ramp-up (Y1 70% / Y2 90% / Y3 100%) → Revenue, EBITDA, project IRR, equity IRR, NPV, breakeven, payback in 3 scenarios (conservative / base / optimistic).',
       'demopanel.s6.title': 'Compare and decide',
       'demopanel.s6.desc.html': 'Sortable dashboard table · CSV export · side-by-side comparison · cannibalisation detection (&lt;1.5 km = critical). You decide with numbers, not hunches.',
+
+      // ─── Desktop: HIW carousel eyebrows + nav ────────────────────
+      'hiw.s1.eyebrow': 'STEP 1 · CATCHMENT',
+      'hiw.s2.eyebrow': 'STEP 2 · DATA',
+      'hiw.s3.eyebrow': 'STEP 3 · SCORE',
+      'hiw.s4.eyebrow': 'STEP 4 · CAPTURE',
+      'hiw.s5.eyebrow': 'STEP 5 · P&L',
+      'hiw.s6.eyebrow': 'STEP 6 · DECISION',
+      'hiw.s5.conservative': 'CONSERVATIVE',
+      'hiw.s5.base': 'BASE',
+      'hiw.s5.optimistic': 'OPTIMISTIC',
+      'hiw.s5.footnote': 'Calibrated on OnAir Montreuil (FP franchise audited by Fiteco). Revenue 2.24M€ · EBITDA 44.7% at maturity.',
+      'hiw.next': 'Next',
+      'hiw.restart': 'Replay',
 
       // ─── Common ──────────────────────────────────────────────────
       'common.yes': 'Yes',
