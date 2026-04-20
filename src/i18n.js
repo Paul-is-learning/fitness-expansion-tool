@@ -440,9 +440,9 @@
       'tour.s8.cta': 'Commencer',
 
       // ─── TOUR BP cible pays (7 slides) ───────────────────────────
-      'bp.s1.eyebrow': 'BP CIBLE PAYS · V17',
+      'bp.s1.eyebrow': 'BP CIBLE PAYS · Avril 2026',
       'bp.s1.title': 'Business Plan FP Romania',
-      'bp.s1.subtitle': "Modèle consolidé sur 10 ans. 40 clubs à maturité (A8), mix 18 propres / 22 franchises. Chiffres calibrés sur OnAir Montreuil (audit Fiteco) et ajustés au marché roumain.",
+      'bp.s1.subtitle': "Modèle consolidé sur 10 ans. 40 clubs à maturité (A7), mix 27 succursales / 13 franchises. Équity fondateurs 3,2 M€ + dette SG-BPI 8 M€ @ 4%. Calibré sur audit Fiteco et adapté au marché roumain.",
       'bp.s2.eyebrow': 'ÉTAPE 1 · HYPOTHÈSES',
       'bp.s2.title': '5 hypothèses clés qui pilotent tout',
       'bp.s2.subtitle': 'Prix, cible membres, ramp-up, churn, redevance MF. Chaque variable est documentée, sourcée, et stressée en Monte Carlo (voir étape 6).',
@@ -911,9 +911,9 @@
       'tour.s8.cta': 'Start',
 
       // ─── BP country-target tour (7 slides) ───────────────────────
-      'bp.s1.eyebrow': 'COUNTRY BP · V17',
+      'bp.s1.eyebrow': 'COUNTRY BP · April 2026',
       'bp.s1.title': 'FP Romania Business Plan',
-      'bp.s1.subtitle': 'Consolidated 10-year model. 40 clubs at maturity (Y8), mix of 18 owned / 22 franchises. Figures calibrated on OnAir Montreuil (Fiteco audit) and adjusted for the Romanian market.',
+      'bp.s1.subtitle': 'Consolidated 10-year model. 40 clubs at maturity (Y7), mix of 27 owned / 13 franchises. Founders equity €3.2M + SG-BPI debt €8M @ 4%. Calibrated on Fiteco audit and adapted for the Romanian market.',
       'bp.s2.eyebrow': 'STEP 1 · ASSUMPTIONS',
       'bp.s2.title': '5 key assumptions that drive everything',
       'bp.s2.subtitle': 'Price, member target, ramp-up, churn, MF royalty. Every variable is documented, sourced, and stress-tested via Monte Carlo (see step 6).',

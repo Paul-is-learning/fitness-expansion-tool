@@ -101,8 +101,9 @@
     }
     if (added > 0) {
       try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
-      try { window.renderCustomSites?.(); } catch {}
-      try { window.refreshCustomMarkers?.(); } catch {}
+      try { window.renderCustomSites?.(); } catch {}     // desktop list
+      try { window.refreshCustomMarkers?.(); } catch {}  // desktop pins
+      try { window._fpMobileRefreshSites?.(); } catch {} // mobile pins + carousel (v6.37 fix)
       console.log(`[cloud-sync] pulled ${added} new site(s) from cloud`);
     }
   }

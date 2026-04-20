@@ -1728,6 +1728,7 @@ function addCustomSite(lat, lng, name, notes) {
   renderCustomSites();
   refreshCustomMarkers(); // re-render avec numérotation continue (v6.32)
   window.cloudSync?.push();
+  window._fpMobileRefreshSites?.(); // v6.37: sync mobile pins quand desktop ajoute
   return site;
 }
 
@@ -1799,6 +1800,7 @@ function importCustomSites(list) {
   renderCustomSites();
   refreshCustomMarkers();
   window.cloudSync?.push();
+  window._fpMobileRefreshSites?.(); // v6.37
   alert(`Import terminé ✓\n${added} site(s) ajouté(s)${skipped ? ` · ${skipped} doublon(s)/invalide(s) ignoré(s)` : ''}.`);
 }
 
@@ -1843,6 +1845,7 @@ function removeCustomSite(id) {
   renderCustomSites();
   refreshCustomMarkers();
   window.cloudSync?.push();
+  window._fpMobileRefreshSites?.(); // v6.37
 }
 
 function qualifyCustomSite(id, status, rating) {
@@ -1856,6 +1859,7 @@ function qualifyCustomSite(id, status, rating) {
   renderCustomSites();
   refreshCustomMarkers();
   window.cloudSync?.push();
+  window._fpMobileRefreshSites?.(); // v6.37
 }
 
 let customMarkersLayer = L.layerGroup();
