@@ -919,9 +919,45 @@
           </div>
         </div>
       </div>
+
+      ${t._kind === 'custom' ? `
+        <div class="fp-detail-danger" style="margin-top:18px;padding:14px;border:1px solid rgba(239,68,68,.25);border-radius:12px;background:rgba(239,68,68,.06)">
+          <div style="font-size:11px;color:var(--gray2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Zone sensible</div>
+          <button id="fpDeleteSite" data-id="${t._id}" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.12);color:#f87171;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+            Supprimer ce site
+          </button>
+          <div style="font-size:10px;color:var(--gray2);text-align:center;margin-top:8px">La suppression est synchronisée sur tous tes appareils.</div>
+        </div>
+      ` : ''}
     `;
 
     qs('#fpDetailBack').addEventListener('click', () => { haptic(10); transitionTo('summary'); });
+
+    // v6.42 — Delete custom site from mobile detail view. Calls removeCustomSite
+    // which does soft-delete + pushNow (CRDT tombstone propagates cross-device).
+    const delBtn = qs('#fpDeleteSite', det);
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        haptic(20);
+        const id = delBtn.dataset.id;
+        const site = getAllSites()[activeIdx];
+        const name = site?.name || 'ce site';
+        if (!confirm(`Supprimer "${name}" ?\n\nCette action supprime le site sur cet appareil et sur tous tes autres appareils (Mac, iPhone…).`)) return;
+        if (typeof removeCustomSite === 'function') {
+          removeCustomSite(id);
+        }
+        // Back to summary: the site is gone from getAllSites() now (tombstone filtered).
+        // Force a full rebuild of the carousel + pins, then close detail.
+        window._fpMobileRefreshSites?.();
+        // Activate nearest remaining site (or first) to avoid stale activeIdx
+        const remaining = getAllSites();
+        if (remaining.length > 0) {
+          activateSite(Math.min(activeIdx, remaining.length - 1), false);
+        }
+        transitionTo('summary');
+      });
+    }
 
     // Prev / Next site navigation buttons
     qsa('.fp-detail-nav-btn', det).forEach(btn => {

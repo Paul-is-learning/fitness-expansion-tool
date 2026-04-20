@@ -1,5 +1,29 @@
 # Changelog
 
+## [v6.42-mobile-delete-custom-site] — 2026-04-20
+
+### ✨ Suppression mobile des custom sites
+
+**Problème** : sur desktop, les custom sites sont supprimables via le bouton "Suppr" de la liste "Mes sites" (v6.34). Mais sur mobile aucune action de suppression n'était exposée → les users iPhone ne pouvaient qu'ajouter, jamais nettoyer.
+
+### Changement
+
+- **`src/mobile.js`** `buildDetail()` : pour `t._kind === 'custom'`, ajoute un bloc "Zone sensible" en bas de la vue détail avec un bouton rouge "Supprimer ce site" (icône poubelle). Affiché uniquement pour les customs — les TARGETS hardcodés (1-5) restent non supprimables.
+- **Flow** : tap → `confirm("Supprimer 'X' ?...")` → `removeCustomSite(id)` (fonction index.html existante) qui soft-delete (tombstone CRDT) + `cloudSync.pushNow()`. Refresh carousel + pins + active site sibling. `transitionTo('summary')` pour fermer la fiche.
+- **Sync cross-device** : la suppression utilise le même soft-delete que desktop → tombstone propagé via CRDT merge à tous les devices au prochain pull (≤ 15s polling ou visibilitychange).
+
+### Copy
+
+- Label bouton : "Supprimer ce site"
+- Confirm : "Supprimer '\<nom\>' ? Cette action supprime le site sur cet appareil et sur tous tes autres appareils (Mac, iPhone…)."
+- Sous-titre : "La suppression est synchronisée sur tous tes appareils."
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (changement UI seul, moteur intact).
+
+---
+
 ## [v6.41-expose-customSites-safeStorage-on-window] — 2026-04-20
 
 ### 🔥🔥🔥 Même pattern, deux autres variables invisibles depuis l'IIFE
