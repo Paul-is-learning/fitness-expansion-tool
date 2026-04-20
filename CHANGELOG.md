@@ -1,5 +1,34 @@
 # Changelog
 
+## [v6.28-cross-device-sync] — 2026-04-20
+
+### Sync sites custom Mac ↔ iPhone (sans backend) — Export/Import JSON
+
+**Problème** : `localStorage` est **isolé par device + navigateur**. Paul ajoute un site sur iPhone Safari, il n'apparaît pas sur Mac Safari. Sans backend, sync auto impossible. Solution : sync manuelle via clipboard et URL.
+
+**Fonctionnalités ajoutées** :
+1. **Bouton "↗ Exporter"** dans le card "Mes sites" → prompt 2 modes :
+   - `1` = Copie le JSON brut dans le presse-papier (à coller via "Importer" sur autre device)
+   - `2` = Copie une URL `?import=<base64>` partageable (auto-import sur autre device)
+2. **Bouton "↙ Importer"** → prompt textarea, accepte JSON brut OU URL `?import=…` (extrait base64 si URL).
+3. **Auto-import via URL** : si l'app est ouverte avec `?import=<b64>`, prompt confirm puis import. URL nettoyée après (history.replaceState) pour éviter ré-import au refresh.
+4. **Dédoublonnage automatique** : merge par lat/lng (4 décimales). Importer 2× la même liste = no-op (les doublons sont skip silencieusement).
+5. **Migration appliquée** : chaque site importé passe par `migrateCustomSite` pour normaliser le schéma + sanitize text.
+
+**Workflow Paul** :
+- Sur iPhone (où "Floreasca" est présent) → onglet Mes Sites → "↗ Exporter" → choix `2` (URL) → URL copiée
+- L'envoyer à soi-même par email/iMessage
+- Ouvrir l'URL sur Mac Safari → confirm "Importer 1 site ?" → site ajouté
+- Plus jamais besoin de re-saisir manuellement
+
+**Fichiers touchés** :
+- `index.html` : 4 nouvelles fonctions (`exportCustomSites`, `importCustomSitesPrompt`, `importCustomSites`, IIFE `autoImportFromURL`) + 2 boutons UI dans le card Mes Sites.
+- `config.js` : bump `MODEL_VERSION` → `v6.28-cross-device-sync`.
+
+**Vérifié en preview** : roundtrip complet URL → auto-import → site ajouté → URL nettoyée + dédoublonnage 1 dup ignoré / 1 nouveau ajouté.
+
+---
+
 ## [v6.27-mes-sites-fix] — 2026-04-20
 
 ### Bugs fixés "Mes sites" + harmonisation pins custom dorés

@@ -702,6 +702,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <input type="text" id="newSiteAddr" placeholder="Adresse (ex: Bd. Iuliu Maniu 100)" data-i18n-placeholder="dmysites.addrPlaceholder" style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:11px;font-family:var(--font)">
           <button class="btn btn-sm" onclick="addSiteByAddress()" data-i18n="dmysites.geocode">Geocoder</button>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;padding:8px 10px;background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.18);border-radius:6px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--gray2);flex:1;min-width:140px">Sync entre devices (Mac ↔ iPhone) :</span>
+          <button class="btn btn-sm" onclick="exportCustomSites()" title="Copie tes sites pour les partager vers un autre device">↗ Exporter</button>
+          <button class="btn btn-sm" onclick="importCustomSitesPrompt()" title="Colle un JSON de sites exportés depuis un autre device">↙ Importer</button>
+        </div>
         <div id="customSitesList"></div>
       </div>
       <div class="card" id="siteAnalysisCard" style="display:none">
@@ -1599,6 +1604,98 @@ function addCustomSite(lat, lng, name, notes) {
   addCustomSiteMarker(site);
   return site;
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Cross-device sync (v6.28): Export/Import JSON via clipboard + URL.
+// localStorage est isolé par device → sans backend, sync = manuel via copie.
+// Format: JSON array de sites (compat fpCustomSites format brut). Base64
+// pour URL safe (?import=<b64>).
+// ────────────────────────────────────────────────────────────────────
+async function exportCustomSites() {
+  if (!customSites.length) { alert('Aucun site custom à exporter.'); return; }
+  const json = JSON.stringify(customSites, null, 2);
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  const url = location.origin + location.pathname + '?import=' + b64;
+  const choice = prompt(
+    `${customSites.length} site(s) prêt(s) à exporter.\n\n` +
+    `Choisis ton mode :\n` +
+    `  1 = Copier le JSON brut (paste dans "Importer" sur autre device)\n` +
+    `  2 = Copier l'URL (ouvre l'URL sur autre device → import auto)\n\n` +
+    `Tape 1 ou 2 :`,
+    '2'
+  );
+  let payload, label;
+  if (choice === '1') { payload = json; label = 'JSON'; }
+  else if (choice === '2') { payload = url; label = 'URL'; }
+  else return;
+  try {
+    await navigator.clipboard.writeText(payload);
+    alert(`${label} copié dans le presse-papier ✓\n\nColle-le sur l'autre device pour récupérer tes sites.`);
+  } catch (e) {
+    prompt(`Copie manuelle (presse-papier indispo) — sélectionne tout puis copie :`, payload);
+  }
+}
+
+function importCustomSitesPrompt() {
+  const raw = prompt('Colle ici le JSON exporté (ou l\'URL ?import=…) :');
+  if (!raw) return;
+  let payload = raw.trim();
+  // Si c'est une URL avec ?import=…, extraire le base64
+  const m = payload.match(/[?&]import=([A-Za-z0-9+/=]+)/);
+  if (m) {
+    try { payload = decodeURIComponent(escape(atob(m[1]))); }
+    catch { alert('URL invalide (base64 corrompu).'); return; }
+  }
+  try {
+    const list = JSON.parse(payload);
+    if (!Array.isArray(list)) throw new Error('format invalide (pas un array)');
+    importCustomSites(list);
+  } catch (e) {
+    alert('Import échoué : ' + e.message);
+  }
+}
+
+function importCustomSites(list) {
+  // Merge avec dédoublonnage par lat/lng (4 décimales) — évite duplicates
+  // si l'user importe 2x le même set.
+  const existing = new Set(customSites.map(s => Number(s.lat).toFixed(4) + ',' + Number(s.lng).toFixed(4)));
+  let added = 0, skipped = 0;
+  for (const s of list) {
+    if (!s || !isFinite(s.lat) || !isFinite(s.lng)) { skipped++; continue; }
+    const key = Number(s.lat).toFixed(4) + ',' + Number(s.lng).toFixed(4);
+    if (existing.has(key)) { skipped++; continue; }
+    customSites.push(migrateCustomSite({...s, id: s.id || (Date.now() + Math.floor(Math.random()*1000))}));
+    existing.add(key);
+    added++;
+  }
+  if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
+  else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
+  renderCustomSites();
+  refreshCustomMarkers();
+  alert(`Import terminé ✓\n${added} site(s) ajouté(s)${skipped ? ` · ${skipped} doublon(s)/invalide(s) ignoré(s)` : ''}.`);
+}
+
+// Auto-import au boot si ?import=base64 dans l'URL.
+// Différé pour s'assurer que customSites est chargé.
+(function autoImportFromURL() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const b64 = params.get('import');
+    if (!b64) return;
+    setTimeout(() => {
+      try {
+        const json = decodeURIComponent(escape(atob(b64)));
+        const list = JSON.parse(json);
+        if (!Array.isArray(list) || !list.length) return;
+        if (confirm(`Importer ${list.length} site(s) depuis l'URL ?\n(Ils seront ajoutés à tes sites existants, sans écrasement.)`)) {
+          importCustomSites(list);
+        }
+        // Cleanup URL pour éviter ré-import au prochain hard refresh
+        history.replaceState({}, '', location.pathname + location.hash);
+      } catch (e) { console.warn('[autoImport] failed:', e); }
+    }, 1800);
+  } catch {}
+})();
 
 function removeCustomSite(id) {
   // String coerce: ID est interpolé inline dans onclick (Number) mais pourrait
