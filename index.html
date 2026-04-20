@@ -6256,27 +6256,47 @@ const origOnMapClick = onMapClick;
 function renderCustomSites() {
   const list = el('customSitesList');
   if(!list) return;
-  // Border-left: prospect en doré (uniforme avec TARGETS) — demande Paul 2026-04-20
   const colors={prospect:'#d4a017',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
-  list.innerHTML = customSites.length===0
-    ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site ajoute. Cliquez + Ajouter pour commencer.</p>'
-    : customSites.map(s=>`
-    <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#8b5cf6'}">
+  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
+
+  // v6.34 — demande Paul: fusionner TARGETS + customs dans "Mes sites".
+  // Pin 1-5 = TARGETS BP hardcoded (non-supprimables, analysables), pin 6+ = customs.
+  const targetCards = (typeof TARGETS !== 'undefined' ? TARGETS : []).map((t, i) => `
+    <div class="comp-card" style="border-left:3px solid #d4a017">
       <div style="flex:1;min-width:0">
-        <div class="comp-name">${s.name}</div>
-        <div class="comp-meta">${s.notes||'Pas de notes'} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</div>
+        <div class="comp-name">${i+1}. ${esc(t.name)}</div>
+        <div class="comp-meta">S${esc(t.sector)} · ${esc(t.area)} · ${esc(t.rent)} · P${esc(t.phase)}</div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center">
+          <span style="padding:3px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.35);border-radius:4px;color:var(--accent);font-size:9px;font-weight:700;letter-spacing:.3px">TARGET BP</span>
+          <span style="font-size:9px;color:${t.status?.includes('securise')?'var(--green)':'var(--yellow)'}">${esc(t.status)} · ${esc(t.opening)}</span>
+          <button class="btn btn-sm" onclick="flyTarget(${t.lat},${t.lng})">Analyser</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const startNum = (typeof TARGETS !== 'undefined' ? TARGETS.length : 0) + 1;
+  const customCards = customSites.length === 0
+    ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site custom ajouté. Clique "+ Ajouter" pour en créer un (il sera numéroté ' + startNum + '+).</p>'
+    : customSites.map((s, i) => `
+    <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#d4a017'}">
+      <div style="flex:1;min-width:0">
+        <div class="comp-name">${startNum + i}. ${esc(s.name)}</div>
+        <div class="comp-meta">${esc(s.notes) || 'Pas de notes'} | ${Number(s.lat).toFixed(4)}, ${Number(s.lng).toFixed(4)}</div>
         <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
           <select onchange="qualifyCustomSite(${s.id},this.value)" style="padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:10px;font-family:var(--font)">
             <option value="prospect" ${s.status==='prospect'?'selected':''}>Prospect</option>
             <option value="shortlist" ${s.status==='shortlist'?'selected':''}>Shortlist</option>
-            <option value="validated" ${s.status==='validated'?'selected':''}>Valide</option>
-            <option value="rejected" ${s.status==='rejected'?'selected':''}>Rejete</option>
+            <option value="validated" ${s.status==='validated'?'selected':''}>Validé</option>
+            <option value="rejected" ${s.status==='rejected'?'selected':''}>Rejeté</option>
           </select>
           <button class="btn btn-sm" onclick="analyzeCustomSite(${s.id})">Analyser</button>
           <button class="btn btn-sm" style="color:var(--red)" onclick="if(confirm('Supprimer ce site?'))removeCustomSite(${s.id})">Suppr.</button>
         </div>
       </div>
     </div>`).join('');
+
+  list.innerHTML = targetCards + customCards;
 
   // Update cannibalization
   if(customSites.length >= 2) updateCannibalization();
