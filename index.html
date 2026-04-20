@@ -1600,7 +1600,7 @@ function addCustomSite(lat, lng, name, notes) {
     return null;
   }
   renderCustomSites();
-  addCustomSiteMarker(site);
+  refreshCustomMarkers(); // re-render avec numérotation continue (v6.32)
   window.cloudSync?.push();
   return site;
 }
@@ -1734,15 +1734,23 @@ function qualifyCustomSite(id, status, rating) {
 
 let customMarkersLayer = L.layerGroup();
 
-function addCustomSiteMarker(site) {
-  // Custom sites partagent la couleur dorée des TARGETS — demande Paul 2026-04-20
-  // (avant: prospect violet, mais Paul veut visuel uniforme avec les 5 TARGETS).
-  const colors={prospect:'#d4a017',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
-  const c=colors[site.status]||'#d4a017';
+function addCustomSiteMarker(site, displayNum) {
+  // v6.32: pins custom = même style rond doré numéroté que TARGETS desktop.
+  // Numérotation continue: TARGETS = 1-5, customs = 6, 7, 8... (demande Paul).
+  // Couleur du gradient varie selon status (prospect/shortlist=doré, validated=vert, rejected=rouge).
+  const palette = {
+    prospect:  { light: '#f3c44f', dark: '#d4a017' },
+    shortlist: { light: '#f3c44f', dark: '#d4a017' },
+    validated: { light: '#34d399', dark: '#10b981' },
+    rejected:  { light: '#f87171', dark: '#ef4444' },
+  };
+  const p = palette[site.status] || palette.prospect;
+  const c = p.dark; // for shadow/popup
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
+  const num = displayNum != null ? displayNum : '★';
   const icon=L.divIcon({className:'',
-    html:`<div style="width:22px;height:22px;background:${c};border:3px solid white;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;box-shadow:0 2px 8px ${c}80;cursor:pointer">&#9733;</div>`,
-    iconSize:[22,22],iconAnchor:[11,11]});
+    html:`<div style="width:30px;height:30px;background:linear-gradient(135deg,${p.light},${p.dark});border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;box-shadow:0 3px 10px ${p.dark}80,0 0 0 1px ${p.dark}66;cursor:pointer">${num}</div>`,
+    iconSize:[30,30],iconAnchor:[15,15]});
   const mk=L.marker([site.lat,site.lng],{icon,draggable:false});
   // XSS-safe: user-supplied name/notes are escapeHtml'd before injection.
   mk.bindPopup(`<h3>${esc(site.name)}</h3>
@@ -1756,7 +1764,9 @@ function addCustomSiteMarker(site) {
 
 function refreshCustomMarkers() {
   customMarkersLayer.clearLayers();
-  customSites.forEach(s=>addCustomSiteMarker(s));
+  // Numérotation continue après TARGETS: pin 1-5 = TARGETS, pin 6+ = custom (v6.32).
+  const startNum = (typeof TARGETS !== 'undefined' ? TARGETS.length : 0) + 1;
+  customSites.forEach((s, i) => addCustomSiteMarker(s, startNum + i));
 }
 
 function analyzeCustomSite(id) {
