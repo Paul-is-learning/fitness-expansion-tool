@@ -6564,7 +6564,38 @@ function renderTargets() {
     </div>
   `).join('');
 
-  // TARGETS are managed via "Mes Sites" tab — no auto-pin on map
+  // Desktop target pins on map (v6.31) — même style doré que custom sites pour
+  // uniformité visuelle (demande Paul 2026-04-20). Mobile a déjà ses propres
+  // pins numérotés via src/mobile.js.
+  renderTargetPinsDesktop();
+}
+
+// Layer + renderer pour les 5 TARGETS desktop. Pins dorés avec numéro.
+let targetMarkersLayer = (typeof L !== 'undefined') ? L.layerGroup() : null;
+function renderTargetPinsDesktop() {
+  if (!targetMarkersLayer || typeof map === 'undefined') return;
+  // Mobile (≤ 768px) gère ses propres pins via src/mobile.js — éviter doublons.
+  if (window.innerWidth <= 768) { targetMarkersLayer.clearLayers(); return; }
+  targetMarkersLayer.clearLayers();
+  TARGETS.forEach((t, i) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:30px;height:30px;background:linear-gradient(135deg,#f3c44f,#d4a017);border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;box-shadow:0 3px 10px rgba(212,160,23,.5),0 0 0 1px rgba(212,160,23,.4);cursor:pointer">${i+1}</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+    const mk = L.marker([t.lat, t.lng], { icon });
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
+    mk.bindPopup(`<h3>${esc(t.name)}</h3>
+      <div class="ps"><span>Phase</span><span class="pv">P${t.phase}</span></div>
+      <div class="ps"><span>Secteur</span><span class="pv">S${esc(t.sector)}</span></div>
+      <div class="ps"><span>Surface</span><span class="pv">${esc(t.area)}</span></div>
+      <div class="ps"><span>Loyer</span><span class="pv">${esc(t.rent)}</span></div>
+      <div class="ps"><span>Statut</span><span class="pv">${esc(t.status)}</span></div>
+      <div style="margin-top:6px"><a href="#" onclick="flyTarget(${t.lat},${t.lng});return false" style="color:#d4a017;font-size:11px;font-weight:600">Centrer carte &rarr;</a></div>`);
+    targetMarkersLayer.addLayer(mk);
+  });
+  if (!map.hasLayer(targetMarkersLayer)) map.addLayer(targetMarkersLayer);
 }
 
 function zoomSector(id) {
