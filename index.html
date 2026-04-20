@@ -1661,15 +1661,22 @@ const CUSTOM_SITE_SCHEMA_VERSION = 1;
 const CUSTOM_SITE_NAME_MAX = 80;
 const CUSTOM_SITE_NOTES_MAX = 500;
 
+// v6.41 — `let` top-level = script-scoped, PAS accessible via window depuis les
+// IIFE modules (cloud-sync.js notamment). On garde le `let` pour le scope local
+// mais on mirror systématiquement sur `window.customSites` à chaque réassignation
+// pour que cloud-sync puisse lire/muter la liste. Les .push/.pop mutent l'array
+// en place donc restent visibles des deux côtés sans mirror additionnel.
 let customSites = [];
+window.customSites = customSites;
 
 /** Load + migrate custom sites from localStorage. Quarantine corrupted entries. */
 function _loadCustomSites() {
   const raw = (typeof safeStorage !== 'undefined') ? safeStorage.get('fpCustomSites', []) : (function(){
     try { return JSON.parse(localStorage.getItem('fpCustomSites') || '[]'); } catch { return []; }
   })();
-  if (!Array.isArray(raw)) { customSites = []; return; }
+  if (!Array.isArray(raw)) { customSites = []; window.customSites = customSites; return; }
   customSites = raw.filter(s => s && isFinite(s.lat) && isFinite(s.lng)).map(migrateCustomSite);
+  window.customSites = customSites; // v6.41 — keep window mirror in sync
 }
 
 function migrateCustomSite(site) {

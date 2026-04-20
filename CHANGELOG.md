@@ -1,5 +1,49 @@
 # Changelog
 
+## [v6.41-expose-customSites-safeStorage-on-window] — 2026-04-20
+
+### 🔥🔥🔥 Même pattern, deux autres variables invisibles depuis l'IIFE
+
+**Symptôme** : après v6.40, le push cloud ne partait toujours pas depuis desktop Mac. Diag in-page révèle `window.customSites: undef`, `window.safeStorage: undef`, `cloudSyncStatus: unknown`.
+
+**Cause** : le même bug que v6.40 pour `currentUser`, généralisé. `let customSites = [];` et `const safeStorage = ...;` sont des déclarations top-level dans un classic script → **script-scoped**, inaccessibles via `window.X` depuis l'IIFE de `cloud-sync.js`. Résultat : `cloud-sync.js` ligne 186 `if (!Array.isArray(window.customSites)) return;` → early return sur chaque `pushNow()`. Le badge de status reste à `{state: 'unknown'}` parce qu'aucun pull/push n'a jamais tourné.
+
+Vérifié via preview :
+```
+customSites (window)  : undefined   // IIFE view
+customSites (eval)    : object      // script-scope view
+safeStorage (window)  : undefined
+safeStorage (eval)    : object
+```
+
+### Fix
+
+- **`index.html`** ligne 1664 : après `let customSites = [];` ajouter `window.customSites = customSites;`. Mirror dans `_loadCustomSites()` après chaque réassignation.
+- **`src/utils.js`** : après la déclaration de `safeStorage`, ajouter `window.safeStorage = safeStorage;`.
+- **`src/cloud-sync.js`** `purgeOldTombstones()` : mutate array en place via `splice` au lieu de `window.customSites = filter(...)`. Sinon après purge, la ref script-scoped `customSites` et `window.customSites` divergent.
+
+### Vérification preview
+
+Stub fetch + appel à la vraie fonction `addCustomSite(...)` :
+```
+addResult: { name: "preview-test-v641" }    // ajout OK
+customSites.length: 2                        // state cohérent
+pushCaptured: true                           // POST bien émis
+capturedUser: paulbecaud@isseo-dev.com
+capturedSites: [...]                         // payload correct
+cloudSyncStatus: { state: "ok" }             // plus "unknown"!
+```
+
+### Regression: floreasca effacé par accident
+
+Pendant le diag précédent, une commande manuelle a push `sites: []` → a écrasé la shared KV → `floreasca` perdu. À re-créer après ce déploiement (lat: 44.4632, lng: 26.1029).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.40-sync-read-user-from-storage] — 2026-04-20
 
 ### 🔥🔥 Root cause trouvé : aucun push cloud ne partait depuis… toujours

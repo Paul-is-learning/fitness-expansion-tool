@@ -116,6 +116,9 @@ const safeStorage = (() => {
 
   return { get, set, remove, quotaExceeded };
 })();
+// v6.41 — expose sur window pour que les IIFE modules (cloud-sync.js…) puissent
+// lire `window.safeStorage`. Sans ça, `const` top-level reste script-scoped.
+window.safeStorage = safeStorage;
 
 /**
  * Classic trailing-edge debounce. Returns a function that delays invoking `fn`

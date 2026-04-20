@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.40-sync-read-user-from-storage (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.41-expose-customSites-safeStorage-on-window (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -168,7 +168,13 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (2026-04-20 · v6.38 → v6.40)
+## Dernière session (2026-04-20 · v6.38 → v6.41)
+
+### Fix sync cloud — généralisation window.X (v6.41)
+- Même bug que v6.40 mais pour `customSites` et `safeStorage`. Déclarations `let/const` top-level → script-scoped, invisibles depuis l'IIFE de cloud-sync.js. `window.customSites` undef → `pushNow()` early-return.
+- Fix : `window.customSites = customSites` après chaque réassignation + `window.safeStorage = safeStorage`. Mutate in place via `splice` dans `purgeOldTombstones` pour garder les 2 refs synchronisées.
+- **IMPORTANT** : `floreasca` a été perdu par accident pendant diag (push manuel `sites: []` a écrasé la KV). À re-créer post-deploy (lat: 44.4632, lng: 26.1029).
+- Vérifié preview : addCustomSite → pushNow → POST émis avec user + sites corrects, status `ok`.
 
 ### Fix root-cause sync cloud (v6.40)
 - **Root cause trouvé** : `cloud-sync.js getUser()` lisait `window.currentUser?.email`, mais `index.html` déclare `let currentUser;` top-level dans un **classic script** → variable script-scoped, **pas accessible via window**. `getUser()` retournait toujours `''`, `pushNow()` early-return, **aucun POST n'a jamais été émis depuis la refonte IIFE**.

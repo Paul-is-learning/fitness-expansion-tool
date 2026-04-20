@@ -100,7 +100,10 @@
     if (!Array.isArray(window.customSites)) return;
     const cutoff = Date.now() - TOMBSTONE_TTL_MS;
     const before = window.customSites.length;
-    window.customSites = window.customSites.filter(s => !s.deletedAt || s.deletedAt > cutoff);
+    // v6.41 — mutate in place (splice) au lieu de réassigner. Sinon la réf
+    // `let customSites` dans index.html diverge de `window.customSites`.
+    const kept = window.customSites.filter(s => !s.deletedAt || s.deletedAt > cutoff);
+    window.customSites.splice(0, window.customSites.length, ...kept);
     if (window.customSites.length !== before) {
       try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
     }
