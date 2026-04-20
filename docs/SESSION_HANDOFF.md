@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.29-cloud-sync-vercel-kv (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.34-mes-sites-merged-list (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -39,7 +39,7 @@ docs/ARCHITECTURE.md    Layout fichiers + load order
 4. **Militari Shopping** (Sec 6) — WATCH, IRR **6.1%**
 5. **Grand Arena** (Sec 4) — WATCH, IRR **1.4%**
 
-Custom sites additionnés via UI mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites`.
+Custom sites additionnés via UI desktop/mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites` + sync auto cloud KV via `/api/sync` (v6.29+). Dans l'onglet "Mes sites" desktop (v6.34), TARGETS et customs sont mergés dans une seule liste numérotée 1-N, pins uniformes ronds dorés.
 
 ## Modèle financier — état actuel (v6.4)
 
@@ -168,15 +168,45 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (v6.29)
-- **Vraie sync auto Mac↔iPhone** via Vercel KV (Redis hosté). Plus besoin de l'export/import URL manuel.
-- `api/sync.js` = serverless function (GET/POST), `src/cloud-sync.js` = layer client (pull boot+focus+poll 30s, push debounce 0.9s).
-- Hooks dans 4 fonctions mutation (addCustomSite, removeCustomSite, qualifyCustomSite, importCustomSites).
-- Badge UI 🟢/🟡/🔴 dans card Mes Sites.
-- **Action requise Paul** : connecter Vercel KV au projet (2 clicks dashboard) + redeploy. Doc complète dans `docs/CLOUD_SYNC_SETUP.md`.
-- Fallback localStorage si KV pas configuré → rien ne casse.
-- v6.27 : pin custom doré (uniforme TARGETS) + defensive re-render switchTab + ID match laxe.
-- v6.28 : export/import JSON + URL `?import=<b64>` (workaround manuel, conservé en backup si offline).
+## Dernière session (2026-04-20 · v6.23 → v6.34)
+
+### Onboarding tour — stabilisation rendu (v6.23 → v6.24)
+- **v6.23** : refonte slides en CSS grid stacking (toutes slides partagent la même cellule grid, hauteur = plus grand slide) → fix chevauchement contenu/dots/CTA sur slides BP + Sources. `syncWrapHeight` JS devient no-op.
+- **v6.23** : bouton 🔄 **hard refresh** in-app (bottom-left, doré) qui clear CacheStorage + unregister SW + reload avec `?hard=ts`.
+- **v6.24** : fix courbe revenus A1→A10 invisible sur slide BP — wrapper de chaque barre reçoit `align-self:stretch + justify-content:flex-end` (avant: parent `auto` → `height:%` résolvait à 0) + animation `fpOnbBarGrow` gated par `.fp-onb-slide.ready` (avant: animations `forwards` inline consumed au boot avec grid-stack).
+
+### Modèle financier — conservatisme investisseur (v6.25)
+- **Décision Paul master-franchisé** : ajout `taxLocalRate: 0.02` dans `PNL_DEFAULTS` (OnAir Montreuil 2.2%, arrondi). Intégré dans 3 spots P&L (main, sensitivity, Monte Carlo) + persisté dans `monthly[]`.
+- Impact 5 TARGETS : IRR -2.0 à -2.2pp, NPV -100 à -250k€, payback +1-2 mo. **Aucun verdict ne bascule** (3 GO COND, 2 WATCH inchangés).
+- Slide BP "Coûts" du tour étendue à 7 lignes + EBITDA cible Y5+ 44-55% → 42-53%. Subtitles FR/EN i18n synchros.
+- `.baseline.json` + `tests/analysis.html BASELINE` régénérés → **197/197 PASS** confirmé.
+
+### UX — CAPEX et v2.8 (v6.26)
+- **v6.26** : vignette CAPEX du tour BP affiche maintenant 2 montants empilés : CAPEX bilan **1 176 k€** (22px doré, secondaire) + **Total cash + leasing 1 680 k€** (30px vert brillant, dominant) — demande Paul "en plus gros", logique investisseur vs compta.
+- Cleanup **v2.8 supprimée définitivement** : badge sidebar + règle CSS orpheline + BUILD comment + meta + footers. Single source of truth = `config.js MODEL_VERSION`.
+
+### Sites custom — fixes + cross-device sync (v6.27 → v6.30)
+- **v6.27** : pin custom doré (uniforme TARGETS) au lieu de violet. Border-left card doré. `switchTab('mysites')` force re-render defensive (`_loadCustomSites` + `refreshCustomMarkers` + `renderCustomSites`). ID match laxe `String(s.id) === String(id)` dans `removeCustomSite` / `qualifyCustomSite` / `analyzeCustomSite` (évite no-op silencieux).
+- **v6.28** : export/import JSON via clipboard + URL `?import=<base64>` (fallback manuel cross-device).
+- **v6.29** : **Vraie sync auto Mac↔iPhone via Vercel KV (Upstash Redis)**. Architecture :
+  - `api/sync.js` : Vercel Serverless Function (Node). `GET /api/sync?user=<email>` → `{sites, ts}` ; `POST` → upsert. Whitelist 4 emails server-side. Cap 500 sites / 500KB. Fallback `503` si KV non configuré.
+  - `src/cloud-sync.js` : `window.cloudSync` exposé (`pull`, `push`, `pushNow`, `isAvailable`, `status`). pull() au boot (event `fp:login-success`) + `visibilitychange` + polling 30s. push() debounce 0.9s après mutations. Last-write-wins + dedup lat/lng 4-décimales.
+  - Hooks dans `addCustomSite`, `removeCustomSite`, `qualifyCustomSite`, `importCustomSites`.
+  - Badge UI `#fpCloudSyncBadge` : 🟢 Synchronisé / 🟡 Local seul / 🔴 Erreur.
+- **v6.30** : fix push initial — si pull retourne `{sites:[], ts:0}` ET `customSites.length > 0`, push automatique pour uploader les sites localStorage pré-v6.29. Sinon iPhone/Mac restent désynchros tant qu'aucun site n'est modifié post-v6.29.
+- **Setup Paul effectué** : Upstash Redis connecté au projet Vercel (région fra1, free 500k commandes/mois, env vars `KV_REST_API_URL` + `KV_REST_API_TOKEN` injectées). Redeploy fait. `/api/sync` répond **HTTP 200**. Doc `docs/CLOUD_SYNC_SETUP.md`.
+
+### Harmonisation pins + parité desktop/mobile (v6.31 → v6.34)
+- **v6.31** : pins TARGETS **sur la carte desktop** (manquaient avant, juste liste sidebar). Nouvelle fonction `renderTargetPinsDesktop()` → `targetMarkersLayer` Leaflet avec divIcons ronds dorés 30px numérotés 1-5. Skip si viewport ≤ 768px (mobile.js gère ses propres pins).
+- **v6.32** : pins custom sites **même style que TARGETS** (ronds dorés numérotés 6+). Avant : carrés 22px avec étoile (★). Après : ronds 30px gradient doré/vert/rouge selon status. `refreshCustomMarkers` calcule `startNum = TARGETS.length + 1` et incrémente par site. `addCustomSite` appelle `refreshCustomMarkers()` pour garder la numérotation continue.
+- **v6.33** : parité mobile ↔ desktop sur les sliders fiche site. Avant : mobile avait loyer + charges + surface, desktop avait seulement loyer. Après : desktop a les 3 (`onChargeSliderChange` + `onSurfaceSliderChange` ajoutées, même logique que `src/mobile.js`). Debounce 150ms recalc 3 scénarios P&L + persist `_siteAnalyses`.
+- **v6.34** : liste "Mes sites d'implantation" desktop **fusionne TARGETS + customs** numérotés 1-N. TARGETS (1-5) = border-left doré, badge `TARGET BP`, bouton **Analyser** seul (non-supprimables car hardcoded). Customs (6+) = select status (prospect/shortlist/validé/rejeté) + **Analyser** + **Suppr**. Ajout/suppression reflète immédiatement le DOM, le localStorage et le cloud KV.
+
+### Règles confirmées (à préserver)
+- Tests `tests/analysis.html` doivent rester **197/197 PASS** (update `.baseline.json` + inline `BASELINE` si recalibration intentionnelle).
+- Chaque commit = bump `MODEL_VERSION` dans `config.js` + entrée dans `CHANGELOG.md`.
+- Sync edits vers `/tmp/fitness-serve/*` pour que le preview Python http.server marche.
+- Les ratios de `PNL_DEFAULTS` sont figés post-calibration OnAir — seuls loyer/charges/surface sont variables par site (+ `taxLocalRate` 2% figé v6.25).
 
 ## Sessions précédentes (≤ v6.25)
 - **Décision investisseur** (Paul, master-franchisé) : ajout 2% impôts locaux RO (taxa pe clădiri) dans `PNL_DEFAULTS.taxLocalRate`. Sourcing OnAir Montreuil 2.2%.
