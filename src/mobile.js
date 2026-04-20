@@ -48,7 +48,8 @@
       const raw = localStorage.getItem('fpCustomSites') || '[]';
       const list = JSON.parse(raw);
       if (Array.isArray(list)) {
-        customs = list.map(c => ({
+        // v6.38 CRDT: filtre les tombstones (sites soft-deleted)
+        customs = list.filter(c => !c.deletedAt).map(c => ({
           name: c.name || 'Site custom',
           lat: c.lat,
           lng: c.lng,

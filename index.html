@@ -1680,8 +1680,15 @@ function migrateCustomSite(site) {
     site.status = site.status || 'prospect';
     site.__v    = 1;
   }
+  // v6.38 — CRDT fields for cross-device sync
+  const now = Date.now();
+  if (!site.updatedAt) site.updatedAt = site.createdAt || now;
+  if (!site.createdAt) site.createdAt = site.updatedAt;
+  if (site.deletedAt === undefined) site.deletedAt = null;
+  if (!site.createdBy) site.createdBy = null; // legacy sites = unknown author
   return site;
 }
+window.migrateCustomSite = migrateCustomSite;
 
 /** Strip control chars + tags from user-supplied text. Does NOT HTML-escape — use escapeHtml() at render. */
 function sanitizeText(s, maxLen) {
@@ -1706,14 +1713,20 @@ function addCustomSite(lat, lng, name, notes) {
     window.showToast?.('Longitude invalide (doit être entre -180 et 180)', 'error', { title: 'Site non ajouté' });
     return null;
   }
-  const cleanName  = sanitizeText(name,  CUSTOM_SITE_NAME_MAX)  || ('Site ' + (customSites.length + 1));
+  const liveCount = customSites.filter(s => !s.deletedAt).length;
+  const cleanName  = sanitizeText(name,  CUSTOM_SITE_NAME_MAX)  || ('Site ' + (liveCount + 1));
   const cleanNotes = sanitizeText(notes, CUSTOM_SITE_NOTES_MAX);
 
+  const now = Date.now();
   const site = {
-    id: Date.now(),
+    id: now,
     lat: latN, lng: lngN,
     name: cleanName, notes: cleanNotes,
     status: 'prospect', rating: null, analysisData: null,
+    createdBy: (window.currentUser?.email || '').toLowerCase().trim() || null,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
     __v: CUSTOM_SITE_SCHEMA_VERSION
   };
   customSites.push(site);
@@ -1827,15 +1840,19 @@ function importCustomSites(list) {
 })();
 
 function removeCustomSite(id) {
-  // String coerce: ID est interpolé inline dans onclick (Number) mais pourrait
-  // dériver en String via JSON migration. Match laxe pour éviter no-op silencieux.
+  // v6.38 — soft delete (tombstone): le site reste en localStorage avec
+  // deletedAt, ce qui permet de propager la suppression sur les autres devices
+  // via cloud sync CRDT. Les tombstones sont purgés automatiquement après 30j
+  // (cloud-sync.js purgeOldTombstones). L'affichage filtre les tombstones.
   const idStr = String(id);
   const site = customSites.find(s => String(s.id) === idStr);
-  customSites = customSites.filter(s => String(s.id) !== idStr);
+  if (!site) return;
+  site.deletedAt = Date.now();
+  site.updatedAt = site.deletedAt;
   if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   // Clean up orphaned overrides for the deleted site.
-  if (site && isFinite(site.lat) && isFinite(site.lng)) {
+  if (isFinite(site.lat) && isFinite(site.lng)) {
     const key = site.lat.toFixed(3) + ',' + site.lng.toFixed(3);
     if (window._rentOverrides)    delete window._rentOverrides[key];
     if (window._chargeOverrides)  delete window._chargeOverrides[key];
@@ -1854,6 +1871,7 @@ function qualifyCustomSite(id, status, rating) {
   if (!site) return;
   site.status = status;
   site.rating = rating;
+  site.updatedAt = Date.now(); // v6.38 CRDT
   if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   renderCustomSites();
@@ -1895,9 +1913,12 @@ function addCustomSiteMarker(site, displayNum) {
 function refreshCustomMarkers() {
   customMarkersLayer.clearLayers();
   // Numérotation continue après TARGETS: pin 1-5 = TARGETS, pin 6+ = custom (v6.32).
+  // v6.38: filtre les tombstones (deletedAt) — ne render que les sites vivants.
   const startNum = (typeof TARGETS !== 'undefined' ? TARGETS.length : 0) + 1;
-  customSites.forEach((s, i) => addCustomSiteMarker(s, startNum + i));
+  const live = customSites.filter(s => !s.deletedAt);
+  live.forEach((s, i) => addCustomSiteMarker(s, startNum + i));
 }
+window.refreshCustomMarkers = refreshCustomMarkers;
 
 function analyzeCustomSite(id) {
   const idStr = String(id);
@@ -3281,7 +3302,7 @@ function addZone(lat,lng,sector,saz,comps) {
 }
 
 function updateCompareSelects() {
-  const allSites = [...zones.map(z=>({name:z.name,lat:z.lat,lng:z.lng})), ...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng})), ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
+  const allSites = [...zones.map(z=>({name:z.name,lat:z.lat,lng:z.lng})), ...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng})), ...customSites.filter(s=>!s.deletedAt).map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
   // Dedupe by name
   const unique = [];
   allSites.forEach(s=>{if(!unique.find(u=>u.name===s.name))unique.push(s)});
@@ -3831,7 +3852,7 @@ function setPresetWeights(f,d,j) {
 // OVERLAP ANALYSIS — BP sites catchment overlap
 // ================================================================
 function showOverlapAnalysis() {
-  const allSites = [...TARGETS, ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
+  const allSites = [...TARGETS, ...customSites.filter(s=>!s.deletedAt).map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
   if(allSites.length < 2) return;
 
   // Draw circles for all sites
@@ -6434,12 +6455,14 @@ function renderCustomSites() {
   `).join('');
 
   const startNum = (typeof TARGETS !== 'undefined' ? TARGETS.length : 0) + 1;
-  const customCards = customSites.length === 0
+  // v6.38 — filtre les tombstones (sites soft-deleted). Seuls les sites vivants s'affichent.
+  const liveSites = customSites.filter(s => !s.deletedAt);
+  const customCards = liveSites.length === 0
     ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site custom ajouté. Clique "+ Ajouter" pour en créer un (il sera numéroté ' + startNum + '+).</p>'
-    : customSites.map((s, i) => `
+    : liveSites.map((s, i) => `
     <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#d4a017'}">
       <div style="flex:1;min-width:0">
-        <div class="comp-name">${startNum + i}. ${esc(s.name)}</div>
+        <div class="comp-name">${startNum + i}. ${esc(s.name)}${s.createdBy ? ` <span style="font-size:9px;color:var(--gray2);font-weight:400">· ${esc(s.createdBy.split('@')[0])}</span>` : ''}</div>
         <div class="comp-meta">${esc(s.notes) || 'Pas de notes'} | ${Number(s.lat).toFixed(4)}, ${Number(s.lng).toFixed(4)}</div>
         <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
           <select onchange="qualifyCustomSite(${s.id},this.value)" style="padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:10px;font-family:var(--font)">
@@ -6457,8 +6480,9 @@ function renderCustomSites() {
   list.innerHTML = targetCards + customCards;
 
   // Update cannibalization
-  if(customSites.length >= 2) updateCannibalization();
+  if(customSites.filter(s=>!s.deletedAt).length >= 2) updateCannibalization();
 }
+window.renderCustomSites = renderCustomSites;
 
 async function addSiteByAddress() {
   const addr = el('newSiteAddr').value.trim();
@@ -6676,9 +6700,9 @@ function updateCaptureRatesSite() {
 
 async function updateCannibalization() {
   const card = el('cannibalizationCard');
-  if(customSites.length < 2) { card.style.display='none'; return; }
+  if(customSites.filter(s=>!s.deletedAt).length < 2) { card.style.display='none'; return; }
   card.style.display = 'block';
-  const allSites = [...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng,type:'BP'})), ...customSites.map(s=>({name:s.name,lat:s.lat,lng:s.lng,type:'custom'}))];
+  const allSites = [...TARGETS.map(t=>({name:t.name,lat:t.lat,lng:t.lng,type:'BP'})), ...customSites.filter(s=>!s.deletedAt).map(s=>({name:s.name,lat:s.lat,lng:s.lng,type:'custom'}))];
 
   let rows = '';
   for(let i=0;i<allSites.length;i++){

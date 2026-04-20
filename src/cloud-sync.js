@@ -1,34 +1,49 @@
 // ─────────────────────────────────────────────────────────────────────
-// cloud-sync.js — cross-device sync layer for custom sites (v6.29).
+// cloud-sync.js — cross-device sync (v6.38 CRDT per-site).
 //
-// Bridge client-side customSites state <-> /api/sync (Vercel KV backend).
-// Architecture:
-//   - pull()   on boot/tab-switch: fetch remote state, merge into local.
-//   - push()   after any mutation: debounced upsert to remote.
-//   - Last-write-wins: remote timestamp decides direction of merge.
+// Bridge client-side customSites <-> /api/sync (Vercel KV backend).
+// Scénario: isolation par user (chaque user = son propre KV key
+// `fp:custom-sites:<email>`). La sync garantit que les 2 devices d'un
+// MÊME user restent cohérents Mac <-> iPhone.
 //
-// Fallback: if /api/sync returns 503 (KV not configured) or network dies,
-// we stay in localStorage-only mode silently. UI badge reflects status.
+// CRDT per-site (v6.38):
+//   - Chaque site a `updatedAt` (ms epoch) + `deletedAt` (ms epoch ou null).
+//   - Merge par site (pas par array entier): pour chaque lat/lng key,
+//     on garde la version avec le plus grand max(updatedAt, deletedAt).
+//   - Suppression = soft delete (tombstone). Propage correctement sur tous
+//     devices. Les tombstones restent en local pour garantir la propagation
+//     même si device B pull avant que device A ait push.
+//   - Pull-before-push sur toute mutation: on récupère l'état cloud, on
+//     merge, puis on push le merge. Évite les écrasements cross-device.
 //
-// Requires:
-//   - window.customSites (the array in index.html)
-//   - window.safeStorage (localStorage wrapper)
-//   - window.currentUser (auth)
-//   - window.renderCustomSites, window.refreshCustomMarkers
-//   - window.migrateCustomSite
+// Fallback: si /api/sync renvoie 503/404 (KV absent), mode local seul.
 // ─────────────────────────────────────────────────────────────────────
 (function () {
   'use strict';
 
   const ENDPOINT = '/api/sync';
-  const DEBOUNCE_MS = 900;        // coalesce rapid edits
-  const POLL_INTERVAL_MS = 30000; // light polling while tab is focused
+  const DEBOUNCE_MS = 700;          // coalesce rapid edits (raccourci v6.38)
+  const POLL_INTERVAL_MS = 15000;   // polling 15s tant que tab visible (v6.38 plus agressif)
+  const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours (purge garbage)
   const STATUS_KEY = '_fpCloudSyncStatus';
 
   let pushTimer = null;
-  let lastPulledTs = 0;
   let pollTimer = null;
-  let kvAvailable = null; // null = unknown, true = OK, false = 503/error
+  let kvAvailable = null;         // null = unknown, true = OK, false = 503/404/error
+  let pushInFlight = false;       // réentrance guard
+  let pendingPushAfterFlight = false;
+
+  function key(s) {
+    // clé stable par site: lat/lng 4 décimales + id fallback
+    return Number(s.lat).toFixed(4) + ',' + Number(s.lng).toFixed(4);
+  }
+
+  function siteTs(s) {
+    // timestamp le plus récent entre updatedAt et deletedAt
+    const u = Number(s?.updatedAt) || 0;
+    const d = Number(s?.deletedAt) || 0;
+    return Math.max(u, d);
+  }
 
   function getUser() {
     try { return (window.currentUser?.email || '').toLowerCase().trim(); } catch { return ''; }
@@ -37,12 +52,12 @@
   function setStatus(state, detail) {
     window[STATUS_KEY] = { state, detail, ts: Date.now() };
     try { window.dispatchEvent(new CustomEvent('fp:cloud-sync-status', { detail: window[STATUS_KEY] })); } catch {}
-    // Update badge in Mes Sites card
     try {
       const el = document.getElementById('fpCloudSyncBadge');
       if (!el) return;
       const palette = {
         ok:      { bg: 'rgba(16,185,129,.18)', fg: '#10b981', label: '☁ Synchronisé' },
+        syncing: { bg: 'rgba(96,165,250,.18)', fg: '#60a5fa', label: '☁ Sync…' },
         offline: { bg: 'rgba(251,191,36,.18)', fg: '#fbbf24', label: '☁ Local seul' },
         error:   { bg: 'rgba(239,68,68,.18)',  fg: '#ef4444', label: '☁ Erreur' },
         unknown: { bg: 'rgba(148,163,184,.18)',fg: 'var(--gray2)', label: '☁ …' },
@@ -55,83 +70,150 @@
     } catch {}
   }
 
+  /** Ensure every site has updatedAt. No-op if already set. Called at boot. */
+  function stampExistingSites() {
+    if (!Array.isArray(window.customSites)) return;
+    const now = Date.now();
+    let changed = false;
+    for (const s of window.customSites) {
+      if (!s.updatedAt) { s.updatedAt = s.createdAt || now; changed = true; }
+      if (s.deletedAt === undefined) s.deletedAt = null;
+    }
+    if (changed) {
+      try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
+    }
+  }
+
+  /** Purge tombstones older than TTL (garbage collection). */
+  function purgeOldTombstones() {
+    if (!Array.isArray(window.customSites)) return;
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+    const before = window.customSites.length;
+    window.customSites = window.customSites.filter(s => !s.deletedAt || s.deletedAt > cutoff);
+    if (window.customSites.length !== before) {
+      try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
+    }
+  }
+
+  /**
+   * CRDT merge per-site: prend le plus récent entre local et remote.
+   * Les tombstones (deletedAt) gagnent sur les versions plus anciennes.
+   * Retourne le nombre de changements appliqués au local.
+   */
+  function mergeCRDT(remoteSites) {
+    if (!Array.isArray(window.customSites)) return 0;
+    const localMap = new Map(window.customSites.map(s => [key(s), s]));
+    let changes = 0;
+    for (const r of remoteSites) {
+      if (!r || !isFinite(r.lat) || !isFinite(r.lng)) continue;
+      const k = key(r);
+      const l = localMap.get(k);
+      if (!l) {
+        // Nouveau site distant → ajoute (même si tombstone, pour propager la suppression)
+        const migrated = typeof window.migrateCustomSite === 'function' ? window.migrateCustomSite({ ...r }) : { ...r };
+        if (!migrated.updatedAt) migrated.updatedAt = r.updatedAt || r.createdAt || Date.now();
+        if (migrated.deletedAt === undefined) migrated.deletedAt = r.deletedAt || null;
+        window.customSites.push(migrated);
+        localMap.set(k, migrated);
+        changes++;
+      } else if (siteTs(r) > siteTs(l)) {
+        // Remote plus récent → écrase local
+        Object.assign(l, r);
+        if (!l.updatedAt) l.updatedAt = Date.now();
+        if (l.deletedAt === undefined) l.deletedAt = null;
+        changes++;
+      }
+      // else: local plus récent ou égal → on garde local
+    }
+    if (changes > 0) {
+      try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
+      try { window.renderCustomSites?.(); } catch {}
+      try { window.refreshCustomMarkers?.(); } catch {}
+      try { window._fpMobileRefreshSites?.(); } catch {}
+      console.log(`[cloud-sync] CRDT merge: ${changes} change(s) applied from cloud`);
+    }
+    return changes;
+  }
+
   async function pull() {
     const user = getUser();
     if (!user) return { ok: false, reason: 'NO_USER' };
     try {
       const r = await fetch(`${ENDPOINT}?user=${encodeURIComponent(user)}`, { cache: 'no-store' });
-      if (r.status === 503 || r.status === 404) { kvAvailable = false; setStatus('offline', r.status === 404 ? '/api/sync absent' : 'KV not configured'); return { ok: false, reason: 'KV_OFFLINE' }; }
+      if (r.status === 503 || r.status === 404) {
+        kvAvailable = false;
+        setStatus('offline', r.status === 404 ? '/api/sync absent' : 'KV not configured');
+        return { ok: false, reason: 'KV_OFFLINE' };
+      }
       if (!r.ok) { setStatus('error', `pull ${r.status}`); return { ok: false, reason: 'HTTP_' + r.status }; }
       kvAvailable = true;
       const data = await r.json();
       const remoteSites = Array.isArray(data.sites) ? data.sites : [];
-      const remoteTs = data.ts || 0;
-      mergeIntoLocal(remoteSites, remoteTs);
-      lastPulledTs = remoteTs;
-      setStatus('ok', `pulled ${remoteSites.length}`);
-      // Initial push: si cloud vide mais local a des sites pré-v6.29 → push.
-      // Couvre le scénario "j'avais des sites en localStorage avant que la
-      // cloud-sync existe" (typique pour Paul: floreasca sur iPhone, jamais
-      // pushed vers le cloud parce qu'il n'a pas modifié le site depuis v6.29).
-      if (remoteSites.length === 0 && Array.isArray(window.customSites) && window.customSites.length > 0) {
-        console.log('[cloud-sync] cloud vide + localStorage non-vide → push initial', window.customSites.length, 'sites');
+      const changes = mergeCRDT(remoteSites);
+      setStatus('ok', `pull ${remoteSites.length}${changes ? ` · ${changes} maj` : ''}`);
+      // Initial push si local non-vide et cloud vide (migration v6.29 legacy)
+      if (remoteSites.length === 0 && Array.isArray(window.customSites) && window.customSites.filter(s => !s.deletedAt).length > 0) {
+        console.log('[cloud-sync] cloud vide, push initial', window.customSites.length, 'sites (incl. tombstones)');
         await pushNow();
       }
-      return { ok: true, count: remoteSites.length, ts: remoteTs };
+      return { ok: true, count: remoteSites.length, changes };
     } catch (e) {
       setStatus('error', e.message || 'pull failed');
       return { ok: false, reason: 'NET', error: String(e) };
     }
   }
 
-  function mergeIntoLocal(remoteSites, remoteTs) {
-    if (!Array.isArray(window.customSites)) return;
-    // Dedup by lat/lng 4-decimal key. Remote wins on conflict (last-write-wins
-    // at the array level — we just replace local array if remote is newer).
-    const localKey = new Set(window.customSites.map(s => Number(s.lat).toFixed(4) + ',' + Number(s.lng).toFixed(4)));
-    let added = 0;
-    for (const s of remoteSites) {
-      if (!s || !isFinite(s.lat) || !isFinite(s.lng)) continue;
-      const k = Number(s.lat).toFixed(4) + ',' + Number(s.lng).toFixed(4);
-      if (localKey.has(k)) continue;
-      const migrated = typeof window.migrateCustomSite === 'function' ? window.migrateCustomSite({ ...s }) : s;
-      window.customSites.push(migrated);
-      localKey.add(k);
-      added++;
-    }
-    if (added > 0) {
-      try { window.safeStorage?.set('fpCustomSites', window.customSites); } catch {}
-      try { window.renderCustomSites?.(); } catch {}     // desktop list
-      try { window.refreshCustomMarkers?.(); } catch {}  // desktop pins
-      try { window._fpMobileRefreshSites?.(); } catch {} // mobile pins + carousel (v6.37 fix)
-      console.log(`[cloud-sync] pulled ${added} new site(s) from cloud`);
-    }
-  }
-
-  function schedulePush() {
-    if (kvAvailable === false) return; // don't spam if KV not configured
-    if (pushTimer) clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushNow, DEBOUNCE_MS);
-  }
-
+  /**
+   * Pull-before-push: on récupère l'état cloud, on merge avec local
+   * (CRDT per-site), puis on push l'union. Évite qu'un device en retard
+   * écrase des modifications faites sur un autre device.
+   */
   async function pushNow() {
+    if (pushInFlight) { pendingPushAfterFlight = true; return; }
     const user = getUser();
     if (!user) return;
     if (!Array.isArray(window.customSites)) return;
+    pushInFlight = true;
+    setStatus('syncing', 'pull+merge+push');
     try {
-      const r = await fetch(ENDPOINT, {
+      // Pull first to merge any remote changes we don't have yet
+      try {
+        const r = await fetch(`${ENDPOINT}?user=${encodeURIComponent(user)}`, { cache: 'no-store' });
+        if (r.status === 503 || r.status === 404) { kvAvailable = false; setStatus('offline', 'KV absent'); return; }
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data.sites)) mergeCRDT(data.sites);
+          kvAvailable = true;
+        }
+      } catch {}
+
+      // Push union (local merged with remote) — includes tombstones for propagation
+      const r2 = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user, sites: window.customSites }),
       });
-      if (r.status === 503) { kvAvailable = false; setStatus('offline', 'KV not configured'); return; }
-      if (!r.ok) { setStatus('error', `push ${r.status}`); return; }
+      if (r2.status === 503) { kvAvailable = false; setStatus('offline', 'KV not configured'); return; }
+      if (!r2.ok) { setStatus('error', `push ${r2.status}`); return; }
       kvAvailable = true;
-      const data = await r.json();
-      setStatus('ok', `pushed ${data.count || window.customSites.length}`);
+      const data = await r2.json();
+      const liveCount = window.customSites.filter(s => !s.deletedAt).length;
+      setStatus('ok', `${liveCount} sites synchros`);
     } catch (e) {
       setStatus('error', e.message || 'push failed');
+    } finally {
+      pushInFlight = false;
+      if (pendingPushAfterFlight) {
+        pendingPushAfterFlight = false;
+        setTimeout(pushNow, 200);
+      }
     }
+  }
+
+  function schedulePush() {
+    if (kvAvailable === false) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, DEBOUNCE_MS);
   }
 
   function startPolling() {
@@ -152,11 +234,15 @@
     pushNow,
     isAvailable: () => kvAvailable,
     status: () => window[STATUS_KEY] || { state: 'unknown' },
+    // Debug utils
+    _purgeTombstones: purgeOldTombstones,
+    _stampSites: stampExistingSites,
   };
 
-  // Auto-boot: on login-success event (defined in index.html) we pull,
-  // then start light polling. Also pull on tab focus (visibilitychange).
+  // Auto-boot
   window.addEventListener('fp:login-success', async () => {
+    stampExistingSites();
+    purgeOldTombstones();
     await pull();
     startPolling();
   });
