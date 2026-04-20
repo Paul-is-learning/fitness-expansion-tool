@@ -1,6 +1,42 @@
 
 # Changelog
 
+## [v6.50-irr-respects-overrides-at-boot] — 2026-04-20
+
+### 🐛 Bug critique : IRR affiché à l'ouverture ignore les overrides persistés
+
+**Symptôme Paul** (captures Militari Shopping) :
+- À l'ouverture : loyer slider 10€/m², charges 2€/m², surface 1150m² → IRR **+22%**, NPV 122k€, WATCH, CAF Y1 rouge faible.
+- Après avoir touché un slider (même +0.5 charges) : même 3 valeurs (10 / 2.5 / 1150) → IRR **+54%**, NPV 1.5M€, **GO COND**, CAF Y1 -40k€.
+- **Plus de charges devrait baisser le TRI, pas l'augmenter.** Incohérent.
+
+### Cause
+
+`ensureAnalysis(i)` dans `src/mobile.js` retournait du cache `analyses[i]` sans vérifier si ce cache avait été calculé avec les overrides actifs pour le site. Flow boot :
+
+1. Init mobile → setTimeout ensureAnalysis(0-4) tous les 300ms
+2. `ensureAnalysis(0)` appelle `runCaptageAnalysis(lat, lng)` **sans** `restoreSiteOverrides` préalable
+3. Les globales `_rentOverride / _chargeOverride / _surfaceOverride` sont null → buildPnL utilise rent/charge/surface **par défaut** (10.5 € Hala / 5.5 charges / 1449 m²), pas les overrides Militari
+4. `analyses[0] = { irrBase: 7.2%, ... }` cached avec le mauvais modèle
+
+Puis au clic sur le slider, le handler rent-slider restore bien les overrides et recalcule → nouvelles valeurs correctes. D'où l'incohérence.
+
+### Fix
+
+- **`ensureAnalysis(i)`** : appelle `restoreSiteOverrides(siteKeyFor(t))` avant tout. Calcule une signature `ovSig` (JSON des 3 overrides pour ce site) et invalide le cache si différent. Sauve `_ovSig` dans `analyses[i]` pour pouvoir comparer.
+- **`fp:overrides-updated` listener** : invalide tout `analyses[]` + re-run ensureAnalysis du site actif + `buildDetail` si fiche ouverte.
+- **`transitionTo('detail')` post-pull** : si pull détecte changement cloud, invalide cache + re-ensure + buildDetail.
+
+### Résultat
+
+TRI / NPV / verdict affichés à l'ouverture reflètent **exactement** les sliders. Glisser un slider (ex: +0.5€ charges) fait évoluer les KPI de façon **cohérente** (plus de charges → TRI baisse).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.49-sync-instantaneous-overrides] — 2026-04-20
 
 ### 🔥 Sync mobile ↔ desktop instantanée + overrides inclus

@@ -429,12 +429,15 @@
       setTimeout(() => wirePullDownDismiss(), 100);
       // v6.49 — pull cloud immédiat à l'ouverture de la fiche pour récupérer
       // les overrides loyer/charges/surface modifiés depuis desktop. Sans attendre
-      // les 5s du polling. Si changement détecté, l'event fp:overrides-updated
-      // rebuild la fiche.
+      // les 5s du polling. v6.50 — en cas de changement, invalider le cache
+      // analyses[activeIdx] puis re-run ensureAnalysis (qui détectera la nouvelle
+      // signature overrides) + buildDetail.
       try {
         window.cloudSync?.pull?.().then((res) => {
-          if (res && res.changes && res.changes > 0 && typeof buildDetail === 'function') {
-            buildDetail();
+          if (res && res.changes && res.changes > 0) {
+            if (Array.isArray(analyses) && analyses[activeIdx]) analyses[activeIdx] = null;
+            ensureAnalysis(activeIdx);
+            if (typeof buildDetail === 'function') buildDetail();
           }
         });
       } catch {}
@@ -678,13 +681,26 @@
   }
 
   function ensureAnalysis(i) {
-    if (analyses[i]) { refreshCard(i); return; }
     if (typeof runCaptageAnalysis !== 'function') return;
     if (typeof computeExecSummary !== 'function') return;
     if (typeof loadAllCompetitors !== 'function') return;
     const sites = getAllSites();
     const t = sites[i];
     if (!t) return;
+    // v6.50 — SCOPE les overrides du site AVANT tout calcul/cache check. Bug
+    // signalé par Paul: au boot ensureAnalysis(i) était appelé sans restore
+    // préalable → IRR initial calculé avec loyer/charges/surface par défaut,
+    // ignorait les overrides persistés pour ce site. D'où incohérence entre
+    // TRI affiché à l'ouverture et valeurs des sliders.
+    const key = siteKeyFor(t);
+    restoreSiteOverrides(key);
+    // Signature des overrides actifs → invalide cache si changé depuis dernier calcul.
+    const ovSig = JSON.stringify({
+      r: window._rentOverrides?.[key] ?? null,
+      c: window._chargeOverrides?.[key] ?? null,
+      s: window._surfaceOverrides?.[key] ?? null,
+    });
+    if (analyses[i] && analyses[i]._ovSig === ovSig) { refreshCard(i); return; }
     const doIt = () => {
       try {
         const r = runCaptageAnalysis(t.lat, t.lng, 3000);
@@ -692,12 +708,13 @@
         analyses[i] = {
           members: r.totalTheorique,
           irrBase: r.pnl?.base?.irr,                // IRR Projet (unlevered)
-          irrEquity: r.pnl?.base?.irrEquity,        // v6.46 — IRR Equity (levered, ce que Paul veut voir par défaut)
+          irrEquity: r.pnl?.base?.irrEquity,        // v6.46 — IRR Equity (levered)
           npvBase: r.pnl?.base?.npv,
           beBase: r.pnl?.base?.breakevenMonth,
           verdict: typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict,
           score: exec.total,
-          raw: r
+          raw: r,
+          _ovSig: ovSig, // v6.50 — signature overrides utilisés pour ce calcul (invalide cache si changent)
         };
         refreshCard(i);
         hideCompetitorMarkers(); // keep the map clean post-analysis
@@ -2930,6 +2947,22 @@
   } else {
     waitForApp(init);
   }
+
+  // v6.50 — listener cloud: si overrides mis à jour depuis un autre device,
+  // invalider le cache analyses et rebuild la fiche/carousel pour que les
+  // KPI hero (TRI, NPV, membres) reflètent les nouveaux overrides.
+  window.addEventListener('fp:overrides-updated', () => {
+    try {
+      // Invalide tout le cache analyses (simple et sûr — 5 sites max).
+      for (let i = 0; i < (analyses?.length || 0); i++) analyses[i] = null;
+      // Recalcule le site actif en priorité (pour refresh hero + sparklines)
+      if (typeof ensureAnalysis === 'function' && activeIdx != null) ensureAnalysis(activeIdx);
+      // Rebuild la fiche si ouverte
+      if (state === 'detail' && typeof buildDetail === 'function') buildDetail();
+      // Refresh carousel (verdict, IRR, NPV peuvent avoir changé)
+      if (typeof renderCarousel === 'function') renderCarousel();
+    } catch (e) { console.warn('[FP mobile] fp:overrides-updated handler failed:', e); }
+  });
 
   // Resize / orientation
   window.addEventListener('resize', () => {
