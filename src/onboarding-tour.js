@@ -1192,8 +1192,10 @@
   }
 
   function demoBpRevenue() {
-    // Courbe ramp-up CA sur 10 ans (clubs × prix × ramp-up)
-    const years = [0.4, 1.9, 4.9, 11.5, 18.9, 31.0, 40.5, 45.8, 49.0, 51.3];
+    // Courbe ramp-up CA enseigne 100% réseau (27 succ + 13 franc, 40 clubs A7).
+    // Source: 01_DCF_BPI!R19 (TOTAL CA ENSEIGNE) — BP Avril 2026 v6.35.
+    // Valeurs en M€ (arrondies à 0.01 près).
+    const years = [0.88, 3.73, 10.33, 20.67, 27.75, 35.66, 42.53, 47.23, 49.71, 51.29];
     const max = 52;
     return `
       <div style="width:100%;display:flex;flex-direction:column;gap:10px;position:relative">
