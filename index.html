@@ -1890,9 +1890,8 @@ function qualifyCustomSite(id, status, rating) {
 let customMarkersLayer = L.layerGroup();
 
 function addCustomSiteMarker(site, displayNum) {
-  // v6.32: pins custom = même style rond doré numéroté que TARGETS desktop.
-  // Numérotation continue: TARGETS = 1-5, customs = 6, 7, 8... (demande Paul).
-  // Couleur du gradient varie selon status (prospect/shortlist=doré, validated=vert, rejected=rouge).
+  // v6.48 — pin blanc stylisé FP (remplace ancien pin doré numéroté).
+  // Logo FP + swoosh jaune centrés dans cercle blanc, badge numéro en coin.
   const palette = {
     prospect:  { light: '#f3c44f', dark: '#d4a017' },
     shortlist: { light: '#f3c44f', dark: '#d4a017' },
@@ -1900,12 +1899,13 @@ function addCustomSiteMarker(site, displayNum) {
     rejected:  { light: '#f87171', dark: '#ef4444' },
   };
   const p = palette[site.status] || palette.prospect;
-  const c = p.dark; // for shadow/popup
+  const c = p.dark; // for popup status color
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
-  const num = displayNum != null ? displayNum : '★';
-  const icon=L.divIcon({className:'',
-    html:`<div style="width:30px;height:30px;background:linear-gradient(135deg,${p.light},${p.dark});border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;box-shadow:0 3px 10px ${p.dark}80,0 0 0 1px ${p.dark}66;cursor:pointer">${num}</div>`,
-    iconSize:[30,30],iconAnchor:[15,15]});
+  const num = displayNum != null ? displayNum : null;
+  const pinHtml = (typeof window.fpLogoPinHTML === 'function')
+    ? window.fpLogoPinHTML({ size: 36, num })
+    : `<div style="width:36px;height:36px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP${num != null ? ' '+num : ''}</div>`;
+  const icon = L.divIcon({ className:'', html: pinHtml, iconSize:[42,42], iconAnchor:[21,21] });
   const mk=L.marker([site.lat,site.lng],{icon,draggable:false});
   // XSS-safe: user-supplied name/notes are escapeHtml'd before injection.
   // v6.43 — lien "Supprimer" dans le popup pour delete direct depuis la carte
@@ -6920,12 +6920,11 @@ function renderTargetPinsDesktop() {
   if (window.innerWidth <= 768) { targetMarkersLayer.clearLayers(); return; }
   targetMarkersLayer.clearLayers();
   TARGETS.forEach((t, i) => {
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="width:30px;height:30px;background:linear-gradient(135deg,#f3c44f,#d4a017);border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;box-shadow:0 3px 10px rgba(212,160,23,.5),0 0 0 1px rgba(212,160,23,.4);cursor:pointer">${i+1}</div>`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
-    });
+    // v6.48 — pin blanc FP stylisé
+    const pinHtml = (typeof window.fpLogoPinHTML === 'function')
+      ? window.fpLogoPinHTML({ size: 36, num: i + 1 })
+      : `<div style="width:36px;height:36px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP ${i+1}</div>`;
+    const icon = L.divIcon({ className: '', html: pinHtml, iconSize: [42, 42], iconAnchor: [21, 21] });
     const mk = L.marker([t.lat, t.lng], { icon });
     const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
     mk.bindPopup(`<h3>${esc(t.name)}</h3>

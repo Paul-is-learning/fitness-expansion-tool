@@ -1222,25 +1222,22 @@
     50% { transform: translate(-50%, -6px); }
   }
 
-  /* ═════ PIN ENHANCEMENTS (numbered, animated) ═════ */
+  /* ═════ PIN ENHANCEMENTS (v6.48: wrapper transparent, pin FP inside) ═════ */
+  /* Avant v6.48: pin doré numéroté directement via ce CSS. Depuis v6.48: le
+     wrapper .fp-target-pin ne fait que hériter l'état active (scale + pulse).
+     Le vrai visuel (cercle blanc + logo FP) est dans le enfant SVG généré
+     par window.fpLogoPinHTML (voir src/fp-logos.js). */
   .fp-target-pin {
-    background: linear-gradient(135deg, var(--accent2) 0%, var(--accent) 100%) !important;
-    width: 36px !important; height: 36px !important;
-    border-radius: 50% !important;
-    border: 3px solid var(--white) !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,.5), 0 0 0 1px rgba(212,160,23,.5) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    color: #000 !important;
-    font-weight: 900 !important;
-    font-size: 15px !important;
-    font-family: var(--font) !important;
-    transition: transform var(--spring-bounce), box-shadow .25s;
+    transition: transform var(--spring-bounce);
   }
   .fp-target-pin.active {
-    transform: scale(1.18);
-    box-shadow: 0 6px 18px rgba(212,160,23,.7), 0 0 0 4px rgba(212,160,23,.3) !important;
+    transform: scale(1.1);
     z-index: 1000 !important;
     animation: fpPinPulse 2.2s ease-in-out infinite;
   }

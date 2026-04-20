@@ -1,6 +1,30 @@
 
 # Changelog
 
+## [v6.48-fp-white-logo-pins-map] — 2026-04-20
+
+### ✨ Pins FP blancs sur la carte (remplace anciens pins dorés numérotés)
+
+Paul a demandé que les pins TARGETS (1-5) et les customs (6+) utilisent un logo Fitness Park stylé fond blanc au lieu des anciens cercles dorés avec numéro. Plus propre, ressort mieux sur carte sombre.
+
+### Implémentation
+
+- **`src/fp-logos.js`** : nouveau helper `window.fpLogoPinHTML({ size, active, num })` qui retourne le HTML d'un pin blanc rond 36px (42 actif) avec SVG logo FP centré (texte "FP" gras noir + swoosh jaune) + petit badge numéro dans un coin (top-right, 38% taille du pin, fond noir/texte jaune/bordure blanche).
+- **`index.html` `addCustomSiteMarker`** (customs desktop) : pin HTML via helper.
+- **`index.html` `renderTargetPinsDesktop`** (TARGETS desktop) : pin HTML via helper.
+- **`src/mobile.js` `buildTargetPins`** (mobile targets + customs) : pin HTML via helper + wrapper `.fp-target-pin` conservé pour le toggle `.active` et pulse.
+- **`mobile.css`** : `.fp-target-pin` réinitialisé (transparent, no border/shadow) — le visuel est maintenant entièrement géré par le SVG enfant. `.active` garde scale + pulse animation.
+
+### Rendu
+
+Sur carte sombre Bucharest, les pins blancs ressortent immédiatement. Le badge numéro en coin garde la cohérence UX entre carte, liste "Mes sites" et carousel mobile (pin N = site N dans la liste). Pin actif = glow doré + pulse.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Vérifié visuellement dans le preview — les 5 TARGETS + customs s'affichent correctement avec le nouveau pin.
+
+---
+
 ## [v6.47-desktop-vignette-clicks-analyze] — 2026-04-20
 
 ### 🐛 Desktop "Analyser" sur TARGET ne lançait aucune analyse

@@ -2536,11 +2536,16 @@
 
     const sites = getAllSites();
     sites.forEach((t, i) => {
-      const isCustom = t._kind === 'custom';
+      // v6.48 — pin blanc FP stylisé (mobile). Actif = plus gros avec glow.
+      const active = i === activeIdx;
+      const pinHtml = (typeof window.fpLogoPinHTML === 'function')
+        ? `<div class="fp-target-pin${active ? ' active' : ''}">${window.fpLogoPinHTML({ size: 36, active, num: i + 1 })}</div>`
+        : `<div class="fp-target-pin${active ? ' active' : ''}">${i + 1}</div>`;
+      const iconDim = active ? 44 : 40; // wrapper + scale buffer
       const icon = L.divIcon({
         className: '',
-        html: `<div class="fp-target-pin${i === activeIdx ? ' active' : ''}${isCustom ? ' fp-custom-pin' : ''}">${i + 1}</div>`,
-        iconSize: [36, 36], iconAnchor: [18, 18]
+        html: pinHtml,
+        iconSize: [iconDim, iconDim], iconAnchor: [iconDim / 2, iconDim / 2]
       });
       const m = L.marker([t.lat, t.lng], { icon, zIndexOffset: 700 }).addTo(pinLayer);
       m.on('click', () => {
