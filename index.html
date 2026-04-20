@@ -1908,14 +1908,33 @@ function addCustomSiteMarker(site, displayNum) {
     iconSize:[30,30],iconAnchor:[15,15]});
   const mk=L.marker([site.lat,site.lng],{icon,draggable:false});
   // XSS-safe: user-supplied name/notes are escapeHtml'd before injection.
+  // v6.43 — lien "Supprimer" dans le popup pour delete direct depuis la carte
+  // (plus rapide qu'aller dans l'onglet "Mes sites"). confirmDeleteCustomSite
+  // fait le confirm() natif + removeCustomSite(id) (soft-delete + push cloud).
   mk.bindPopup(`<h3>${esc(site.name)}</h3>
     <div class="ps"><span>Statut</span><span class="pv" style="color:${c}">${esc(site.status)}</span></div>
     <div class="ps"><span>Notes</span><span class="pv">${esc(site.notes) || '-'}</span></div>
-    <div style="margin-top:6px"><a href="#" onclick="analyzeCustomSite(${Number(site.id)});return false" style="color:#d4a017;font-size:11px;font-weight:600">Analyser ce site &rarr;</a></div>
+    <div style="margin-top:8px;display:flex;justify-content:space-between;gap:8px;align-items:center">
+      <a href="#" onclick="analyzeCustomSite(${Number(site.id)});return false" style="color:#d4a017;font-size:11px;font-weight:600">Analyser ce site &rarr;</a>
+      <a href="#" onclick="confirmDeleteCustomSite(${Number(site.id)});return false" style="color:#f87171;font-size:11px;font-weight:600" title="Supprimer ce site">&#10005; Supprimer</a>
+    </div>
   `);
   mk.siteId = site.id;
   customMarkersLayer.addLayer(mk);
 }
+
+// v6.43 — wrapper avec confirm() pour le lien "Supprimer" dans le popup Leaflet
+// du pin custom. Appelle removeCustomSite (soft-delete + push cloud + UI refresh).
+function confirmDeleteCustomSite(id) {
+  const idStr = String(id);
+  const site = customSites.find(s => String(s.id) === idStr);
+  if (!site) { alert('Site introuvable. Rechargez la page.'); return; }
+  if (!confirm(`Supprimer "${site.name}" ?\n\nLe site sera retiré de cet appareil et de tous tes autres appareils (iPhone, Mac…).`)) return;
+  removeCustomSite(idStr);
+  // Ferme le popup Leaflet ouvert (sinon il reste affiché sur un site qui n'existe plus)
+  try { map?.closePopup?.(); } catch {}
+}
+window.confirmDeleteCustomSite = confirmDeleteCustomSite;
 
 function refreshCustomMarkers() {
   customMarkersLayer.clearLayers();
@@ -6479,12 +6498,19 @@ function renderCustomSites() {
             <option value="rejected" ${s.status==='rejected'?'selected':''}>Rejeté</option>
           </select>
           <button class="btn btn-sm" onclick="analyzeCustomSite(${s.id})">Analyser</button>
-          <button class="btn btn-sm" style="color:var(--red)" onclick="if(confirm('Supprimer ce site?'))removeCustomSite(${s.id})">Suppr.</button>
+          <button class="btn btn-sm" style="color:var(--red)" onclick="confirmDeleteCustomSite(${s.id})">Suppr.</button>
         </div>
       </div>
     </div>`).join('');
 
   list.innerHTML = targetCards + customCards;
+
+  // v6.44 — resync automatique du clone mobile (FAB → Mes sites) après
+  // chaque mutation. Sinon le site supprimé/ajouté reste stale dans le
+  // secondary sheet tant que Paul n'a pas refermé+rouvert le FAB.
+  document.querySelectorAll('[data-orig-id="customSitesList"]').forEach(clone => {
+    if (clone !== list) clone.innerHTML = list.innerHTML;
+  });
 
   // Update cannibalization
   if(customSites.filter(s=>!s.deletedAt).length >= 2) updateCannibalization();

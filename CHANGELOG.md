@@ -1,5 +1,23 @@
 # Changelog
 
+## [v6.44-delete-everywhere-consistent] — 2026-04-20
+
+### ✨ Suppression accessible partout + refresh auto du clone mobile
+
+**Additions**
+
+- **Desktop — popup pin carte** : dans `addCustomSiteMarker`, le popup Leaflet affiche maintenant "Analyser ce site →" ET "✕ Supprimer" côte à côte. Plus besoin d'aller dans l'onglet "Mes sites" pour supprimer — click direct sur le pin doré → popup → Supprimer → confirm → tombstone + push cloud.
+- **Nouvelle fonction** `window.confirmDeleteCustomSite(id)` dans `index.html` : wrapper centralisé avec `confirm()` enrichi ("Le site sera retiré de cet appareil et de tous tes autres appareils (iPhone, Mac…)") + `removeCustomSite` + `map.closePopup()`. Utilisée par :
+  - popup pin carte desktop (nouveau)
+  - bouton "Suppr." de la liste "Mes sites" desktop (remplace l'ancien `onclick="if(confirm(...))removeCustomSite()"` inline)
+- **Mobile — resync auto du clone "Mes sites"** : `renderCustomSites()` copie désormais son innerHTML vers tous les `[data-orig-id="customSitesList"]` (clones FAB secondary sheet). Avant v6.44, un site supprimé restait visible dans le secondary sheet mobile jusqu'à fermeture/réouverture du FAB. Maintenant la liste se met à jour en temps réel.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.42-mobile-delete-custom-site] — 2026-04-20
 
 ### ✨ Suppression mobile des custom sites
