@@ -1,5 +1,30 @@
 # Changelog
 
+## [v6.39-sync-immediate-plus-beacon] — 2026-04-20
+
+### 🔥 Fix critique sync mobile : les sites ajoutés sur iPhone disparaissent
+
+**Symptôme** : un site ajouté sur iPhone s'affiche correctement, mais après fermeture de l'onglet Safari il n'apparaît ni sur iPhone au reload ni sur desktop. Confirmé via `curl /api/sync` → shared KV vide pour le nouveau site.
+
+**Cause** : le hook `cloudSync.push()` après `addCustomSite` / `removeCustomSite` / `qualifyCustomSite` / `importCustomSites` passait par un debounce 700ms (`schedulePush`). Sur iOS, l'utilisateur ferme souvent l'onglet dans un délai < 700ms après l'ajout → le `setTimeout` est annulé, aucun POST ne part, le site est perdu (Safari iOS ITP ou eviction purge ensuite le localStorage entre les sessions).
+
+### Changements
+
+- **`index.html`** (4 occurrences) : `window.cloudSync?.push()` → `window.cloudSync?.pushNow()`. Push immédiat, plus de debounce pour les mutations user-initiated.
+- **`src/cloud-sync.js`** : handler `pagehide` qui utilise `navigator.sendBeacon` comme filet de sécurité. Garantit par le navigateur pour survivre à l'unload, même si iOS ferme l'onglet en arrière-plan.
+
+### Comportement attendu
+
+- Ajout de site iPhone → POST part **immédiatement** (visible dans curl `/api/sync` sous 1s).
+- Fermeture brutale de l'onglet iPhone → sendBeacon fire-and-forget, 200 côté serveur même si la page est déjà dead.
+- Au prochain reload iPhone → `pull()` au `fp:login-success` récupère le site depuis le shared KV via CRDT merge, même si le localStorage local a été vidé par iOS.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (pas d'impact sur le moteur financier).
+
+---
+
 ## [v6.35-bp-harmonized-avril2026] — 2026-04-20
 
 ### 🔥 Synchronisation complète avec le BP Excel harmonisé (Avril 2026)

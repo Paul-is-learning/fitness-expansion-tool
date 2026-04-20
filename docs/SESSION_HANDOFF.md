@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.35-bp-harmonized-avril2026 (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.39-sync-immediate-plus-beacon (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -168,7 +168,18 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (2026-04-20 · v6.23 → v6.34)
+## Dernière session (2026-04-20 · v6.38 → v6.39)
+
+### Fix critique sync mobile (v6.39)
+- **Symptôme reproduit par Paul** : site ajouté sur iPhone → visible en session → fermeture onglet → **disparu** au reload iPhone ET invisible sur desktop. `curl /api/sync` confirme : shared KV ne contient pas le nouveau site (seul `floreasca` desktop legacy).
+- **Cause** : `cloudSync.push()` était debounce 700ms. iOS ferme souvent l'onglet avant → `setTimeout` annulé → aucun POST parti → Safari iOS ITP purge ensuite le localStorage entre sessions, perte définitive.
+- **Fix** :
+  - `index.html` (4 call sites) : `cloudSync?.push()` → `cloudSync?.pushNow()` (push immédiat).
+  - `src/cloud-sync.js` : handler `pagehide` avec `navigator.sendBeacon(ENDPOINT, blob)`. Garanti par le navigateur pour survivre à l'unload.
+- Tests 197/197 PASS.
+- **À valider par Paul** : reproduire le flow iPhone (ajout → ferme onglet → rouvre) et vérifier que le site persiste + apparaît sur desktop.
+
+## Session précédente (2026-04-20 · v6.23 → v6.34)
 
 ### Onboarding tour — stabilisation rendu (v6.23 → v6.24)
 - **v6.23** : refonte slides en CSS grid stacking (toutes slides partagent la même cellule grid, hauteur = plus grand slide) → fix chevauchement contenu/dots/CTA sur slides BP + Sources. `syncWrapHeight` JS devient no-op.

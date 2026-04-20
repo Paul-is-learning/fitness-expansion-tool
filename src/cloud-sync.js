@@ -249,4 +249,20 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && getUser() && kvAvailable !== false) pull();
   });
+
+  // v6.39 — beacon push on pagehide (iOS Safari ferme les onglets en background
+  // sans laisser le temps au fetch POST de partir). sendBeacon est garanti par
+  // le navigateur pour survivre à l'unload. On ne pousse que si on a un user
+  // canonical + au moins un site (live ou tombstone à propager).
+  window.addEventListener('pagehide', () => {
+    try {
+      const user = getUser();
+      if (!user) return;
+      if (kvAvailable === false) return;
+      if (!Array.isArray(window.customSites) || window.customSites.length === 0) return;
+      const payload = JSON.stringify({ user, sites: window.customSites });
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon?.(ENDPOINT, blob);
+    } catch {}
+  });
 })();
