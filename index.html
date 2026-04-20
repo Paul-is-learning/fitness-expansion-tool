@@ -2061,10 +2061,12 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   const capMembers = n => n; // no cap — let model show full potential
   const monthlyARPU = getPanierMoyenHT(); // Uses blended ARPU (base + VAD premium/ultimate)
 
+  // v6.46 — facturation 4 sem = 13 périodes/an (cf PNL_DEFAULTS.billingPeriodsPerYear)
+  const periodsPerYear = (typeof PNL_DEFAULTS !== 'undefined' && PNL_DEFAULTS.billingPeriodsPerYear) || 13;
   return {
-    pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*12/1000)},
-    realistic: {members:capMembers(realistic), ca:Math.round(capMembers(realistic)*monthlyARPU*12/1000)},
-    optimistic: {members:capMembers(optimistic), ca:Math.round(capMembers(optimistic)*monthlyARPU*12/1000)},
+    pessimistic: {members:capMembers(pessimistic), ca:Math.round(capMembers(pessimistic)*monthlyARPU*periodsPerYear/1000)},
+    realistic: {members:capMembers(realistic), ca:Math.round(capMembers(realistic)*monthlyARPU*periodsPerYear/1000)},
+    optimistic: {members:capMembers(optimistic), ca:Math.round(capMembers(optimistic)*monthlyARPU*periodsPerYear/1000)},
     penetration: (effectivePenetration*100).toFixed(1),
     fluxBonus: Math.round(fluxBonus*100),
     breakeven: capMembers(realistic) >= 2800 ? 'OUI' : capMembers(realistic) >= 2000 ? 'POSSIBLE' : 'NON'
@@ -4533,7 +4535,8 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
   for(let i = 0; i < data.length; i++) {
     const yearIdx = Math.floor(i / 12);
     const yearNum = yearIdx + 1;
-    const caAdherents = data[i].monthlyCA;
+    // v6.46 — facturation 4 sem = 13 périodes/an
+    const caAdherents = Math.round(data[i].monthlyCA * PNL_DEFAULTS.billingFactor);
     const ptRevenue = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yearIdx));
     const totalCA = caAdherents + ptRevenue;
     const costOfSales = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);
@@ -4678,7 +4681,13 @@ const PNL_DEFAULTS = {
   priceUltimateHT: 39.5,     // Ultimate HT (HYPOTHESES!C44)
   arpuMeanHT: 25.49,         // Panier moyen HT avec VAD 20% (HYPOTHESES!C47)
   TAUX_VAD: 0.20,            // % clients VAD (HYPOTHESES!C46)
-  TVA_RO: 0.21               // TVA Roumanie (HYPOTHESES!C24)
+  TVA_RO: 0.21,              // TVA Roumanie (HYPOTHESES!C24)
+  // v6.46 — Facturation 4 semaines = 13 périodes/an (pattern FP/low-cost).
+  // Source: Paul BP Avril 2026 "facturation tout les 4 semaines = 13 mois".
+  // Appliqué comme multiplicateur sur caAdherents MENSUEL pour annualiser à 13 périodes.
+  // Ne s'applique PAS au PT revenue (ptMonthlyRevenue reste × 12).
+  billingPeriodsPerYear: 13,
+  billingFactor:         13 / 12,   // ≈ 1.0833 — applique au caAdherents mensuel
 };
 
 // Get monthly rent (all-in: base rent + service charges + marketing) for a given year
@@ -4827,7 +4836,8 @@ function buildPnL(cohortData, avgQuartierPrice) {
     const yearNum = yearIdx + 1; // A1, A2, ...
 
     // --- REVENUE ---
-    const caAdherents = d.monthlyCA;
+    // v6.46 — facturation 4 sem = 13 périodes/an → CA adhérents × 13/12
+    const caAdherents = Math.round(d.monthlyCA * PNL_DEFAULTS.billingFactor);
     const ptRevenue = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yearIdx));
     const totalCA = caAdherents + ptRevenue;
 
@@ -4926,7 +4936,8 @@ function buildPnL(cohortData, avgQuartierPrice) {
       const d = cohortData[i];
       const yIdx = Math.floor(i / 12);
       const yNum = yIdx + 1;
-      const caAdh = d.monthlyCA;
+      // v6.46 — facturation 4 sem = 13 périodes/an
+      const caAdh = Math.round(d.monthlyCA * PNL_DEFAULTS.billingFactor);
       const ptRev = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1 + PNL_DEFAULTS.ptGrowth, yIdx));
       const tCA = caAdh + ptRev;
       const cos = Math.round(tCA * PNL_DEFAULTS.costOfSalesRate);
@@ -5088,7 +5099,8 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       const d = simCohort[m];
       const yearIdx = Math.floor(m / 12);
       const yearNum = yearIdx + 1;
-      const caAdherents = d.monthlyCA;
+      // v6.46 — facturation 4 sem = 13 périodes/an
+      const caAdherents = Math.round(d.monthlyCA * PNL_DEFAULTS.billingFactor);
       const ptRev = Math.round(PNL_DEFAULTS.ptMonthlyRevenue * Math.pow(1.05, yearIdx));
       const totalCA = caAdherents + ptRev;
       const cos = Math.round(totalCA * PNL_DEFAULTS.costOfSalesRate);

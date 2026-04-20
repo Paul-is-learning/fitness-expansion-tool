@@ -368,8 +368,10 @@
     const verdict = a?.verdict || 'loading';
     const verClass = 'fp-verdict ' + verdictClass(verdict);
     const verLabel = verdict === 'loading' ? '…' : verdict.replace('GO CONDITIONNEL', 'GO COND');
-    const irr = a ? fmtPct(a.irrBase) : '—';
-    const irrClass = a?.irrBase > 0 ? 'good' : (a?.irrBase < 0 ? 'bad' : '');
+    // v6.46 — hero affiche IRR Equity (TRI leveragé) par défaut, ce que Paul demande
+    const irrMetric = (a?.irrEquity != null) ? a.irrEquity : a?.irrBase;
+    const irr = a ? fmtPct(irrMetric) : '—';
+    const irrClass = irrMetric > 0 ? 'good' : (irrMetric < 0 ? 'bad' : '');
     const members = a ? fmtNum(a.members) : '—';
     const be = a?.beBase ? a.beBase + ' mo' : '—';
     const npv = a ? fmtM(a.npvBase) : '—';
@@ -678,7 +680,8 @@
         const exec = computeExecSummary(r);
         analyses[i] = {
           members: r.totalTheorique,
-          irrBase: r.pnl?.base?.irr,
+          irrBase: r.pnl?.base?.irr,                // IRR Projet (unlevered)
+          irrEquity: r.pnl?.base?.irrEquity,        // v6.46 — IRR Equity (levered, ce que Paul veut voir par défaut)
           npvBase: r.pnl?.base?.npv,
           beBase: r.pnl?.base?.breakevenMonth,
           verdict: typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict,
@@ -770,9 +773,9 @@
           <div style="font-size:10px;color:var(--gray);margin-top:2px">${fmtNum(r.pessimiste)} – ${fmtNum(r.optimiste)}</div>
         </div>
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.irrBase')}</div>
-          <div style="font-size:26px;font-weight:900;color:${a.irrBase > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtPct(a.irrBase)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.payback')}${pbSuffix}</div>
+          <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">TRI Equity</div>
+          <div style="font-size:26px;font-weight:900;color:${(a.irrEquity ?? a.irrBase) > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtPct(a.irrEquity ?? a.irrBase)}</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:2px">Projet: ${fmtPct(a.irrBase)} · ${_t('detail.hero.payback')}${pbSuffix}</div>
         </div>
         <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
           <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.npv5yr')}</div>
@@ -1014,7 +1017,7 @@
         const nNode = heroCards[2].querySelector('div[style*="font-size:22px"]');
         const sNode = heroCards[3].querySelector('div[style*="font-size:26px"]');
         if (mNode) animateNumber(mNode, 0, a.members,  700, v => fmtNum(v));
-        if (iNode) animateNumber(iNode, 0, a.irrBase,  700, v => fmtPct(v));
+        if (iNode) animateNumber(iNode, 0, (a.irrEquity ?? a.irrBase), 700, v => fmtPct(v));
         if (nNode) animateNumber(nNode, 0, a.npvBase,  700, v => fmtM(v));
         if (sNode) animateNumber(sNode, 0, Math.round(a.score), 700, v => Math.round(v));
       }
@@ -1602,15 +1605,18 @@
       const r = runCaptageAnalysis(t.lat, t.lng, 3000);
       const exec = computeExecSummary(r);
       const a = analyses[activeIdx];
-      const oldMembers = a?.members, oldIrr = a?.irrBase, oldNpv = a?.npvBase;
+      const oldMembers = a?.members;
+      const oldIrr = a?.irrEquity ?? a?.irrBase; // v6.46 — hero affiche Equity
+      const oldNpv = a?.npvBase;
       if (a) {
-        a.members  = r.totalTheorique;
-        a.irrBase  = r.pnl?.base?.irr;
-        a.npvBase  = r.pnl?.base?.npv;
-        a.beBase   = r.pnl?.base?.breakevenMonth;
-        a.verdict  = typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict;
-        a.score    = exec.total;
-        a.raw      = r;
+        a.members   = r.totalTheorique;
+        a.irrBase   = r.pnl?.base?.irr;
+        a.irrEquity = r.pnl?.base?.irrEquity; // v6.46
+        a.npvBase   = r.pnl?.base?.npv;
+        a.beBase    = r.pnl?.base?.breakevenMonth;
+        a.verdict   = typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict;
+        a.score     = exec.total;
+        a.raw       = r;
       }
       // ═══ Persist KPIs dans _siteAnalyses (v6.21) ═══
       // Critical : sans cet appel, le Dashboard compare (desktop) + l'export
@@ -1663,8 +1669,10 @@
       const sNode = heroCards[3].querySelector('div[style*="font-size:26px"]');
       if (mNode) animateNumber(mNode, prev.oldMembers || 0, a.members, 500, (v) => fmtNum(v));
       if (iNode) {
-        iNode.style.color = (a.irrBase > 0 ? '#34d399' : '#f87171');
-        animateNumber(iNode, prev.oldIrr || 0, a.irrBase, 500, (v) => fmtPct(v));
+        // v6.46 — hero affiche IRR Equity (TRI leveragé)
+        const irrShown = (a.irrEquity ?? a.irrBase);
+        iNode.style.color = (irrShown > 0 ? '#34d399' : '#f87171');
+        animateNumber(iNode, prev.oldIrr || 0, irrShown, 500, (v) => fmtPct(v));
       }
       if (nNode) {
         nNode.style.color = (a.npvBase > 0 ? '#34d399' : '#f87171');

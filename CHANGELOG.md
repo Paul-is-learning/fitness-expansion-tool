@@ -1,4 +1,43 @@
 
+# Changelog
+
+## [v6.46-facturation-13-periodes-4-semaines] — 2026-04-20
+
+### 🔥 BP harmonisé v6.35 incomplet — facturation 4 semaines (13 périodes/an) manquante
+
+Paul a identifié que **la facturation se fait toutes les 4 semaines = 13 périodes par an** (pattern FP / low-cost) alors que le modèle calculait un CA annuel × 12 mois. Différence : **+8.33% CA adhérents/an**, impact majeur sur IRR/NPV.
+
+Ajouté dans `PNL_DEFAULTS` :
+```js
+billingPeriodsPerYear: 13,
+billingFactor: 13 / 12,   // ≈ 1.0833 — multiplicateur CA adhérents mensuel
+```
+
+Appliqué dans les 4 spots qui calculent `caAdherents` : main `buildPnL`, sensitivity analysis, IRR Offre Initiale, Monte Carlo. Plus le revenue scenarios pessimistic/realistic/optimistic. **Pas** appliqué au PT revenue.
+
+### Impact sur les 5 TARGETS (baselines régénérées)
+
+| Site | IRR Projet avant | IRR Projet après | NPV avant | NPV après |
+|---|---|---|---|---|
+| Hala Laminor | 62.8% | **69.0%** | 4,985k€ | **5,826k€** |
+| Baneasa | 65.9% | **72.2%** | 5,399k€ | **6,274k€** |
+| Unirea | 44.4% | **50.2%** | 2,764k€ | **3,420k€** |
+| Militari | 7.2% | **13.9%** | **-280k€** | **+122k€** |
+| Grand Arena | 1.4% | **8.6%** | -579k€ | -202k€ |
+
+Militari passe **NPV positif** pour la première fois.
+
+### Hero mobile : affichage TRI Equity (ce que Paul demandait)
+
+- `src/mobile.js` : les `analyses[]` stockent maintenant `irrEquity` (en plus de `irrBase`).
+- Hero KPI (carousel card + detail view) affiche **IRR Equity** (levered) par défaut — le TRI leveragé. Label "TRI Equity". IRR Projet en sous-texte dans le detail view ("Projet: X%").
+- Animation sur slider change + ouverture hero : pointent vers `irrEquity`.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** après regen baseline `.baseline.json` + inline `BASELINE`.
+
+---
 
 ## [v6.45-bp-plug-time-decay-everywhere] — 2026-04-20
 

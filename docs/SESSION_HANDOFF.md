@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.45-bp-plug-time-decay-everywhere (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.46-facturation-13-periodes-4-semaines (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -32,12 +32,12 @@ docs/MODEL.md           Golden numbers documentation
 docs/ARCHITECTURE.md    Layout fichiers + load order
 ```
 
-## 5 TARGETS (priorité expansion — IRR Projet post-v6.35 BP harmonisé Avril 2026)
-1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **62.8%** — flagship
-2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **65.9%** — destination mall premium
-3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **44.4%**
-4. **Militari Shopping** (Sec 6) — WATCH, IRR **7.2%**
-5. **Grand Arena** (Sec 4) — WATCH, IRR **1.4%**
+## 5 TARGETS (priorité expansion — IRR Projet post-v6.46 facturation 13 périodes)
+1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **69.0%** — flagship
+2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **72.2%** — destination mall premium
+3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **50.2%**
+4. **Militari Shopping** (Sec 6) — WATCH, IRR **13.9%** (NPV +122k€, enfin positif)
+5. **Grand Arena** (Sec 4) — WATCH, IRR **8.6%**
 
 Custom sites additionnés via UI desktop/mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites` + sync auto cloud KV via `/api/sync` (v6.29+). Dans l'onglet "Mes sites" desktop (v6.34), TARGETS et customs sont mergés dans une seule liste numérotée 1-N, pins uniformes ronds dorés.
 
