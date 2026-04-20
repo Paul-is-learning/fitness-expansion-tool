@@ -23,7 +23,7 @@
 
   const ENDPOINT = '/api/sync';
   const DEBOUNCE_MS = 700;          // coalesce rapid edits (raccourci v6.38)
-  const POLL_INTERVAL_MS = 15000;   // polling 15s tant que tab visible (v6.38 plus agressif)
+  const POLL_INTERVAL_MS = 5000;    // v6.49 — polling 5s (tab visible). ~500k KV calls/mois free tier.
   const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours (purge garbage)
   const STATUS_KEY = '_fpCloudSyncStatus';
 
@@ -149,6 +149,39 @@
     return changes;
   }
 
+  /**
+   * v6.49 — Merge des overrides per-site (loyer/charges/surface).
+   * Stratégie simple: si remote a des overrides et (local vide OU remote ts ≥ local ts),
+   * remote écrase local. Évite que local "gagne" silencieusement après reload.
+   * Déclenche un rerender des fiches ouvertes si ça change.
+   */
+  function mergeOverrides(remote) {
+    if (!remote || typeof remote !== 'object') return 0;
+    let changes = 0;
+    const maps = [
+      ['rent',    '_rentOverrides'],
+      ['charge',  '_chargeOverrides'],
+      ['surface', '_surfaceOverrides'],
+    ];
+    for (const [rKey, wKey] of maps) {
+      const rObj = remote[rKey];
+      if (!rObj || typeof rObj !== 'object') continue;
+      const lObj = window[wKey] || (window[wKey] = {});
+      for (const k in rObj) {
+        if (lObj[k] !== rObj[k]) {
+          lObj[k] = rObj[k];
+          changes++;
+        }
+      }
+    }
+    if (changes > 0) {
+      try { window.persistOverrides?.(); } catch {}
+      // Signal aux UIs ouvertes qu'elles doivent recalculer (rent/charge/surface sliders).
+      try { window.dispatchEvent(new CustomEvent('fp:overrides-updated', { detail: { changes } })); } catch {}
+    }
+    return changes;
+  }
+
   async function pull() {
     const user = getUser();
     if (!user) return { ok: false, reason: 'NO_USER' };
@@ -164,13 +197,15 @@
       const data = await r.json();
       const remoteSites = Array.isArray(data.sites) ? data.sites : [];
       const changes = mergeCRDT(remoteSites);
-      setStatus('ok', `pull ${remoteSites.length}${changes ? ` · ${changes} maj` : ''}`);
+      const ovChanges = mergeOverrides(data.overrides);
+      const total = changes + ovChanges;
+      setStatus('ok', `pull ${remoteSites.length}${total ? ` · ${total} maj` : ''}`);
       // Initial push si local non-vide et cloud vide (migration v6.29 legacy)
       if (remoteSites.length === 0 && Array.isArray(window.customSites) && window.customSites.filter(s => !s.deletedAt).length > 0) {
         console.log('[cloud-sync] cloud vide, push initial', window.customSites.length, 'sites (incl. tombstones)');
         await pushNow();
       }
-      return { ok: true, count: remoteSites.length, changes };
+      return { ok: true, count: remoteSites.length, changes: total };
     } catch (e) {
       setStatus('error', e.message || 'pull failed');
       return { ok: false, reason: 'NET', error: String(e) };
@@ -190,22 +225,30 @@
     pushInFlight = true;
     setStatus('syncing', 'pull+merge+push');
     try {
-      // Pull first to merge any remote changes we don't have yet
+      // Pull first to merge any remote changes we don't have yet (sites + overrides)
       try {
         const r = await fetch(`${ENDPOINT}?user=${encodeURIComponent(user)}`, { cache: 'no-store' });
         if (r.status === 503 || r.status === 404) { kvAvailable = false; setStatus('offline', 'KV absent'); return; }
         if (r.ok) {
           const data = await r.json();
           if (Array.isArray(data.sites)) mergeCRDT(data.sites);
+          mergeOverrides(data.overrides);
           kvAvailable = true;
         }
       } catch {}
 
-      // Push union (local merged with remote) — includes tombstones for propagation
+      // v6.49 — Push union sites + overrides (rent/charge/surface).
+      // Overrides stockés localement sous window._rentOverrides etc. (cf index.html
+      // persistOverrides). Cloud = dernière version écrite gagne (LWW simple).
+      const overrides = {
+        rent:    window._rentOverrides    || {},
+        charge:  window._chargeOverrides  || {},
+        surface: window._surfaceOverrides || {},
+      };
       const r2 = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, sites: window.customSites }),
+        body: JSON.stringify({ user, sites: window.customSites, overrides }),
       });
       if (r2.status === 503) { kvAvailable = false; setStatus('offline', 'KV not configured'); return; }
       if (!r2.ok) { setStatus('error', `push ${r2.status}`); return; }
@@ -274,7 +317,14 @@
       if (!user) return;
       if (kvAvailable === false) return;
       if (!Array.isArray(window.customSites) || window.customSites.length === 0) return;
-      const payload = JSON.stringify({ user, sites: window.customSites });
+      // v6.49 — inclut aussi les overrides dans le beacon (sync cross-device même
+      // si iOS ferme brutalement l'onglet juste après un slider change).
+      const overrides = {
+        rent:    window._rentOverrides    || {},
+        charge:  window._chargeOverrides  || {},
+        surface: window._surfaceOverrides || {},
+      };
+      const payload = JSON.stringify({ user, sites: window.customSites, overrides });
       const blob = new Blob([payload], { type: 'application/json' });
       navigator.sendBeacon?.(ENDPOINT, blob);
     } catch {}

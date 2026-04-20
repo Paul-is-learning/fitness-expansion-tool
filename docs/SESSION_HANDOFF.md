@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.48-fp-white-logo-pins-map (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.49-sync-instantaneous-overrides (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```

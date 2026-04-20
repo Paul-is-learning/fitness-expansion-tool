@@ -80,18 +80,23 @@ module.exports = async (req, res) => {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const user = String(body.user || '').toLowerCase().trim();
       const sites = Array.isArray(body.sites) ? body.sites : null;
+      // v6.49 — overrides per-site (rent / charge / surface) synchronisés aussi.
+      // Maps keyed by "lat.toFixed(3),lng.toFixed(3)". LWW simple via ts global.
+      const overrides = (body.overrides && typeof body.overrides === 'object') ? body.overrides : null;
       if (!ALLOWED_USERS.has(user)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!sites) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
       if (sites.length > 1000) { res.status(413).json({ error: 'TOO_MANY_SITES' }); return; }
-      const serialized = JSON.stringify(sites);
+      const serialized = JSON.stringify({ sites, overrides });
       if (serialized.length > 1 * 1024 * 1024) { res.status(413).json({ error: 'PAYLOAD_TOO_LARGE' }); return; }
       const ts = Date.now();
       // Stamp createdBy on sites that don't have one (new sites from this user)
       for (const s of sites) {
         if (!s.createdBy) s.createdBy = user;
       }
-      await kvSet(SHARED_KEY, { sites, ts });
-      res.status(200).json({ ok: true, ts, count: sites.length });
+      const payload = { sites, ts };
+      if (overrides) payload.overrides = overrides;
+      await kvSet(SHARED_KEY, payload);
+      res.status(200).json({ ok: true, ts, count: sites.length, hasOverrides: !!overrides });
       return;
     }
 

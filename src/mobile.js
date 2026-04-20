@@ -427,6 +427,17 @@
       sheet.style.height = 'var(--detail-h)';
       buildDetail();
       setTimeout(() => wirePullDownDismiss(), 100);
+      // v6.49 — pull cloud immédiat à l'ouverture de la fiche pour récupérer
+      // les overrides loyer/charges/surface modifiés depuis desktop. Sans attendre
+      // les 5s du polling. Si changement détecté, l'event fp:overrides-updated
+      // rebuild la fiche.
+      try {
+        window.cloudSync?.pull?.().then((res) => {
+          if (res && res.changes && res.changes > 0 && typeof buildDetail === 'function') {
+            buildDetail();
+          }
+        });
+      } catch {}
     }
 
     // Parallax: subtle scale on the map as sheet grows (gives depth)

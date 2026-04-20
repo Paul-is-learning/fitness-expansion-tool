@@ -1,6 +1,57 @@
 
 # Changelog
 
+## [v6.49-sync-instantaneous-overrides] — 2026-04-20
+
+### 🔥 Sync mobile ↔ desktop instantanée + overrides inclus
+
+Paul veut une sync irréprochable instant. Gaps identifiés :
+- **Overrides per-site (loyer / charges / surface) pas synchronisés cloud** — chaque device avait sa propre copie locale, jamais partagée.
+- **Polling 15s** trop lent pour un feeling instantané.
+- **Pas de pull immédiat** au changement de tab desktop ou ouverture fiche mobile.
+
+### Changements
+
+**Payload cloud élargi**
+- `api/sync.js` : accepte maintenant `body.overrides = { rent, charge, surface }` (maps keyed par `"lat.toFixed(3),lng.toFixed(3)"`). Stocké dans la même KV key sous `{ sites, overrides, ts }`.
+- `src/cloud-sync.js pushNow()` : lit `window._rentOverrides / _chargeOverrides / _surfaceOverrides` et les inclut dans le POST.
+- `src/cloud-sync.js mergeOverrides()` : nouveau merge LWW simple. Remote gagne sur local si différent. Émet `fp:overrides-updated` pour que les UIs rebuild.
+- `src/cloud-sync.js pagehide beacon` : inclut aussi les overrides (survit à un iOS unload brutal juste après slider change).
+
+**Polling plus réactif**
+- `POLL_INTERVAL_MS` : **15000 → 5000 ms** (5s, ~500k KV calls/mois free tier).
+
+**Pull immédiat sur contextes critiques**
+- Desktop `switchTab('mysites')` : `cloudSync.pull()` avant de render la liste + markers — si iPhone a muté qqch, visible immédiatement.
+- Mobile `transitionTo('detail')` : `cloudSync.pull()` à l'ouverture de la fiche ; si changement → `buildDetail()` rebuild.
+
+**Hook auto sur persistOverrides**
+- `window.persistOverrides()` dans index.html trigger désormais `cloudSync.pushNow()` après 700ms de debounce (coalesce les slider events rapides).
+
+### Résultat attendu
+
+| Scénario | Latence max |
+|---|---|
+| Ajout site iPhone → visible Mac | < 5s (polling) ou immédiat si Mac switch sur "Mes sites" |
+| Suppression site Mac → visible iPhone | < 5s (polling) ou immédiat si iPhone ouvre fiche |
+| Slider loyer iPhone → desktop | < 5s (polling) ou immédiat si switch tab |
+| Slider loyer Mac → iPhone | idem |
+
+### Vérification preview
+
+Stub fetch + appel `persistOverrides()` :
+```
+pushCaptured: true
+rent: { "44.463,26.103": 12.5 }       // override bien dans payload
+charge: {...}, surface: {...}
+```
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.48-fp-white-logo-pins-map] — 2026-04-20
 
 ### ✨ Pins FP blancs sur la carte (remplace anciens pins dorés numérotés)

@@ -4719,13 +4719,30 @@ window._rentOverrides    = (typeof safeStorage !== 'undefined') ? (safeStorage.g
 window._chargeOverrides  = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpChargeOverrides', {})  || {}) : {};
 window._surfaceOverrides = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpSurfaceOverrides', {}) || {}) : {};
 
-/** Persist the 3 per-site override maps to localStorage. Cheap (< 1 KB). */
+/** Persist the 3 per-site override maps to localStorage. Cheap (< 1 KB).
+ *  v6.49 — également poussés cloud (via cloudSync.push, debounce 700ms pour
+ *  coalesce les rapid slider moves). Pull des overrides au polling 5s + boot. */
+let _overridesPushTimer = null;
 window.persistOverrides = function persistOverrides() {
-  if (typeof safeStorage === 'undefined') return;
-  safeStorage.set('fpRentOverrides',    window._rentOverrides    || {});
-  safeStorage.set('fpChargeOverrides',  window._chargeOverrides  || {});
-  safeStorage.set('fpSurfaceOverrides', window._surfaceOverrides || {});
+  if (typeof safeStorage !== 'undefined') {
+    safeStorage.set('fpRentOverrides',    window._rentOverrides    || {});
+    safeStorage.set('fpChargeOverrides',  window._chargeOverrides  || {});
+    safeStorage.set('fpSurfaceOverrides', window._surfaceOverrides || {});
+  }
+  // Debounce cloud push — les sliders peuvent fire 10+ events en quelques ms.
+  if (_overridesPushTimer) clearTimeout(_overridesPushTimer);
+  _overridesPushTimer = setTimeout(() => {
+    try { window.cloudSync?.pushNow?.(); } catch {}
+  }, 700);
 };
+
+// v6.49 — listener global: si les overrides arrivent du cloud (autre device),
+// refresh la liste + markers. Si la fiche d'analyse est ouverte, elle est
+// implicitement rebuilded lors du prochain clic utilisateur (live slider).
+window.addEventListener('fp:overrides-updated', () => {
+  try { window.renderCustomSites?.(); } catch {}
+  try { window.refreshCustomMarkers?.(); } catch {}
+});
 
 function getRentSteps(scenario) {
   const steps = PNL_DEFAULTS.rentSteps[scenario || 'objectifNego'];
@@ -6872,6 +6889,14 @@ function switchTab(name) {
     if (typeof _loadCustomSites === 'function') _loadCustomSites();
     if (typeof refreshCustomMarkers === 'function') refreshCustomMarkers();
     if (typeof renderCustomSites === 'function') renderCustomSites();
+    // v6.49 — pull cloud immédiat pour attraper les modifs faites depuis iPhone
+    // avant d'afficher la liste. Sans attendre le polling 5s.
+    try {
+      window.cloudSync?.pull?.().then(() => {
+        if (typeof renderCustomSites === 'function') renderCustomSites();
+        if (typeof refreshCustomMarkers === 'function') refreshCustomMarkers();
+      });
+    } catch {}
   }
 }
 
