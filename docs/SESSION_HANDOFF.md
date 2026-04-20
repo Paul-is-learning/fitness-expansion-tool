@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.39-sync-immediate-plus-beacon (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.40-sync-read-user-from-storage (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -168,9 +168,16 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (2026-04-20 · v6.38 → v6.39)
+## Dernière session (2026-04-20 · v6.38 → v6.40)
 
-### Fix critique sync mobile (v6.39)
+### Fix root-cause sync cloud (v6.40)
+- **Root cause trouvé** : `cloud-sync.js getUser()` lisait `window.currentUser?.email`, mais `index.html` déclare `let currentUser;` top-level dans un **classic script** → variable script-scoped, **pas accessible via window**. `getUser()` retournait toujours `''`, `pushNow()` early-return, **aucun POST n'a jamais été émis depuis la refonte IIFE**.
+- Confirmé preview : `typeof window.currentUser === 'undefined'`.
+- Legacy `floreasca` dans KV = push via version pré-IIFE de cloud-sync.js.
+- **Fix** : `getUser()` lit `localStorage.getItem('fpCurrentUser')` (fallback sessionStorage). `addCustomSite` createdBy idem via `currentUser?.email` (même script scope).
+- Vérifié preview : stub fetch + push → `pushCaptured: true`, `user: paulbecaud@isseo-dev.com`, `sites: 1`, status `ok`.
+
+### Fix critique sync mobile (v6.39 — partiel, voir v6.40)
 - **Symptôme reproduit par Paul** : site ajouté sur iPhone → visible en session → fermeture onglet → **disparu** au reload iPhone ET invisible sur desktop. `curl /api/sync` confirme : shared KV ne contient pas le nouveau site (seul `floreasca` desktop legacy).
 - **Cause** : `cloudSync.push()` était debounce 700ms. iOS ferme souvent l'onglet avant → `setTimeout` annulé → aucun POST parti → Safari iOS ITP purge ensuite le localStorage entre sessions, perte définitive.
 - **Fix** :

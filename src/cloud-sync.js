@@ -46,7 +46,18 @@
   }
 
   function getUser() {
-    try { return (window.currentUser?.email || '').toLowerCase().trim(); } catch { return ''; }
+    // v6.40 — lire directement depuis storage. La variable globale `currentUser`
+    // est déclarée `let` top-level dans un classic script → script-scoped, PAS
+    // accessible via `window.currentUser` depuis l'IIFE de ce module. Résultat
+    // avant fix: getUser() retournait toujours '' → pushNow() early-return →
+    // aucun POST ne partait jamais. Bug invisible car le backend stampait
+    // quand même createdBy avec `body.user` (legacy). Lire storage est robuste.
+    try {
+      const raw = localStorage.getItem('fpCurrentUser') || sessionStorage.getItem('fpCurrentUser');
+      if (!raw) return '';
+      const u = JSON.parse(raw);
+      return (u?.email || '').toLowerCase().trim();
+    } catch { return ''; }
   }
 
   function setStatus(state, detail) {

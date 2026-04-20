@@ -1723,7 +1723,7 @@ function addCustomSite(lat, lng, name, notes) {
     lat: latN, lng: lngN,
     name: cleanName, notes: cleanNotes,
     status: 'prospect', rating: null, analysisData: null,
-    createdBy: (window.currentUser?.email || '').toLowerCase().trim() || null,
+    createdBy: (currentUser?.email || '').toLowerCase().trim() || null, // v6.40 — window.currentUser absent (script-scoped let), lire la var directement
     createdAt: now,
     updatedAt: now,
     deletedAt: null,

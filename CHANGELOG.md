@@ -1,5 +1,42 @@
 # Changelog
 
+## [v6.40-sync-read-user-from-storage] — 2026-04-20
+
+### 🔥🔥 Root cause trouvé : aucun push cloud ne partait depuis… toujours
+
+**Symptôme** : après v6.39 (pushNow immédiat + sendBeacon), les sites ajoutés sur iPhone persistent localement mais n'apparaissent toujours pas dans la shared KV (`curl /api/sync` retourne toujours le même `ts`, seul legacy `floreasca`).
+
+**Cause réelle** : `cloud-sync.js` lit `window.currentUser?.email` dans son IIFE. Or `index.html` déclare `let currentUser;` au top-level (ligne 7533). **`let` top-level dans un classic script ne crée PAS `window.currentUser`** — c'est une variable script-scoped, accessible uniquement dans le même script. Résultat : `getUser()` retourne toujours `''`, `pushNow()` early-return sur `if (!user) return;`. **Aucun POST n'a jamais été émis depuis la mise en place de l'IIFE.**
+
+Confirmé via preview : `typeof window.currentUser === 'undefined'` même app chargée.
+
+Pourquoi `floreasca` existait quand même dans la KV ? Legacy d'une version pré-IIFE de cloud-sync.js qui lisait `currentUser` sans préfixe `window.` (variable accessible dans le même script context).
+
+### Fix
+
+- **`src/cloud-sync.js`** `getUser()` : lit directement `localStorage.getItem('fpCurrentUser')` (fallback `sessionStorage`). Indépendant de la variable script-scoped, marche toujours.
+- **`index.html`** `addCustomSite` : `window.currentUser?.email` → `currentUser?.email` (même fichier = même script scope, accessible directement). Cosmétique — le serveur stampait déjà `createdBy` via `body.user`.
+
+### Vérification preview
+
+Stub `fetch`, push simulé avec user localStorage :
+```
+pushCaptured: true                      // POST bien émis
+capturedUser: paulbecaud@isseo-dev.com  // user extrait correctement
+capturedSitesCount: 1                   // payload OK
+status.state: 'ok'                      // '1 sites synchros'
+```
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (fix hors moteur financier).
+
+### Comportement attendu après v6.40
+
+Ajout de site iPhone ou desktop → `curl /api/sync` voit le nouveau site **sous 1s**. `ts` update à chaque mutation. Pin correspondant visible sur l'autre device après pull (polling 15s ou `visibilitychange`).
+
+---
+
 ## [v6.39-sync-immediate-plus-beacon] — 2026-04-20
 
 ### 🔥 Fix critique sync mobile : les sites ajoutés sur iPhone disparaissent
