@@ -69,6 +69,14 @@
       mergeIntoLocal(remoteSites, remoteTs);
       lastPulledTs = remoteTs;
       setStatus('ok', `pulled ${remoteSites.length}`);
+      // Initial push: si cloud vide mais local a des sites pré-v6.29 → push.
+      // Couvre le scénario "j'avais des sites en localStorage avant que la
+      // cloud-sync existe" (typique pour Paul: floreasca sur iPhone, jamais
+      // pushed vers le cloud parce qu'il n'a pas modifié le site depuis v6.29).
+      if (remoteSites.length === 0 && Array.isArray(window.customSites) && window.customSites.length > 0) {
+        console.log('[cloud-sync] cloud vide + localStorage non-vide → push initial', window.customSites.length, 'sites');
+        await pushNow();
+      }
       return { ok: true, count: remoteSites.length, ts: remoteTs };
     } catch (e) {
       setStatus('error', e.message || 'pull failed');
