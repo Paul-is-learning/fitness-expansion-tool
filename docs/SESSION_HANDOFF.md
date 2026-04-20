@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.44-delete-everywhere-consistent (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.45-bp-plug-time-decay-everywhere (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```

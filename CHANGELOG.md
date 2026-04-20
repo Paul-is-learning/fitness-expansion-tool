@@ -1,4 +1,46 @@
-# Changelog
+
+
+## [v6.45-bp-plug-time-decay-everywhere] — 2026-04-20
+
+### 🐛 Bug BP : 3 fonctions auxiliaires utilisaient encore l'ancien OPEX flat
+
+**Symptôme rapporté par Paul** (capture Militari Shopping mobile) : "Le nouveau BP n'a pas été appliqué sur ce site, les résultats ne peuvent pas être aussi mauvais avec 3 339 adhérents. Utiliser derniere structure de cout travaillée et pluguée ensemble."
+
+**Investigation** : le main `buildPnL` utilise bien `opexOpsRateByYear` (time-decay Y1 20% → Y5+ 12%) depuis v6.35. L'IRR affiché (+7.2% pour Militari) vient bien de ce calcul avec le BP harmonisé Avril 2026 — **le chiffre est cohérent avec le BP**. Mais **3 fonctions auxiliaires** utilisaient encore `PNL_DEFAULTS.opexOpsRate` (flat 0.12 legacy) au lieu du time-decay, produisant des résultats incohérents entre elles :
+
+| Fonction | Ligne | Impact |
+|---|---|---|
+| Sensitivity analysis (IRR ajusté) | 4544 | Perturbe coûts, IRR trop optimiste Y1-Y4 |
+| IRR Offre Initiale (loyer scénario alt) | 4935 | IRR scénario alternatif décalé |
+| Monte Carlo simulation | 5095 | Bornes confidence intervals biaisées |
+
+### Fix
+
+Toutes les 3 fonctions remplacent :
+```js
+const opex = totalCA * PNL_DEFAULTS.opexOpsRate;  // 12% flat legacy
+```
+par :
+```js
+const opexRate = PNL_DEFAULTS.opexOpsRateByYear?.[Math.min(yearIdx, 4)] ?? PNL_DEFAULTS.opexOpsRate;
+const opex = totalCA * opexRate;  // time-decay v6.35
+```
+
+### Display UI refreshé (stale pre-v6.35)
+
+- **BP Template tab** ligne 6076 + **Card description "P&L"** ligne 6301-6302 : affichaient encore "Staff 9% CA plancher 65k" et "OPEX Ops 12%". Remplacé par le vrai modèle v6.35 : **"Staff 3 ETP plug (1 manager 36k€ + 2 vendeurs 24k€, +2.2% charges, +6%/an)" | "OPEX Ops 20%→12% CA time-decay"**.
+
+### Clarification Militari Shopping
+
+L'IRR +7.2% affiché est **le vrai résultat du BP harmonisé Avril 2026**, pas un cache stale. Avec les ratios actuels (staff plug 85k A1, rent 10.5→13€/m² paliers, OPEX time-decay, tax locale 2%, fonds pub 2%), un site à 3 339 membres @ 25.49 ARPU HT génère EBITDA Y5 ~43% mais les Y1-Y3 ramp-up + CAPEX 892k (scaled 1100/1449 m²) + leasing 5 ans pèsent → IRR Projet modeste. Le verdict WATCH est cohérent avec la baseline (voir SESSION_HANDOFF.md).
+
+Si Paul veut améliorer Militari spécifiquement : baisser loyer (slider), augmenter surface (si négo mall), ou revoir projection membres (calibrage captage).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (main buildPnL inchangé, les 3 fonctions fix n'étaient pas dans les baselines testées).
+
+---
 
 ## [v6.44-delete-everywhere-consistent] — 2026-04-20
 

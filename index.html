@@ -4541,7 +4541,9 @@ function runSensitivityCase(totalTheorique, personaMix, avgQuartierPrice, paramK
     const staffM = Math.round(getStaffMonthly(totalCA, yearNum) * adjOpexMult);
     const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * adjRentMult);
     const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yearIdx) * adjOpexMult);
-    const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+    // v6.45 — time-decay OPEX ops (Y1 20% → Y5+ 12%). Avant: flat 0.12 legacy (optimiste Y1-Y4).
+    const opexRateYear = PNL_DEFAULTS.opexOpsRateByYear?.[Math.min(yearIdx, 4)] ?? PNL_DEFAULTS.opexOpsRate;
+    const opexOps = Math.round(totalCA * opexRateYear);
     const redevance = Math.round(caAdherents * PNL_DEFAULTS.redevanceRate);
     const fondsPub = Math.round(caAdherents * PNL_DEFAULTS.fondsPubRate);
     const taxLocal = Math.round(totalCA * PNL_DEFAULTS.taxLocalRate);
@@ -4932,7 +4934,9 @@ function buildPnL(cohortData, avgQuartierPrice) {
       const stf = getStaffMonthly(tCA, yNum);
       const rnt = getSteppedRentMonthly(yNum, 'offerInitiale');
       const fpc = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1 + PNL_DEFAULTS.fpCloudGrowth, yIdx));
-      const opx = Math.round(tCA * PNL_DEFAULTS.opexOpsRate);
+      // v6.45 — time-decay (idem main P&L), pas flat 0.12 legacy
+      const opxRate = PNL_DEFAULTS.opexOpsRateByYear?.[Math.min(yIdx, 4)] ?? PNL_DEFAULTS.opexOpsRate;
+      const opx = Math.round(tCA * opxRate);
       const rdv = Math.round(caAdh * PNL_DEFAULTS.redevanceRate);
       const fpb = Math.round(caAdh * PNL_DEFAULTS.fondsPubRate);
       const lsg = yNum <= PNL_DEFAULTS.leasingYears ? leasingMonthly : 0;
@@ -5092,7 +5096,9 @@ function runMonteCarlo(totalTheorique, personaMix, avgQuartierPrice, iterations)
       const staffM = Math.round(getStaffMonthly(totalCA, yearNum) * pOpex);
       const rentM = Math.round(getSteppedRentMonthly(yearNum, 'objectifNego') * pRent);
       const fpCloud = Math.round(PNL_DEFAULTS.fpCloudMonthly * Math.pow(1.01, yearIdx) * pOpex);
-      const opexOps = Math.round(totalCA * PNL_DEFAULTS.opexOpsRate);
+      // v6.45 — time-decay (idem main P&L), pas flat 0.12 legacy
+      const mcOpexRate = PNL_DEFAULTS.opexOpsRateByYear?.[Math.min(yearIdx, 4)] ?? PNL_DEFAULTS.opexOpsRate;
+      const opexOps = Math.round(totalCA * mcOpexRate * pOpex);
       const redev = Math.round(caAdherents * (PNL_DEFAULTS.redevanceRate + PNL_DEFAULTS.fondsPubRate));
       const taxLocal = Math.round(totalCA * PNL_DEFAULTS.taxLocalRate);
       const leasing = yearNum <= 5 ? leasingMonthly : 0;
@@ -6067,7 +6073,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         </div>
       </div>
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
-        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff ${Math.round(PNL_DEFAULTS.staffRate*100)}% CA (plancher ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRate*100)}% CA | Redev 6%+2% | CIT 16% | WACC ${PNL_DEFAULTS.discountRate*100}%
+        CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff 3 ETP plug ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k A1 (+${Math.round((PNL_DEFAULTS.staff?.inflationRate||0.06)*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRateByYear[0]*100)}%→${Math.round(PNL_DEFAULTS.opexOpsRateByYear[4]*100)}% CA | Redev ${Math.round(PNL_DEFAULTS.redevanceRate*100)}%+${Math.round(PNL_DEFAULTS.fondsPubRate*100)}% | CIT ${Math.round(PNL_DEFAULTS.citRate*100)}% | WACC ${Math.round(PNL_DEFAULTS.discountRate*100)}%
       </div>
       <div id="rent-block" style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -6292,8 +6298,8 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         Calibre sur donnees reelles FP Espagne (2 clubs)<br><br>
         <b>Churn/LTV</b> : Modele cohortes calibre sur BP FP France (3800 mbr, 300 clubs). Y1 churn bas (~0.7%/mois) + spike renouvellement annuel (12% a M13/M25/M37/M49) + Y2+ steady-state (~3%/mois). LTV = ARPU/churn. CAC ≈ 50 EUR<br>
         Membres_net(t) = Membres(t-1) + Nouveaux(t) - Churned(t)<br><br>
-        <b>P&L</b> : Calibre BP V17 — CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an<br>
-        Staff ${Math.round(PNL_DEFAULTS.staffRate*100)}% CA (plancher ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k/an, +${Math.round(PNL_DEFAULTS.staffGrowth*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRate*100)}% CA | Redev 6%+2% | CIT 16%<br>
+        <b>P&L</b> : Calibre BP harmonise Avril 2026 (v6.35) — CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an<br>
+        Staff 3 ETP plug (1 manager ${fmt(PNL_DEFAULTS.staff?.managerSalary||36000)}€ + ${PNL_DEFAULTS.staff?.nbVendors||2} vendeurs ${fmt(PNL_DEFAULTS.staff?.vendorSalary||24000)}€, +${Math.round((PNL_DEFAULTS.staff?.chargeRate||0.0225)*100*10)/10}% charges, +${Math.round((PNL_DEFAULTS.staff?.inflationRate||0.06)*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRateByYear[0]*100)}%→${Math.round(PNL_DEFAULTS.opexOpsRateByYear[4]*100)}% CA time-decay | Redev ${Math.round(PNL_DEFAULTS.redevanceRate*100)}%+${Math.round(PNL_DEFAULTS.fondsPubRate*100)}% | Tax locale ${Math.round(PNL_DEFAULTS.taxLocalRate*100)}% | CIT ${Math.round(PNL_DEFAULTS.citRate*100)}%<br>
         IRR = bisection 60 mois + Terminal Value (EBITDA Y5 × ${PNL_DEFAULTS.exitMultiple}x exit multiple) | NPV @WACC ${PNL_DEFAULTS.discountRate*100}%<br>
         IRR Ops = cashflows operationnels purs (sans TV) | Payback = mois ou cumul CF ops > CAPEX<br><br>
         <b>Saisonnalite</b> : Jan +35%, Fev +20%, Jun-Aout -25 a -30%, Sep +15% (IHRSA)<br>
