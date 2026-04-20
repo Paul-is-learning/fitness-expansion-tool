@@ -1601,9 +1601,11 @@ function addCustomSite(lat, lng, name, notes) {
 }
 
 function removeCustomSite(id) {
-  // Find the site before removing so we can clean up its per-site overrides.
-  const site = customSites.find(s => s.id === id);
-  customSites = customSites.filter(s => s.id !== id);
+  // String coerce: ID est interpolé inline dans onclick (Number) mais pourrait
+  // dériver en String via JSON migration. Match laxe pour éviter no-op silencieux.
+  const idStr = String(id);
+  const site = customSites.find(s => String(s.id) === idStr);
+  customSites = customSites.filter(s => String(s.id) !== idStr);
   if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   // Clean up orphaned overrides for the deleted site.
@@ -1619,20 +1621,24 @@ function removeCustomSite(id) {
 }
 
 function qualifyCustomSite(id, status, rating) {
-  const site = customSites.find(s => s.id === id);
+  const idStr = String(id);
+  const site = customSites.find(s => String(s.id) === idStr);
   if (!site) return;
   site.status = status;
   site.rating = rating;
   if (typeof safeStorage !== 'undefined') safeStorage.set('fpCustomSites', customSites);
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   renderCustomSites();
+  refreshCustomMarkers();
 }
 
 let customMarkersLayer = L.layerGroup();
 
 function addCustomSiteMarker(site) {
-  const colors={prospect:'#8b5cf6',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
-  const c=colors[site.status]||'#8b5cf6';
+  // Custom sites partagent la couleur dorée des TARGETS — demande Paul 2026-04-20
+  // (avant: prospect violet, mais Paul veut visuel uniforme avec les 5 TARGETS).
+  const colors={prospect:'#d4a017',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
+  const c=colors[site.status]||'#d4a017';
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
   const icon=L.divIcon({className:'',
     html:`<div style="width:22px;height:22px;background:${c};border:3px solid white;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;box-shadow:0 2px 8px ${c}80;cursor:pointer">&#9733;</div>`,
@@ -1654,7 +1660,8 @@ function refreshCustomMarkers() {
 }
 
 function analyzeCustomSite(id) {
-  const site = customSites.find(s=>s.id===id);
+  const idStr = String(id);
+  const site = customSites.find(s => String(s.id) === idStr);
   if(!site) {console.error('Site not found:',id,customSites);alert('Site introuvable. Rechargez la page.');return}
 
   // Switch to Mes Sites tab first so user sees results
@@ -6077,7 +6084,8 @@ const origOnMapClick = onMapClick;
 function renderCustomSites() {
   const list = el('customSitesList');
   if(!list) return;
-  const colors={prospect:'#8b5cf6',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
+  // Border-left: prospect en doré (uniforme avec TARGETS) — demande Paul 2026-04-20
+  const colors={prospect:'#d4a017',shortlist:'#d4a017',validated:'#10b981',rejected:'#ef4444'};
   list.innerHTML = customSites.length===0
     ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site ajoute. Cliquez + Ajouter pour commencer.</p>'
     : customSites.map(s=>`
@@ -6415,6 +6423,14 @@ function switchTab(name) {
   // Peupler les compareSelects avec TARGETS dès l'ouverture — sinon l'user voit
   // des dropdowns quasi-vides tant qu'aucune zone n'a été analysée.
   if(name==='dash' && typeof updateCompareSelects==='function') updateCompareSelects();
+  // Force re-render desktop "Mes Sites" à chaque ouverture du tab — defensive
+  // fix v6.27 : si le state localStorage a été modifié hors session (mobile,
+  // autre tab, hard refresh sans wipe), la liste desktop pouvait rester vide.
+  if(name==='mysites') {
+    if (typeof _loadCustomSites === 'function') _loadCustomSites();
+    if (typeof refreshCustomMarkers === 'function') refreshCustomMarkers();
+    if (typeof renderCustomSites === 'function') renderCustomSites();
+  }
 }
 
 // ================================================================

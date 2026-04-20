@@ -527,13 +527,13 @@
   .fp-sheet-detail-scroll.fp-detail-swipe-next { transform: translateX(-8px); opacity: .3; }
   .fp-sheet-detail-scroll.fp-detail-swipe-prev { transform: translateX(8px); opacity: .3; }
 
-  /* Custom site pin: slightly different style (purple tint) */
+  /* Custom site pin: même style doré que TARGETS (demande Paul 2026-04-20).
+     Override neutralisé — fp-custom-pin hérite désormais du style fp-target-pin. */
   .fp-target-pin.fp-custom-pin {
-    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
-    color: white !important;
+    /* No override — match TARGETS gold pin exactly */
   }
   .fp-target-pin.fp-custom-pin.active {
-    animation: fpPinPulsePurple 2.2s ease-in-out infinite;
+    /* Hérite de l'animation .active de fp-target-pin (doré) */
   }
   @keyframes fpPinPulsePurple {
     0%, 100% {

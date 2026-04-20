@@ -1,5 +1,28 @@
 # Changelog
 
+## [v6.27-mes-sites-fix] — 2026-04-20
+
+### Bugs fixés "Mes sites" + harmonisation pins custom dorés
+
+**Demande Paul** : (1) sites custom n'apparaissent plus sur desktop alors que mobile OK ; (2) nouveaux sites doivent avoir la même vignette dorée que les TARGETS ; (3) bouton Suppr non-fonctionnel ressenti.
+
+**Fixes** :
+1. **Pin custom desktop = doré** (au lieu de violet `#8b5cf6` par défaut) → `addCustomSiteMarker` colors map: `prospect:'#d4a017', shortlist:'#d4a017'`. `validated` reste vert, `rejected` reste rouge.
+2. **Pin custom mobile = doré** → CSS `.fp-target-pin.fp-custom-pin` override neutralisé (héritait avant un gradient violet `#a78bfa→#8b5cf6` !important). Désormais identique au TARGETS gold pin.
+3. **Border-left card desktop = doré** → `renderCustomSites` colors map alignée idem.
+4. **Defensive re-render à l'ouverture du tab "mysites"** → `switchTab('mysites')` appelle désormais `_loadCustomSites()` + `refreshCustomMarkers()` + `renderCustomSites()`. Évite que le state localStorage modifié hors-session (mobile, autre tab, hard refresh sans wipe) laisse la liste desktop vide.
+5. **ID match laxe Number/String** dans `removeCustomSite`, `qualifyCustomSite`, `analyzeCustomSite` → `String(s.id) === String(id)` au lieu de `===` strict. Évite no-op silencieux si l'ID a dérivé en string via migration JSON.
+6. **`qualifyCustomSite` re-refresh markers** (manquait) — changement de status remet à jour la couleur du pin sur la carte.
+
+**Vérifié en preview** : 1 site seedé → border-left `rgb(212,160,23)` doré ✅ → bouton Suppr → 0 sites + liste re-rendue ✅.
+
+**Fichiers touchés** :
+- `index.html` : `addCustomSiteMarker`/`renderCustomSites` colors → doré ; `switchTab('mysites')` re-render defensive ; ID match `String()` dans 3 fonctions ; `qualifyCustomSite` ajoute `refreshCustomMarkers()`.
+- `mobile.css` : `.fp-target-pin.fp-custom-pin` override violet supprimé.
+- `config.js` : bump `MODEL_VERSION` → `v6.27-mes-sites-fix`.
+
+---
+
 ## [v6.26-capex-leasing-total] — 2026-04-19
 
 ### UX : vignette CAPEX du tour BP affiche aussi le total cash + leasing
