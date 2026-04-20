@@ -680,6 +680,9 @@
     } catch {}
   }
 
+  // v6.52 — token par slot pour annuler les doIt concurrents stale.
+  const _ensureRunToken = [];
+
   function ensureAnalysis(i) {
     if (typeof runCaptageAnalysis !== 'function') return;
     if (typeof computeExecSummary !== 'function') return;
@@ -687,37 +690,49 @@
     const sites = getAllSites();
     const t = sites[i];
     if (!t) return;
-    // v6.50 — SCOPE les overrides du site AVANT tout calcul/cache check. Bug
-    // signalé par Paul: au boot ensureAnalysis(i) était appelé sans restore
-    // préalable → IRR initial calculé avec loyer/charges/surface par défaut,
-    // ignorait les overrides persistés pour ce site. D'où incohérence entre
-    // TRI affiché à l'ouverture et valeurs des sliders.
     const key = siteKeyFor(t);
-    restoreSiteOverrides(key);
-    // Signature des overrides actifs → invalide cache si changé depuis dernier calcul.
-    const ovSig = JSON.stringify({
+    // Signature overrides actifs (lu à l'entrée pour cache check uniquement).
+    const ovSigEntry = JSON.stringify({
       r: window._rentOverrides?.[key] ?? null,
       c: window._chargeOverrides?.[key] ?? null,
       s: window._surfaceOverrides?.[key] ?? null,
     });
-    if (analyses[i] && analyses[i]._ovSig === ovSig) { refreshCard(i); return; }
+    if (analyses[i] && analyses[i]._ovSig === ovSigEntry) { refreshCard(i); return; }
+
+    // Cancellation token — un nouveau ensureAnalysis(i) stale tous les doIt précédents.
+    _ensureRunToken[i] = (_ensureRunToken[i] || 0) + 1;
+    const myToken = _ensureRunToken[i];
+
     const doIt = () => {
+      // v6.52 — RESTORE overrides DANS doIt (juste avant le calcul). Sinon les
+      // globals _rentOverride/_chargeOverride/_surfaceOverride sont écrasés par
+      // d'autres ensureAnalysis() concurrents (race condition: 5 setTimeout
+      // décalés, load comps async → globals = ceux du dernier site invoqué).
+      if (_ensureRunToken[i] !== myToken) return; // call obsolète, skip
+      restoreSiteOverrides(key);
       try {
         const r = runCaptageAnalysis(t.lat, t.lng, 3000);
         const exec = computeExecSummary(r);
+        if (_ensureRunToken[i] !== myToken) return; // obsolète pendant le calc
+        // Re-compute ovSig AU MOMENT du calcul (c'est ce qui compte).
+        const ovSig = JSON.stringify({
+          r: window._rentOverrides?.[key] ?? null,
+          c: window._chargeOverrides?.[key] ?? null,
+          s: window._surfaceOverrides?.[key] ?? null,
+        });
         analyses[i] = {
           members: r.totalTheorique,
-          irrBase: r.pnl?.base?.irr,                // IRR Projet (unlevered)
-          irrEquity: r.pnl?.base?.irrEquity,        // v6.46 — IRR Equity (levered)
+          irrBase: r.pnl?.base?.irr,
+          irrEquity: r.pnl?.base?.irrEquity,
           npvBase: r.pnl?.base?.npv,
           beBase: r.pnl?.base?.breakevenMonth,
           verdict: typeof exec.verdict === 'object' ? exec.verdict.label : exec.verdict,
           score: exec.total,
           raw: r,
-          _ovSig: ovSig, // v6.50 — signature overrides utilisés pour ce calcul (invalide cache si changent)
+          _ovSig: ovSig,
         };
         refreshCard(i);
-        hideCompetitorMarkers(); // keep the map clean post-analysis
+        hideCompetitorMarkers();
       } catch (e) { console.warn('[FP mobile] analysis failed:', e); }
     };
     if (typeof allComps !== 'undefined' && allComps && allComps.length > 0) {
@@ -2948,18 +2963,20 @@
     waitForApp(init);
   }
 
-  // v6.50 — listener cloud: si overrides mis à jour depuis un autre device,
-  // invalider le cache analyses et rebuild la fiche/carousel pour que les
-  // KPI hero (TRI, NPV, membres) reflètent les nouveaux overrides.
+  // v6.52 — listener cloud: si overrides mis à jour depuis un autre device,
+  // invalider TOUT le cache analyses et re-ensure TOUS les sites (pas juste
+  // activeIdx). Sinon les sites non-actifs gardent leurs valeurs stales
+  // jusqu'à ce que l'user swipe dessus.
   window.addEventListener('fp:overrides-updated', () => {
     try {
-      // Invalide tout le cache analyses (simple et sûr — 5 sites max).
+      const sites = getAllSites();
       for (let i = 0; i < (analyses?.length || 0); i++) analyses[i] = null;
-      // Recalcule le site actif en priorité (pour refresh hero + sparklines)
-      if (typeof ensureAnalysis === 'function' && activeIdx != null) ensureAnalysis(activeIdx);
-      // Rebuild la fiche si ouverte
+      if (typeof ensureAnalysis === 'function') {
+        for (let i = 0; i < sites.length; i++) {
+          setTimeout(() => ensureAnalysis(i), i * 30); // micro-stagger pour éviter freeze UI
+        }
+      }
       if (state === 'detail' && typeof buildDetail === 'function') buildDetail();
-      // Refresh carousel (verdict, IRR, NPV peuvent avoir changé)
       if (typeof renderCarousel === 'function') renderCarousel();
     } catch (e) { console.warn('[FP mobile] fp:overrides-updated handler failed:', e); }
   });

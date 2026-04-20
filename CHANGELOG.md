@@ -1,6 +1,49 @@
 
 # Changelog
 
+## [v6.52-fix-race-ensure-analysis] — 2026-04-20
+
+### 🐛 Race condition ensureAnalysis — cache TRI stale indéfiniment
+
+**Symptôme diagnostiqué avec Paul** (via console iPhone USB Mac) :
+- Overrides Hala locaux iPhone = KV cloud = `rent 13, charge 5, surface 1650` (sync OK)
+- FRESH calc in-console : IRR Projet 56.39% / IRR Equity 84.59% / NPV 4.78M€ ✅
+- UI card hero : **47.2%** / 2.2M€ ❌ — incohérent
+
+Le cache `analyses[0]` avait été calculé avec des globals erronés. Ne se réparait jamais tout seul.
+
+### Cause (race condition)
+
+`ensureAnalysis(i)` v6.50 appelait `restoreSiteOverrides(key)` à l'**entrée** (sync), mais `doIt()` qui exécute `runCaptageAnalysis` est **async** (via `loadAllCompetitors().then(doIt)`).
+
+Les 5 sites sont lancés par `setTimeout` décalés de 300ms (`init()` boot). Entre `restoreSiteOverrides` et l'exécution de `doIt`, **d'autres ensureAnalysis(j)** écrasent les globals `_rentOverride / _chargeOverride / _surfaceOverride`. Le dernier qui passe dans doIt lit les globals du site **j** pas du site **i**.
+
+Exemple timeline :
+```
+T=400  ensureAnalysis(0) Hala: restoreSiteOverrides(Hala) → _rentOverride = 13
+T=700  loadComps async...
+T=1100 ensureAnalysis(1) Unirea: restoreSiteOverrides(Unirea) → _rentOverride = null
+T=1200 doIt() Hala exécute → runCaptageAnalysis avec _rentOverride = null (celui d'Unirea!)
+       → analyses[0] stocké avec IRR calculé sur defaults, pas overrides Hala.
+```
+
+### Fix
+
+**`src/mobile.js ensureAnalysis`** :
+- `restoreSiteOverrides(key)` déplacé **à l'intérieur** de `doIt()`, juste avant `runCaptageAnalysis`. Plus de race.
+- **Cancellation token** `_ensureRunToken[i]` : si un nouveau `ensureAnalysis(i)` est appelé, les `doIt()` précédents pour ce slot abort.
+- `ovSig` re-calculé **après** `runCaptageAnalysis` (reflète les overrides effectivement utilisés).
+
+**Listener `fp:overrides-updated`** : invalide tout `analyses[]` et re-ensure **TOUS** les sites (pas juste `activeIdx`). Micro-stagger 30ms × i pour éviter freeze UI. Sinon les sites non-actifs gardaient leurs valeurs stales jusqu'à ce que l'user swipe dessus.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (test suite se base sur un flow clean sans race).
+
+Paul doit **hard refresh iPhone** après deploy pour vider le cache `analyses[]` in-memory + clear le localStorage `fpSiteAnalyses` (cache clearé via bump MODEL_VERSION v6.51 → v6.52).
+
+---
+
 ## [v6.51-fp-pin-faithful-plus-apple-animations] — 2026-04-20
 
 ### ✨ Pin FP fidèle à l'image + animations apple-like
