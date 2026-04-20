@@ -5045,6 +5045,47 @@ function onRentSliderChange(val) {
   window._rentRecalcTimer = setTimeout(recalcPnLWithRent, 150);
 }
 
+// v6.33: parité mobile ↔ desktop — sliders charges + surface (même logique que mobile.js)
+function onChargeSliderChange(val) {
+  const v = parseFloat(val);
+  window._chargeOverride = {chargeTotal: v};
+  if(window._lastCaptageLocation) {
+    const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
+    window._chargeOverrides = window._chargeOverrides || {};
+    window._chargeOverrides[key] = v;
+    window.persistOverrides?.();
+  }
+  const lbl = document.getElementById('charge-slider-label');
+  if(lbl) lbl.textContent = v.toFixed(1) + '€/m²';
+  // Update monthly labels to reflect new charges (all tiers share same charges)
+  const e = id => document.getElementById(id);
+  if(e('rent-y1-monthly')) e('rent-y1-monthly').textContent = fmt(getSteppedRentMonthly(1,'objectifNego')) + '/mois';
+  if(e('rent-y3-monthly')) e('rent-y3-monthly').textContent = fmt(getSteppedRentMonthly(3,'objectifNego')) + '/mois';
+  if(e('rent-y5-monthly')) e('rent-y5-monthly').textContent = fmt(getSteppedRentMonthly(5,'objectifNego')) + '/mois';
+  clearTimeout(window._chargeRecalcTimer);
+  window._chargeRecalcTimer = setTimeout(recalcPnLWithRent, 150);
+}
+
+function onSurfaceSliderChange(val) {
+  const v = parseInt(val, 10);
+  window._surfaceOverride = {surface: v};
+  if(window._lastCaptageLocation) {
+    const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
+    window._surfaceOverrides = window._surfaceOverrides || {};
+    window._surfaceOverrides[key] = v;
+    window.persistOverrides?.();
+  }
+  const lbl = document.getElementById('surface-slider-label');
+  if(lbl) lbl.textContent = v + ' m²';
+  // Update monthly labels (loyer mensuel = rent * surface → surface change le montant)
+  const e = id => document.getElementById(id);
+  if(e('rent-y1-monthly')) e('rent-y1-monthly').textContent = fmt(getSteppedRentMonthly(1,'objectifNego')) + '/mois';
+  if(e('rent-y3-monthly')) e('rent-y3-monthly').textContent = fmt(getSteppedRentMonthly(3,'objectifNego')) + '/mois';
+  if(e('rent-y5-monthly')) e('rent-y5-monthly').textContent = fmt(getSteppedRentMonthly(5,'objectifNego')) + '/mois';
+  clearTimeout(window._surfaceRecalcTimer);
+  window._surfaceRecalcTimer = setTimeout(recalcPnLWithRent, 150);
+}
+
 function recalcPnLWithRent() {
   if(!window._lastCaptageData) return;
   const {r, avgPrice} = window._lastCaptageData;
@@ -5853,6 +5894,27 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <div id="rent-footer" style="font-size:7px;color:var(--gray2)">
           Charges: ${PNL_DEFAULTS.rentSteps.serviceCharge}€/m² + Marketing: ${PNL_DEFAULTS.rentSteps.marketingFee}€/m² | Indexation HICP ~${(PNL_DEFAULTS.rentSteps.indexation*100).toFixed(0)}%/an
           ${r.pnl.base.irrOffreInitiale !== null ? `<br><span id="rent-offre-delta" style="color:var(--orange)">⚠ Si offre initiale bailleur (${PNL_DEFAULTS.rentSteps.offerInitiale[0].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[1].rent}→${PNL_DEFAULTS.rentSteps.offerInitiale[2].rent}€/m²) : IRR = ${r.pnl.base.irrOffreInitiale.toFixed(1)}% vs ${r.pnl.base.irr.toFixed(1)}% objectif négo → delta ${(r.pnl.base.irr - r.pnl.base.irrOffreInitiale).toFixed(1)} pts</span>` : ''}
+        </div>
+
+        <!-- v6.33: sliders charges + surface (parité mobile ↔ desktop) -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(212,160,23,.15)">
+          <div style="font-size:8px;font-weight:700;color:var(--accent)">CHARGES + MARKETING €/m²</div>
+          <div style="font-size:9px;font-weight:800;color:var(--accent)" id="charge-slider-label">${(window._chargeOverride?.chargeTotal ?? (PNL_DEFAULTS.rentSteps.serviceCharge + PNL_DEFAULTS.rentSteps.marketingFee)).toFixed(1)}€/m²</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:7px;color:var(--gray2)">0€</span>
+          <input id="chargeSlider" type="range" min="0" max="12" step="0.5" value="${window._chargeOverride?.chargeTotal ?? (PNL_DEFAULTS.rentSteps.serviceCharge + PNL_DEFAULTS.rentSteps.marketingFee)}" style="flex:1;accent-color:var(--accent);height:5px;cursor:pointer" oninput="onChargeSliderChange(this.value)">
+          <span style="font-size:7px;color:var(--gray2)">12€</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;margin-top:8px">
+          <div style="font-size:8px;font-weight:700;color:var(--accent)">SURFACE m²</div>
+          <div style="font-size:9px;font-weight:800;color:var(--accent)" id="surface-slider-label">${window._surfaceOverride?.surface ?? PNL_DEFAULTS.rentSteps.surface} m²</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:7px;color:var(--gray2)">800</span>
+          <input id="surfaceSlider" type="range" min="800" max="2500" step="50" value="${window._surfaceOverride?.surface ?? PNL_DEFAULTS.rentSteps.surface}" style="flex:1;accent-color:var(--accent);height:5px;cursor:pointer" oninput="onSurfaceSliderChange(this.value)">
+          <span style="font-size:7px;color:var(--gray2)">2500</span>
         </div>
       </div>
     </div>
