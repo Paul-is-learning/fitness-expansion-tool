@@ -1946,38 +1946,53 @@ function refreshCustomMarkers() {
 }
 window.refreshCustomMarkers = refreshCustomMarkers;
 
+// v6.47 — fonction unifiée pour analyser n'importe quel site (TARGET ou custom).
+// Avant: TARGETS → flyTarget(lat,lng) qui volait juste la map sans analyser.
+//        Customs → analyzeCustomSite(id) qui analysait. Incohérent côté UX.
+// Après: les deux passent par analyzeSiteAt → même flow (switchTab + loading +
+// onMapClick pour SAZ/concurrents + runSiteAnalysis pour captage/P&L + sliders).
+async function analyzeSiteAt(siteLike) {
+  if (!siteLike || !isFinite(siteLike.lat) || !isFinite(siteLike.lng)) {
+    console.error('analyzeSiteAt: site invalide', siteLike);
+    return;
+  }
+  switchTab('mysites');
+  const card = el('siteAnalysisCard');
+  if (card) {
+    card.style.display = 'block';
+    if (el('siteAnalysisContent')) {
+      el('siteAnalysisContent').innerHTML = `<div style="text-align:center;padding:30px;color:var(--gray2)"><div class="spinner" style="margin:0 auto 10px"></div>Analyse en cours de <b>${(typeof escapeHtml==='function' ? escapeHtml(siteLike.name||'') : (siteLike.name||''))}</b>...</div>`;
+    }
+  }
+  map.flyTo([siteLike.lat, siteLike.lng], 14);
+  setTimeout(async () => {
+    try { await onMapClick({ latlng: { lat: siteLike.lat, lng: siteLike.lng } }); } catch (e) { console.log('Map click:', e); }
+    try { await runSiteAnalysis(siteLike); } catch (e) {
+      console.error('Analysis error:', e);
+      if (el('siteAnalysisContent')) el('siteAnalysisContent').innerHTML = '<div style="color:var(--red);padding:10px">Erreur: ' + e.message + '</div>';
+    }
+    switchTab('mysites');
+    setTimeout(() => {
+      const c = el('siteAnalysisCard');
+      if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  }, 800);
+}
+window.analyzeSiteAt = analyzeSiteAt;
+
 function analyzeCustomSite(id) {
   const idStr = String(id);
   const site = customSites.find(s => String(s.id) === idStr);
-  if(!site) {console.error('Site not found:',id,customSites);alert('Site introuvable. Rechargez la page.');return}
-
-  // Switch to Mes Sites tab first so user sees results
-  switchTab('mysites');
-
-  // Show loading state
-  const card = el('siteAnalysisCard');
-  if(card) {card.style.display='block'; el('siteAnalysisContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--gray2)"><div class="spinner" style="margin:0 auto 10px"></div>Analyse en cours de <b>'+site.name+'</b>...</div>';}
-
-  // Fly to site on map
-  map.flyTo([site.lat,site.lng],14);
-
-  // Run analysis with delay for map to settle
-  setTimeout(async ()=>{
-    // Map analysis (SAZ, competitors overlay)
-    try { await onMapClick({latlng:{lat:site.lat,lng:site.lng}}); } catch(e) {console.log('Map click:',e)}
-    // Detailed site analysis + captage
-    try { await runSiteAnalysis(site); } catch(e) {
-      console.error('Analysis error:',e);
-      if(el('siteAnalysisContent')) el('siteAnalysisContent').innerHTML='<div style="color:var(--red);padding:10px">Erreur: '+e.message+'</div>';
-    }
-    // Ensure we're on Mes Sites tab and scroll to results
-    switchTab('mysites');
-    setTimeout(()=>{
-      const c = el('siteAnalysisCard');
-      if(c) c.scrollIntoView({behavior:'smooth',block:'start'});
-    },300);
-  },800);
+  if(!site) { console.error('Site not found:', id, customSites); alert('Site introuvable. Rechargez la page.'); return; }
+  analyzeSiteAt(site);
 }
+
+// v6.47 — pour TARGETS (index dans TARGETS). Remplace flyTarget dans les vignettes.
+function analyzeTargetByIdx(idx) {
+  if (typeof TARGETS === 'undefined' || !TARGETS[idx]) return;
+  analyzeSiteAt(TARGETS[idx]);
+}
+window.analyzeTargetByIdx = analyzeTargetByIdx;
 
 // Find nearest cartier for a point
 function findCartier(lat,lng) {
@@ -6484,15 +6499,17 @@ function renderCustomSites() {
 
   // v6.34 — demande Paul: fusionner TARGETS + customs dans "Mes sites".
   // Pin 1-5 = TARGETS BP hardcoded (non-supprimables, analysables), pin 6+ = customs.
+  // v6.47 — vignette ENTIÈRE cliquable → analyzeTargetByIdx(i) (avant: onclick sur
+  // bouton Analyser appelait flyTarget qui ne faisait QUE voler la map sans analyser).
   const targetCards = (typeof TARGETS !== 'undefined' ? TARGETS : []).map((t, i) => `
-    <div class="comp-card" style="border-left:3px solid #d4a017">
+    <div class="comp-card" style="border-left:3px solid #d4a017;cursor:pointer" onclick="analyzeTargetByIdx(${i})" title="Cliquer pour analyser ${esc(t.name)}">
       <div style="flex:1;min-width:0">
         <div class="comp-name">${i+1}. ${esc(t.name)}</div>
         <div class="comp-meta">S${esc(t.sector)} · ${esc(t.area)} · ${esc(t.rent)} · P${esc(t.phase)}</div>
         <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center">
           <span style="padding:3px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.35);border-radius:4px;color:var(--accent);font-size:9px;font-weight:700;letter-spacing:.3px">TARGET BP</span>
           <span style="font-size:9px;color:${t.status?.includes('securise')?'var(--green)':'var(--yellow)'}">${esc(t.status)} · ${esc(t.opening)}</span>
-          <button class="btn btn-sm" onclick="flyTarget(${t.lat},${t.lng})">Analyser</button>
+          <button class="btn btn-sm" onclick="event.stopPropagation();analyzeTargetByIdx(${i})">Analyser</button>
         </div>
       </div>
     </div>
@@ -6504,11 +6521,11 @@ function renderCustomSites() {
   const customCards = liveSites.length === 0
     ? '<p style="font-size:11px;color:var(--gray2);padding:8px 0">Aucun site custom ajouté. Clique "+ Ajouter" pour en créer un (il sera numéroté ' + startNum + '+).</p>'
     : liveSites.map((s, i) => `
-    <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#d4a017'}">
+    <div class="comp-card" style="border-left:3px solid ${colors[s.status]||'#d4a017'};cursor:pointer" onclick="analyzeCustomSite(${s.id})" title="Cliquer pour analyser ${esc(s.name)}">
       <div style="flex:1;min-width:0">
         <div class="comp-name">${startNum + i}. ${esc(s.name)}${s.createdBy ? ` <span style="font-size:9px;color:var(--gray2);font-weight:400">· ${esc(s.createdBy.split('@')[0])}</span>` : ''}</div>
         <div class="comp-meta">${esc(s.notes) || 'Pas de notes'} | ${Number(s.lat).toFixed(4)}, ${Number(s.lng).toFixed(4)}</div>
-        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
           <select onchange="qualifyCustomSite(${s.id},this.value)" style="padding:3px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--white);font-size:10px;font-family:var(--font)">
             <option value="prospect" ${s.status==='prospect'?'selected':''}>Prospect</option>
             <option value="shortlist" ${s.status==='shortlist'?'selected':''}>Shortlist</option>

@@ -1,6 +1,36 @@
 
 # Changelog
 
+## [v6.47-desktop-vignette-clicks-analyze] — 2026-04-20
+
+### 🐛 Desktop "Analyser" sur TARGET ne lançait aucune analyse
+
+**Symptôme Paul** : clic "Analyser" sur Hala Laminor (ou autre TARGET) → la carte vole jusqu'au site mais rien d'analysé, pas de fiche, pas de sliders loyer/charges/superficie.
+
+**Cause** : `flyTarget(lat, lng)` dans `renderCustomSites` ne faisait que `map.flyTo` (+ un appel `onMapClick` conditionnel à `analysisMode === true`, désactivé par défaut). Les customs passaient par `analyzeCustomSite(id)` qui faisait le vrai flow analyse, mais les TARGETS étaient bloqués sur un simple flyTo.
+
+### Fix
+
+- **Nouvelle fonction unifiée** `analyzeSiteAt(siteLike)` (index.html ~ligne 1949) qui centralise le flow complet : `switchTab('mysites')` → spinner loading → `map.flyTo` → `onMapClick` (SAZ + concurrents) → `runSiteAnalysis` (captage + P&L + sliders per-site) → scroll vers résultats. Exposée sur `window`.
+- **`analyzeCustomSite(id)`** : délègue à `analyzeSiteAt(site)` (comportement identique).
+- **Nouvelle `analyzeTargetByIdx(i)`** : `analyzeSiteAt(TARGETS[i])`. Remplace `flyTarget` dans les vignettes TARGET.
+
+### UX : vignette entière cliquable
+
+- **TARGETS + customs** : `cursor:pointer` + `onclick` sur la card entière. Plus besoin de viser le petit bouton "Analyser".
+- Le bouton "Analyser" reste (redondance utile) avec `event.stopPropagation()` pour éviter le double trigger.
+- Les contrôles inner (select status, bouton Suppr., bouton Analyser) ont `stopPropagation` pour ne pas déclencher l'analyse en chaîne.
+
+### Parité desktop / mobile
+
+Après click vignette, la fiche desktop affiche : IRR Projet + NPV, sliders **loyer** (€/m²) + **surface** (m²) + charges — vérifié dans le preview. Flow identique à la detail view mobile (sheet → accordions + sliders live-reactive depuis v6.33).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.46-facturation-13-periodes-4-semaines] — 2026-04-20
 
 ### 🔥 BP harmonisé v6.35 incomplet — facturation 4 semaines (13 périodes/an) manquante
