@@ -1,6 +1,40 @@
 
 # Changelog
 
+## [v6.51-fp-pin-faithful-plus-apple-animations] — 2026-04-20
+
+### ✨ Pin FP fidèle à l'image + animations apple-like
+
+Paul veut que le pin map reprenne exactement l'image de référence FP (cercle blanc cassé, texte "FITNESS PARK" complet italique noir, swoosh jaune) et apparaisse avec des animations dynamiques apple-style.
+
+### Changements `src/fp-logos.js`
+
+- **SVG fidèle** : viewBox 200×200, cercle fond `#f3f4f6`, texte `<text>` "FITNESS PARK" italique bold avec `textLength="170"` + `lengthAdjust="spacingAndGlyphs"` pour tenir dans le cercle sans déformer. Swoosh jaune `#fbbf24` en courbe Q+T (quadratic curves), stroke 9.
+- **Taille défaut 48px** (au lieu de 36) → texte "FITNESS PARK" lisible, badge numéro 32% de la taille.
+- **CSS animations injecté une fois** (idempotent) :
+  - `fpPinDrop` au mount : scale 0.3 → 1.12 → 0.96 → 1, translateY -18 → 0, cubic-bezier(.34,1.56,.64,1) — spring apple classique, 0.65s.
+  - `fpSwooshDraw` au mount : stroke-dasharray 200, offset 200 → 0 sur 0.9s cubic-bezier(.22,1,.36,1) delay 0.25s — effet trace-in.
+  - `:hover` : scale 1.1 + brightness 1.06, z-index 1000 (viens devant les autres pins).
+  - `:active` : scale 0.94 en 80ms (feedback tap).
+  - `.fp-pin-active` (site sélectionné) : pulse continu scale 1.06 ↔ 1.14 sur 2.4s.
+- **Respect `prefers-reduced-motion`** : animations désactivées si user a opt out.
+
+### Callers bump taille 36 → 48
+
+- `addCustomSiteMarker` (customs desktop) : iconSize 56, pin 48
+- `renderTargetPinsDesktop` (TARGETS desktop) : idem
+- `buildTargetPins` (mobile) : idem (actif = 58, normal = 54)
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Vérifié visuellement dans le preview : les 6 pins affichent "FITNESS PARK" bien cadré avec swoosh jaune, badges numéros aux bons index, pin actif avec glow doré pulsant.
+
+### Note
+
+Paul a fourni un PNG référence. Impossible d'extraire le binaire depuis le chat ; le SVG reproduit fidèlement les proportions et les couleurs. Si Paul veut le PNG exact, qu'il le sauvegarde dans `assets/fp-pin.png` et je switch la source du SVG vers `<image href="assets/fp-pin.png">` en 2 lignes.
+
+---
+
 ## [v6.50-irr-respects-overrides-at-boot] — 2026-04-20
 
 ### 🐛 Bug critique : IRR affiché à l'ouverture ignore les overrides persistés

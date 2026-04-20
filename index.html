@@ -1903,9 +1903,9 @@ function addCustomSiteMarker(site, displayNum) {
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
   const num = displayNum != null ? displayNum : null;
   const pinHtml = (typeof window.fpLogoPinHTML === 'function')
-    ? window.fpLogoPinHTML({ size: 36, num })
-    : `<div style="width:36px;height:36px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP${num != null ? ' '+num : ''}</div>`;
-  const icon = L.divIcon({ className:'', html: pinHtml, iconSize:[42,42], iconAnchor:[21,21] });
+    ? window.fpLogoPinHTML({ size: 48, num })
+    : `<div style="width:48px;height:48px;background:#f3f4f6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP${num != null ? ' '+num : ''}</div>`;
+  const icon = L.divIcon({ className:'', html: pinHtml, iconSize:[56,56], iconAnchor:[28,28] });
   const mk=L.marker([site.lat,site.lng],{icon,draggable:false});
   // XSS-safe: user-supplied name/notes are escapeHtml'd before injection.
   // v6.43 — lien "Supprimer" dans le popup pour delete direct depuis la carte
@@ -6945,11 +6945,11 @@ function renderTargetPinsDesktop() {
   if (window.innerWidth <= 768) { targetMarkersLayer.clearLayers(); return; }
   targetMarkersLayer.clearLayers();
   TARGETS.forEach((t, i) => {
-    // v6.48 — pin blanc FP stylisé
+    // v6.51 — pin FP fidèle image (size 48 + animations apple-like)
     const pinHtml = (typeof window.fpLogoPinHTML === 'function')
-      ? window.fpLogoPinHTML({ size: 36, num: i + 1 })
-      : `<div style="width:36px;height:36px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP ${i+1}</div>`;
-    const icon = L.divIcon({ className: '', html: pinHtml, iconSize: [42, 42], iconAnchor: [21, 21] });
+      ? window.fpLogoPinHTML({ size: 48, num: i + 1 })
+      : `<div style="width:48px;height:48px;background:#f3f4f6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2937">FP ${i+1}</div>`;
+    const icon = L.divIcon({ className: '', html: pinHtml, iconSize: [56, 56], iconAnchor: [28, 28] });
     const mk = L.marker([t.lat, t.lng], { icon });
     const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s||''));
     mk.bindPopup(`<h3>${esc(t.name)}</h3>

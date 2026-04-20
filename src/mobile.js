@@ -2564,12 +2564,12 @@
 
     const sites = getAllSites();
     sites.forEach((t, i) => {
-      // v6.48 — pin blanc FP stylisé (mobile). Actif = plus gros avec glow.
+      // v6.51 — pin FP fidèle image (size 48 + animations apple-like)
       const active = i === activeIdx;
       const pinHtml = (typeof window.fpLogoPinHTML === 'function')
-        ? `<div class="fp-target-pin${active ? ' active' : ''}">${window.fpLogoPinHTML({ size: 36, active, num: i + 1 })}</div>`
+        ? `<div class="fp-target-pin${active ? ' active' : ''}">${window.fpLogoPinHTML({ size: 48, active, num: i + 1 })}</div>`
         : `<div class="fp-target-pin${active ? ' active' : ''}">${i + 1}</div>`;
-      const iconDim = active ? 44 : 40; // wrapper + scale buffer
+      const iconDim = active ? 58 : 54; // wrapper + scale buffer
       const icon = L.divIcon({
         className: '',
         html: pinHtml,
