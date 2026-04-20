@@ -1,5 +1,84 @@
 # Changelog
 
+## [v6.35-bp-harmonized-avril2026] — 2026-04-20
+
+### 🔥 Synchronisation complète avec le BP Excel harmonisé (Avril 2026)
+
+**Source unique** : `MF FP - BP RO - vFinancement mixte - Avril.xlsx` (Paul, 2026-04-20). Sheets utilisées : `HYPOTHESES` (source de vérité paramètres), `PL_CLUB_TYPE` (P&L succursale 10 ans), `01_DCF_BPI` (scénario financement simple BPI — Paul demandé explicitement en référence).
+
+**EXEC_SUMMARY ignoré** (contient des #REF! sur sections DCF v3/Uneverage — Paul confirmé pas à jour).
+
+### Changements PNL_DEFAULTS (index.html)
+
+| Paramètre | V17 (avant) | BP Avril (après) | Source Excel |
+|---|---|---|---|
+| `targetMembers` | 4 000 | **3 600** | HYPOTHESES!C34 |
+| `staff` (structure) | `staffRate: 9%` + plancher 65k | **Object ETP × salaires** (1 manager 36k + 2 vendeurs 24k) | HYPOTHESES!C55-C61 |
+| `staff.chargeRate` | — | **0.0225** (RO taux réduit) | HYPOTHESES!C58 |
+| `staff.inflationRate` | 0.03 | **0.06** (+6%/an) | HYPOTHESES!C61 |
+| `fondsPubRate` | 0.01 | **0.02** (DOUBLÉ) | HYPOTHESES!C17 |
+| `exitMultiple` | 6× | **8×** | HYPOTHESES!C116 |
+| `rentGrowth` | 0.03 (HICP) | **0.02** | HYPOTHESES!C54 |
+| `financing.loanRate` | 0.065 | **0.04** (SG garantie BPI 60%) | 01_DCF_BPI!C68 |
+| `churnAnnual` | — | **0.043** (nouveau) | HYPOTHESES!C37 |
+| `priceBaseTTC` | 28 | **27.8** | HYPOTHESES!C42 |
+| `arpuMeanHT` | — | **25.49** (VAD 20%) | HYPOTHESES!C47 |
+
+### Non modifié (demande Paul "plug depuis l'app")
+
+- `rentSteps.surface` (1 449 m²), `serviceCharge`, `marketingFee`, `clubSurface`
+- `offerInitiale`, `objectifNego` (Hala Laminor scenarios)
+- Logique des sliders user-controlled (`_rentOverride`, `_chargeOverride`, `_surfaceOverride`)
+- Structure overrides per-site + cloud sync
+
+### Staff refactor (structurel)
+
+`getStaffMonthly()` passe d'un calcul `max(9% CA, plancher 65k × inflation)` à un **plug direct** :
+```
+grossAnnual = managerSalary × nbManagers + vendorSalary × nbVendors  (= 84k A1)
+chargedAnnual = grossAnnual × (1 + chargeRate)                        (= 85.89k A1)
+staffAnnualY = chargedAnnual × (1 + inflationRate)^(year-1)           (A5: 108.4k)
+```
+Impact : sur gros CA (Hala, Baneasa), staff ne scale plus en % → économie importante → IRR/NPV boostés.
+
+### UI — Dashboard + tour BP
+
+- **Card "Paramètres clés BP"** (dashboard) : entièrement refait, inclut un bloc "DCF BPI — Scénario consolidé 40 clubs" avec Equity Value A5/A7/A10 post-IS, TRI Equity 64.5%/61.9%, MOIC 12.1x/29.2x/57.8x.
+- **Slide BP "Coûts"** (tour onboarding) : ratios mis à jour (Staff note "3 ETP plug direct · 86k A1 → 108k A5", Fonds pub 2%, Loyer+charges 19%).
+- **Badge sidebar** : "V17" → "BP Avril 2026".
+
+### Impact KPI 5 TARGETS
+
+| Site | IRR Projet | NPV (k€) | Score | Verdict |
+|---|---|---|---|---|
+| Hala Laminor | 55.43 → **62.80** (+7.4pp) | 3 640 → **4 985** (+37%) | 69.6 → 69.3 | GO COND ✅ |
+| Baneasa | 58.28 → **65.90** (+7.6pp) | 3 949 → **5 399** (+37%) | 68.8 → 68.5 | GO COND ✅ |
+| Unirea | 38.61 → **44.38** (+5.8pp) | 1 977 → **2 764** (+40%) | 70.3 → 70.3 | GO COND ✅ |
+| Militari | 6.13 → **7.24** (+1.1pp) | -323 → **-280** | 56.2 → 56.1 | WATCH ⚠️ |
+| Grand Arena | 1.42 → **1.43** | -555 → **-579** | 53.9 → 51.4 | WATCH ⚠️ |
+
+Gains principaux : fin du % CA sur staff (plug fixe sur 3 ETP) + exit multiple 8× + loan rate 4%.
+
+### Tests
+
+`.baseline.json` + `tests/analysis.html BASELINE` régénérés → **197/197 PASS** confirmé preview.
+
+### Sourcing
+
+Tous les paramètres PNL_DEFAULTS ont désormais des commentaires de source pointant vers la cellule Excel exacte (ex: `// HYPOTHESES!C34`). Single source of truth = Excel Paul.
+
+---
+
+## [v6.30 → v6.34] — 2026-04-20 (consolidation)
+
+- **v6.30** `cloud-sync-initial-push` : push auto au boot si cloud vide + localStorage non-vide (fix pour récup iPhone floreasca → Mac).
+- **v6.31** `desktop-target-pins` : pins ronds dorés numérotés 1-5 sur carte desktop (matching mobile).
+- **v6.32** `pins-uniform-numbered` : custom sites = même style que TARGETS, numérotés 6+.
+- **v6.33** `desktop-charges-surface-sliders` : parité mobile ↔ desktop (3 sliders : loyer + charges + surface).
+- **v6.34** `mes-sites-merged-list` : liste "Mes sites" desktop = TARGETS 1-5 + customs 6+ en continuité.
+
+---
+
 ## [v6.29-cloud-sync-vercel-kv] — 2026-04-20
 
 ### 🔥 Vraie sync auto Mac ↔ iPhone via Vercel KV (Redis géré)

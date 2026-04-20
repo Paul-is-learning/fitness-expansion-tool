@@ -1213,18 +1213,17 @@
   }
 
   function demoBpCosts() {
-    // Structure de coûts % CA — verrouillée post-calibration OnAir Montreuil v6.x
-    // Sources: docs/SESSION_HANDOFF.md + PNL_DEFAULTS dans index.html
-    // OnAir observé: Staff 9% / Loyer 12.4% / OPEX 10.8% / Royalties 4% / Pub 1% / EBITDA 44.7%
-    // Ajustements Romania: OPEX +1.2pp prudent (12% Y5+), Royalties 6% (master-franchise Isseo vs 4% classique)
+    // Structure de coûts calibrée BP harmonisé Avril 2026 (v6.35).
+    // Source: MF FP - BP RO - vFinancement mixte - Avril.xlsx (PL_CLUB_TYPE, maturité A3).
+    // Staff passé en plug ETP (plus un ratio CA): 3 ETP chargés = 86k A1 → ~9% CA A3.
     const costs = [
-      { lbl: 'Cost of sales',  pct: 2.8,  c: '#94a3b8', note: 'calibré OnAir 2,77%' },
-      { lbl: 'Staff',          pct: 9,    c: '#60a5fa', note: '+ plancher 65k€/an · 4 ETP' },
-      { lbl: 'Loyer + charges',pct: 12.4, c: '#f97316', note: 'variable par site' },
+      { lbl: 'Cost of sales',  pct: 2.8,  c: '#94a3b8', note: 'accessoires VAD (BP C63)' },
+      { lbl: 'Staff',          pct: 9,    c: '#60a5fa', note: '3 ETP plug direct · 86k A1 → 108k A5 (+6%/an)' },
+      { lbl: 'Loyer + charges',pct: 19,   c: '#f97316', note: 'flat 19.7k€/mois · variable par site' },
       { lbl: 'OPEX ops Y1→Y5', pct: 16,   c: '#34d399', note: '20% Y1 → 12% Y5+ (time-decay)' },
-      { lbl: 'Royalties MF',   pct: 6,    c: '#a78bfa', note: 'master-franchise Isseo · OnAir 4%' },
-      { lbl: 'Fonds pub',      pct: 1,    c: '#fbbf24', note: 'standard franchise EU' },
-      { lbl: 'Impôts locaux RO',pct: 2,   c: '#f87171', note: 'taxa pe clădiri · OnAir 2,2%' },
+      { lbl: 'Royalties MF',   pct: 6,    c: '#a78bfa', note: 'succursale paie FP France direct' },
+      { lbl: 'Fonds pub',      pct: 2,    c: '#fbbf24', note: 'neutre MF (transparence)' },
+      { lbl: 'Impôts locaux RO',pct: 2,   c: '#f87171', note: 'taxe foncière + taxes locales' },
     ];
     const total = costs.reduce((a,c)=>a+c.pct, 0);
     return `

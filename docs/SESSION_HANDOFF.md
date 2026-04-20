@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.34-mes-sites-merged-list (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.35-bp-harmonized-avril2026 (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -32,11 +32,11 @@ docs/MODEL.md           Golden numbers documentation
 docs/ARCHITECTURE.md    Layout fichiers + load order
 ```
 
-## 5 TARGETS (priorité expansion — IRR Projet post-v6.25 incluant 2% impôts locaux)
-1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **55.4%** — flagship
-2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **58.3%** — destination mall premium
-3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **38.6%**
-4. **Militari Shopping** (Sec 6) — WATCH, IRR **6.1%**
+## 5 TARGETS (priorité expansion — IRR Projet post-v6.35 BP harmonisé Avril 2026)
+1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **62.8%** — flagship
+2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **65.9%** — destination mall premium
+3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **44.4%**
+4. **Militari Shopping** (Sec 6) — WATCH, IRR **7.2%**
 5. **Grand Arena** (Sec 4) — WATCH, IRR **1.4%**
 
 Custom sites additionnés via UI desktop/mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites` + sync auto cloud KV via `/api/sync` (v6.29+). Dans l'onglet "Mes sites" desktop (v6.34), TARGETS et customs sont mergés dans une seule liste numérotée 1-N, pins uniformes ronds dorés.
