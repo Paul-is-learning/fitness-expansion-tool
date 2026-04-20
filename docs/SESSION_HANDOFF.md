@@ -8,10 +8,11 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.25-impots-locaux-2pct (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.29-cloud-sync-vercel-kv (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
+api/sync.js             Vercel Serverless Function — backend KV pour sync custom sites (v6.29)
 index.html              ~6800L (UI + moteur analyse + auth inline)
 config.js               Constantes globales + MODEL_VERSION (cache-bust key)
 data/*.js               TARGETS (5 sites), VERIFIED_CLUBS (92), CARTIERE (83),
@@ -22,6 +23,7 @@ src/invariants.js       Runtime sanity checks (10 invariants)
 src/validators.js       Schema check au boot
 src/audit.js            Log des analyses sessionStorage
 src/auth-guard.js       Rate limit + session sig
+src/cloud-sync.js       Cross-device sync (pull/push debounced) → /api/sync (v6.29)
 mobile.css              Responsive mobile-first (@media ≤ 768px)
 desktop-polish.css      Glassmorphism + springs + pins desktop (@media ≥ 769px)
 tests/analysis.html     197 assertions regression (baseline + invariants)
@@ -166,7 +168,17 @@ Bump `MODEL_VERSION` dans `config.js` quand modèle change → clear `fpSiteAnal
 - Pour future séance : possibilité d'ajouter scénario "stress test" sur chaque param
 - Plateforme admin user creation — discuté mais finalement hardcoded dans `data/users.js`
 
-## Dernière session (v6.25)
+## Dernière session (v6.29)
+- **Vraie sync auto Mac↔iPhone** via Vercel KV (Redis hosté). Plus besoin de l'export/import URL manuel.
+- `api/sync.js` = serverless function (GET/POST), `src/cloud-sync.js` = layer client (pull boot+focus+poll 30s, push debounce 0.9s).
+- Hooks dans 4 fonctions mutation (addCustomSite, removeCustomSite, qualifyCustomSite, importCustomSites).
+- Badge UI 🟢/🟡/🔴 dans card Mes Sites.
+- **Action requise Paul** : connecter Vercel KV au projet (2 clicks dashboard) + redeploy. Doc complète dans `docs/CLOUD_SYNC_SETUP.md`.
+- Fallback localStorage si KV pas configuré → rien ne casse.
+- v6.27 : pin custom doré (uniforme TARGETS) + defensive re-render switchTab + ID match laxe.
+- v6.28 : export/import JSON + URL `?import=<b64>` (workaround manuel, conservé en backup si offline).
+
+## Sessions précédentes (≤ v6.25)
 - **Décision investisseur** (Paul, master-franchisé) : ajout 2% impôts locaux RO (taxa pe clădiri) dans `PNL_DEFAULTS.taxLocalRate`. Sourcing OnAir Montreuil 2.2%.
 - Charge externe → pèse sur EBITDA, intégrée dans 3 spots P&L (sensitivity, main, Monte Carlo).
 - Slide BP "Coûts" du tour étendue à 7 lignes ; EBITDA cible Y5+ ajusté 44-55% → 42-53%.

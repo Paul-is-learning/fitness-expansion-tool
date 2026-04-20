@@ -40,6 +40,7 @@
 <script src="src/invariants.js" defer></script>
 <script src="src/audit.js" defer></script>
 <script src="src/auth-guard.js" defer></script>
+<script src="src/cloud-sync.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -692,7 +693,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <div class="tab-panel" id="tab-mysites">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="icon">&#9733;</span> <span data-i18n="dmysites.title">Mes sites d'implantation</span></div>
+          <div class="card-title"><span class="icon">&#9733;</span> <span data-i18n="dmysites.title">Mes sites d'implantation</span> <span id="fpCloudSyncBadge" style="display:inline-block;margin-left:8px;font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(148,163,184,.18);color:var(--gray2);font-weight:600" title="Statut sync cloud">☁ …</span></div>
           <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()" data-i18n="dmysites.addBtn">+ Ajouter</button>
         </div>
         <p style="font-size:11px;color:var(--gray2);margin-bottom:10px" data-i18n="dmysites.hint">Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.</p>
@@ -1600,6 +1601,7 @@ function addCustomSite(lat, lng, name, notes) {
   }
   renderCustomSites();
   addCustomSiteMarker(site);
+  window.cloudSync?.push();
   return site;
 }
 
@@ -1670,6 +1672,7 @@ function importCustomSites(list) {
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   renderCustomSites();
   refreshCustomMarkers();
+  window.cloudSync?.push();
   alert(`Import terminé ✓\n${added} site(s) ajouté(s)${skipped ? ` · ${skipped} doublon(s)/invalide(s) ignoré(s)` : ''}.`);
 }
 
@@ -1713,6 +1716,7 @@ function removeCustomSite(id) {
   }
   renderCustomSites();
   refreshCustomMarkers();
+  window.cloudSync?.push();
 }
 
 function qualifyCustomSite(id, status, rating) {
@@ -1725,6 +1729,7 @@ function qualifyCustomSite(id, status, rating) {
   else try { localStorage.setItem('fpCustomSites', JSON.stringify(customSites)); } catch {}
   renderCustomSites();
   refreshCustomMarkers();
+  window.cloudSync?.push();
 }
 
 let customMarkersLayer = L.layerGroup();

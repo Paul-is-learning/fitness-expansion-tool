@@ -1,5 +1,43 @@
 # Changelog
 
+## [v6.29-cloud-sync-vercel-kv] — 2026-04-20
+
+### 🔥 Vraie sync auto Mac ↔ iPhone via Vercel KV (Redis géré)
+
+**Demande Paul** : « tout doit être automatiquement liéer ». L'export/import URL v6.28 est manuel — pas suffisant pour un master-franchisé qui jongle Mac/iPhone toute la journée.
+
+**Architecture** :
+- **`api/sync.js`** : Vercel Serverless Function (Node runtime) qui fait passerelle vers Vercel KV (Redis hosté). Endpoints :
+  - `GET /api/sync?user=<email>` → `{ sites, ts }`
+  - `POST /api/sync { user, sites }` → upsert
+  - Whitelist server-side : 4 emails canoniques. Cap 500 sites / 500 KB.
+  - Fallback `503 KV_NOT_CONFIGURED` si la KV integration n'est pas connectée → client retombe sur localStorage.
+- **`src/cloud-sync.js`** : layer client `window.cloudSync` exposé.
+  - `pull()` au boot (event `fp:login-success`) + à chaque `visibilitychange visible`
+  - `push()` debounce 0.9s après chaque mutation
+  - Polling léger 30s tant que tab visible
+  - Last-write-wins (acceptable pour 4 users × 1-20 sites)
+  - Merge defensive par lat/lng 4-décimales (pas d'écrasement local non remonté)
+- **Hooks index.html** : `cloudSync.push()` ajouté après `addCustomSite`, `removeCustomSite`, `qualifyCustomSite`, `importCustomSites`.
+- **Badge UI** dans le card "Mes sites" : 🟢 Synchronisé / 🟡 Local seul / 🔴 Erreur.
+
+**Action Paul (2-3 min, doc complète `docs/CLOUD_SYNC_SETUP.md`)** :
+1. Vercel dashboard → projet → Storage → Create KV Database → Connect au projet
+2. Redeploy
+3. Vérifier badge "☁ Synchronisé" vert sur l'app
+
+**Une fois actif** :
+- Ajout site iPhone → ~1s plus tard visible sur Mac (au prochain pull / focus)
+- Suppression Mac → push immédiat → propagé à iPhone
+- Polling 30s tant que tab visible
+- Hors KV configuré : mode dégradé localStorage + export/import URL (rien ne casse)
+
+**Sécurité** : credentials KV jamais exposés au client (env vars Vercel) ; whitelist email server-side ; CORS `*` mais 403 si user inconnu.
+
+**Coût** : Vercel KV Hobby gratuit (30k commandes/mois). Notre usage estimé ~50/jour → 1.5k/mois. Marge ×20.
+
+---
+
 ## [v6.28-cross-device-sync] — 2026-04-20
 
 ### Sync sites custom Mac ↔ iPhone (sans backend) — Export/Import JSON
