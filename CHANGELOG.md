@@ -1,6 +1,40 @@
 
 # Changelog
 
+## [v6.55-desktop-fp-pins-wait-logos-ready] — 2026-04-20
+
+### 🐛 Desktop web : pins affichent "FP 1" simplifié au lieu du logo FITNESS PARK
+
+**Symptôme Paul** (capture desktop Safari Mac, onglet Explorer) : les pins FP 1-5 apparaissaient comme un cercle blanc avec juste le texte **"FP 1"**, **"FP 2"**... — sans le logo FITNESS PARK complet ni le swoosh jaune.
+
+### Cause
+
+`renderTargetPinsDesktop()` et `addCustomSiteMarker()` dans `index.html` (script inline) s'exécutaient **avant** que `src/fp-logos.js` (chargé avec `defer`) ne soit parsé. Résultat : `window.fpLogoPinHTML` était `undefined` au moment du rendu → code tombait sur le fallback HTML minimal `<div>FP ${num}</div>`.
+
+Sur mobile, pas de bug car `buildTargetPins` est appelé depuis mobile.js qui est lui aussi `defer` et exécuté après fp-logos.js dans l'ordre des defer scripts.
+
+### Fix
+
+- **`src/fp-logos.js`** : dispatch un event `fp:logos-ready` à la fin de l'IIFE après avoir exposé `window.fpLogoPinHTML`.
+- **`index.html` `renderTargetPinsDesktop`** : si `fpLogoPinHTML` pas dispo, retry 100ms plus tard (simple et idempotent).
+- **`index.html` `addCustomSiteMarker`** : flag `_pendingCustomMarkers = true` si `fpLogoPinHTML` absent.
+- **Listener global `fp:logos-ready`** : re-render `renderTargetPinsDesktop()` + `refreshCustomMarkers()` si pending. Les pins avec fallback sont remplacés par les vrais SVG dès que fp-logos est chargé.
+
+### Vérification preview
+
+Viewport 1400x900 desktop :
+```
+pin0 HTML: 1548 chars
+pin0HasSvg: true                // vrai SVG inline, pas fallback
+pin0HasFitness: "FITNESS PARK"  // texte logo présent
+```
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.54-onboarding-churn-cohort-y1-y2-y3] — 2026-04-20
 
 ### ✨ Onboarding step 1 : "Évolution nette Y1/Y2/Y3" au lieu de "Churn annuel"

@@ -26,4 +26,4 @@ const GOOGLE_CACHE_KEY = 'fp_google_cache';
 const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
 
 // Model version — bumped when cached data format changes; triggers cache clear
-const MODEL_VERSION = 'v6.54-onboarding-churn-cohort-y1-y2-y3';
+const MODEL_VERSION = 'v6.55-desktop-fp-pins-wait-logos-ready';

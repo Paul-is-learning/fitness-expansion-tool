@@ -92,4 +92,9 @@
       ${num != null ? `<div style="position:absolute;top:-4px;right:-4px;width:${badgeSize}px;height:${badgeSize}px;border-radius:50%;background:#1f2937;color:#fbbf24;font-size:${Math.round(badgeSize*0.58)}px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1.5px solid #ffffff;box-shadow:0 2px 5px rgba(0,0,0,.45);font-family:Inter,Arial,sans-serif;line-height:1">${num}</div>` : ''}
     </div>`;
   };
+
+  // v6.55 — signal au code inline (index.html) qu'il peut re-render les pins
+  // avec le vrai logo. Avant ce signal, renderTargetPinsDesktop peut avoir
+  // fallback au HTML simplifié "FP N" faute de fpLogoPinHTML dispo (script defer).
+  try { window.dispatchEvent(new CustomEvent('fp:logos-ready')); } catch {}
 })();

@@ -1889,7 +1889,25 @@ function qualifyCustomSite(id, status, rating) {
 
 let customMarkersLayer = L.layerGroup();
 
+// v6.55 — flag pour re-render les custom markers quand fp-logos.js est chargé
+// (les premiers rendus pendant le boot utilisent un fallback HTML).
+let _pendingCustomMarkers = false;
+window.addEventListener('fp:logos-ready', () => {
+  try {
+    if (typeof renderTargetPinsDesktop === 'function') renderTargetPinsDesktop();
+    if (_pendingCustomMarkers && typeof refreshCustomMarkers === 'function') {
+      refreshCustomMarkers();
+      _pendingCustomMarkers = false;
+    }
+  } catch (e) { console.warn('[fp:logos-ready] re-render failed:', e); }
+});
+
 function addCustomSiteMarker(site, displayNum) {
+  // v6.55 — si fp-logos.js pas loadé, re-render plus tard via listener
+  // fp:logos-ready (pas de retry ici car pourrait spammer sur imports batch).
+  if (typeof window.fpLogoPinHTML !== 'function') {
+    _pendingCustomMarkers = true; // flag: refreshCustomMarkers quand ready
+  }
   // v6.48 — pin blanc stylisé FP (remplace ancien pin doré numéroté).
   // Logo FP + swoosh jaune centrés dans cercle blanc, badge numéro en coin.
   const palette = {
@@ -6948,6 +6966,12 @@ function renderTargetPinsDesktop() {
   if (!targetMarkersLayer || typeof map === 'undefined') return;
   // Mobile (≤ 768px) gère ses propres pins via src/mobile.js — éviter doublons.
   if (window.innerWidth <= 768) { targetMarkersLayer.clearLayers(); return; }
+  // v6.55 — si fp-logos.js (defer) pas encore chargé, retry dans 100ms plutôt
+  // que d'afficher le fallback HTML simplifié "FP N" (bug desktop signalé par Paul).
+  if (typeof window.fpLogoPinHTML !== 'function') {
+    setTimeout(renderTargetPinsDesktop, 100);
+    return;
+  }
   targetMarkersLayer.clearLayers();
   TARGETS.forEach((t, i) => {
     // v6.51 — pin FP fidèle image (size 48 + animations apple-like)
