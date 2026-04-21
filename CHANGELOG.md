@@ -1,6 +1,50 @@
 
 # Changelog
 
+## [v6.59-full-viewport-height-desktop] — 2026-04-21
+
+### 🖥️ Fix — sidebar, map et right panel descendent jusqu'en bas de l'écran
+
+Paul : « Dans Analyser sur Mac, la map et les informations de gauche ne descendent pas jusqu'en bas de l'écran. Utilise tout l'écran. »
+
+Sur certains viewports (Mac avec tabs verticaux Safari notamment), la sidebar et la carte s'arrêtaient avant le bas, laissant une bande noire visible sous la status-bar et sous le panneau SAZ.
+
+### Cause
+
+- `.app` grid sans `grid-template-rows` explicite → dépendait de l'auto-stretch d'une row implicite pour hériter de `height:100vh`. Sur Safari Mac, le calcul de `100vh` pouvait se faire avant la reflow complète, laissant les colonnes grid sans hauteur stable.
+- `#map { height: 100vh }` en valeur absolue, indépendant de la cellule grid → risque de décalage si `.map-area` ne matche pas exactement `100vh`.
+- Aucune garantie que `.sidebar` et `.right-panel` remplissent leur cellule si une règle parente fluctuait.
+
+### Fix `index.html`
+
+```css
+html{height:100%}
+body{height:100vh;height:100dvh;margin:0;overflow:hidden}
+.app{grid-template-rows:100vh;grid-template-rows:100dvh;height:100vh;height:100dvh}
+.sidebar{height:100%;min-height:0}
+.right-panel{height:100%;min-height:0}
+.map-area{height:100%}
+#map{height:100%}
+```
+
+Principes :
+- **`100dvh` avec fallback `100vh`** pour absorber les différences de calcul Safari/Chrome.
+- **`grid-template-rows` explicite** au niveau `.app` pour figer la hauteur de la row unique.
+- **`#map: height:100%`** relatif à `.map-area` (au lieu de `100vh` absolu) → la map suit exactement la cellule grid.
+- **`min-height:0`** sur sidebar et right panel pour permettre à un flex child (`.sidebar-body`) de scroller correctement sans pousser le parent.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Changement CSS uniquement, hors moteur d'analyse.
+
+### Vérifié
+
+- 1440×900 : sidebar + map + right panel = 900px chacun, status-bar collée au bas.
+- 1920×1080 : sidebar + map + right panel = 1080px chacun, pas d'espace vide.
+- Mobile (≤768px) : règles `mobile.css` avec `!important` dominent, layout stacked conservé.
+
+---
+
 ## [v6.58-tri-aligned-mobile-desktop-plus-live-sync] — 2026-04-20
 
 ### 🎯 2 fixes définitifs
