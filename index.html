@@ -3734,9 +3734,14 @@ async function genHeatmap() {
     }
   }
   if(heatLayer) map.removeLayer(heatLayer);
+  // v6.57 — Paul: "heatmap trop marquee". Reduit l'intensite visuelle:
+  //   - max 0.6 → 1.0   (plus de headroom avant saturation complete)
+  //   - minOpacity 0.35 → 0.20  (moins presente en zone basse densite)
+  //   - radius 45 → 38 / blur 35 → 28 (zones plus nettes, moins envahissantes)
+  //   - gradient: stops etales + rouge adouci pour limiter les masses rouge vif
   heatLayer=L.heatLayer(allComps.map(c=>[c.lat,c.lng,1.0]),{
-    radius:45,blur:35,maxZoom:13,max:0.6,minOpacity:0.35,
-    gradient:{0.05:'#1e3a5f',0.2:'#3b82f6',0.4:'#06b6d4',0.6:'#eab308',0.8:'#f97316',1:'#ef4444'}
+    radius:38,blur:28,maxZoom:13,max:1.0,minOpacity:0.20,
+    gradient:{0.05:'#1e3a5f',0.25:'#3b82f6',0.5:'#06b6d4',0.7:'#eab308',0.85:'#f97316',1:'#dc2626'}
   }).addTo(map);
 }
 

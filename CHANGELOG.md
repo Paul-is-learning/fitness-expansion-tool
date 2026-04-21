@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.57-heatmap-concurrence-softer] — 2026-04-20
+
+### 🎨 Heatmap concurrence moins marquée (desktop + mobile)
+
+Paul : "heatmap concurrence un peu trop marquée, peux-tu réduire légèrement". Sur la capture, les zones rouge vif couvraient quasi tout Bucarest.
+
+### Changements `index.html` `loadHeatmap()`
+
+Appliqué sur `L.heatLayer(...)` partagé entre desktop et mobile (même layer) :
+
+| Param | Avant | Après | Effet |
+|---|---|---|---|
+| `max` | 0.6 | **1.0** | Headroom avant saturation complète |
+| `minOpacity` | 0.35 | **0.20** | Moins présent en zone basse densité |
+| `radius` | 45 | **38** | Zones plus nettes, moins diffuses |
+| `blur` | 35 | **28** | Contours plus définis |
+| gradient rouge final | `#ef4444` | `#dc2626` | Rouge adouci, stops plus étalés |
+
+Résultat : les clusters concurrents ressortent toujours clairement (zones saturées lisibles) mais la carte reste lisible, les targets FP + fonds OSM ne sont plus écrasés par le rouge.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (changement visuel map uniquement, hors moteur).
+
+---
+
 ## [v6.56-fp-pins-float-idle-animation] — 2026-04-20
 
 ### ✨ Tous les pins FP sont dynamiques (float continu desktop + mobile)
