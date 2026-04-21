@@ -1,6 +1,35 @@
 
 # Changelog
 
+## [v6.58-tri-aligned-mobile-desktop-plus-live-sync] — 2026-04-20
+
+### 🎯 2 fixes définitifs
+
+**1. TRI mobile ≠ TRI desktop — résolu**
+
+Paul voyait mobile hero Hala = 84.6% et desktop table = 85.2%. Ces valeurs correspondaient à **2 métriques différentes** :
+- Mobile hero = **IRR Equity base** (levered) ⭐
+- Desktop tableau = 3 IRR **Projet** scénarios (unlevered) dont 85.2% = optimiste et 56.4% = base
+
+Le desktop cachait le vrai IRR Equity. Paul comparait Equity mobile vs Projet optimiste desktop → forcément décalé.
+
+**Fix `index.html` 3-scenarios card** :
+- Ligne **"IRR (incl. TV)"** → **"IRR Projet (unlevered)"** (valeurs visibles: 33.05% / 56.39% / 85.2%)
+- **Nouvelle ligne "IRR Equity (levered) ⭐"** ajoutée juste en dessous — c'est CETTE ligne base scenario qui matchera le mobile hero (84.6% dans ce cas)
+- Arrondi uniformisé `.toFixed(1)` — mobile `fmtPct(x)` fait pareil → zéro écart visuel
+
+**2. Inputs mobile ne propageaient pas live vers desktop — résolu**
+
+Paul ajustait un slider sur mobile, le desktop gardait ses valeurs stales tant qu'il n'avait pas re-cliqué "Analyser".
+
+**Fix listener `fp:overrides-updated`** dans `index.html` : maintenant **re-run `renderCaptageAnalysis`** (avec `window._lastCaptageLocation`) si la fiche analyse desktop est ouverte. Le slider mobile → push cloud → pull desktop (< 5s polling) → event → desktop recalcule tout (IRR, NPV, CAF, sparklines, sliders sync). Même dans l'autre sens (desktop → mobile) déjà couvert par le listener mobile v6.52.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.57-heatmap-concurrence-softer] — 2026-04-20
 
 ### 🎨 Heatmap concurrence moins marquée (desktop + mobile)

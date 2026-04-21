@@ -4765,11 +4765,22 @@ window.persistOverrides = function persistOverrides() {
 };
 
 // v6.49 — listener global: si les overrides arrivent du cloud (autre device),
-// refresh la liste + markers. Si la fiche d'analyse est ouverte, elle est
-// implicitement rebuilded lors du prochain clic utilisateur (live slider).
+// refresh la liste + markers. v6.58 — ET re-run la fiche d'analyse ouverte
+// pour que IRR/NPV/sliders desktop reflètent l'input mobile (ou vice versa)
+// sans attendre un clic user.
 window.addEventListener('fp:overrides-updated', () => {
   try { window.renderCustomSites?.(); } catch {}
   try { window.refreshCustomMarkers?.(); } catch {}
+  // v6.58 — si la fiche analyse desktop est ouverte, re-run l'analyse
+  // avec les nouveaux overrides. Sinon les KPI restent stale jusqu'au
+  // prochain click "Analyser".
+  try {
+    const card = document.getElementById('siteAnalysisCard');
+    const last = window._lastCaptageLocation;
+    if (card && card.style.display !== 'none' && last && typeof renderCaptageAnalysis === 'function') {
+      renderCaptageAnalysis(last.containerId, last.lat, last.lng, last.radius);
+    }
+  } catch (e) { console.warn('[fp:overrides-updated] desktop re-analysis failed:', e); }
 });
 
 function getRentSteps(scenario) {
@@ -5661,7 +5672,8 @@ function exportPDF() {
         ${[0,1,2,3,4].map(i => `<tr><td style="font-weight:600">A${i+1}</td><td>${fmt(Math.round(r.pnl.conservateur.annualCA[i]/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.annualCA[i]/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.annualCA[i]/1000))}k€</td></tr>`).join('')}
         <tr style="border-top:1px solid #888"><td style="font-size:7px;color:#888">EBITDA A5</td><td style="font-size:7px">${fmt(Math.round(r.pnl.conservateur.annualEBITDA[4]/1000))}k€</td><td style="font-size:7px;font-weight:700">${fmt(Math.round(r.pnl.base.annualEBITDA[4]/1000))}k€</td><td style="font-size:7px">${fmt(Math.round(r.pnl.optimiste.annualEBITDA[4]/1000))}k€</td></tr>
         <tr><td style="font-size:7px;color:#888">TV (${PNL_DEFAULTS.exitMultiple}x EBITDA)</td><td style="font-size:7px">${fmt(Math.round(r.pnl.conservateur.terminalValue/1000))}k€</td><td style="font-size:7px;font-weight:700">${fmt(Math.round(r.pnl.base.terminalValue/1000))}k€</td><td style="font-size:7px">${fmt(Math.round(r.pnl.optimiste.terminalValue/1000))}k€</td></tr>
-        <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR (incl. TV)</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr}%</td></tr>
+        <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR Projet (unlevered)</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr.toFixed(1)}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr.toFixed(1)}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr.toFixed(1)}%</td></tr>
+        <tr><td style="font-weight:700">IRR Equity (levered) ⭐</td><td style="color:${r.pnl.conservateur.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.conservateur.irrEquity ?? 0).toFixed(1)}%</td><td style="font-weight:700;color:${r.pnl.base.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.base.irrEquity ?? 0).toFixed(1)}%</td><td style="color:${r.pnl.optimiste.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.optimiste.irrEquity ?? 0).toFixed(1)}%</td></tr>
         <tr><td style="font-weight:700">NPV</td><td>${fmt(Math.round(r.pnl.conservateur.npv/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.npv/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.npv/1000))}k€</td></tr>
       </table>
     </div>
