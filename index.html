@@ -4704,6 +4704,11 @@ const PNL_DEFAULTS = {
   billingPeriodsPerYear: 13,
   billingFactor:         13 / 12,   // ≈ 1.0833 — applique au caAdherents mensuel
 };
+// v6.53 — expose PNL_DEFAULTS sur window pour que les IIFE modules
+// (onboarding-tour.js etc.) puissent lire les vraies valeurs BP sans
+// hardcoder. Mirror inerte (ref): les mutations de PNL_DEFAULTS seraient
+// visibles des 2 côtés (même objet).
+window.PNL_DEFAULTS = PNL_DEFAULTS;
 
 // Get monthly rent (all-in: base rent + service charges + marketing) for a given year
 // scenario: 'offerInitiale' or 'objectifNego'

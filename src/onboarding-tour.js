@@ -1177,12 +1177,24 @@
   }
 
   function demoBpAssumptions() {
+    // v6.53 — lit les valeurs depuis PNL_DEFAULTS (BP harmonisé Avril 2026 via
+    // HYPOTHESES.xlsx). Fallback hardcodé si PNL_DEFAULTS indisponible.
+    const P = (typeof window !== 'undefined' && window.PNL_DEFAULTS) || {};
+    const priceTTC = P.priceBaseTTC != null ? P.priceBaseTTC : 27.8;
+    const priceHT = P.priceStandardHT != null ? P.priceStandardHT : 22.98;
+    const target = P.targetMembers != null ? P.targetMembers : 3600;
+    const churn = P.churnAnnual != null ? P.churnAnnual : 0.043;
+    const royalty = P.redevanceRate != null ? P.redevanceRate : 0.06;
+    const formatEur = (n) => Math.round(n * 100) / 100 + ' €';
+    const formatEurHT = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' HT';
+    const formatMembers = (n) => n.toLocaleString('fr-FR');
+    const formatPct = (n) => (n * 100).toFixed(1).replace(/\.0$/, '') + '%';
     const rows = [
-      { lbl: 'Prix mensuel',       val: '28 €',    sub: 'TTC · 23,14 HT',   c: '#d4a017' },
-      { lbl: 'Membres cibles A3',  val: '4 000',   sub: 'par club mature',  c: '#60a5fa' },
+      { lbl: 'Prix mensuel',       val: formatEur(priceTTC), sub: 'TTC · ' + formatEurHT(priceHT), c: '#d4a017' },
+      { lbl: 'Membres cibles A3',  val: formatMembers(target), sub: 'par club mature',  c: '#60a5fa' },
       { lbl: 'Ramp-up A1 / A2',    val: '70% / 90%', sub: 'courbe maturité', c: '#34d399' },
-      { lbl: 'Churn annuel',       val: '45%',     sub: 'standard low-cost EU', c: '#f97316' },
-      { lbl: 'Redevance MF',       val: '6%',      sub: 'du CA HT → FP France', c: '#a78bfa' },
+      { lbl: 'Churn annuel',       val: formatPct(churn), sub: 'standard low-cost EU', c: '#f97316' },
+      { lbl: 'Redevance MF',       val: formatPct(royalty), sub: 'du CA HT → FP France', c: '#a78bfa' },
     ];
     return `
       <div style="display:flex;flex-direction:column;gap:5px;width:100%">

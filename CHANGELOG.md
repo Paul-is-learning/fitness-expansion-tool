@@ -1,6 +1,38 @@
 
 # Changelog
 
+## [v6.53-onboarding-bp-values-from-pnl-defaults] — 2026-04-20
+
+### 🐛 Onboarding tour affichait encore des valeurs BP V17 (pré-v6.35)
+
+**Symptôme Paul** (capture step 1 "5 key assumptions") :
+- Prix mensuel : **28 €** TTC / 23,14 HT → devrait être **27,8 €** / **22,98 HT** (BP Avril 2026)
+- Membres cibles A3 : **4 000** → devrait être **3 600** (Excel harmonisé)
+- Churn annuel : **45%** → devrait être **4,3%** (churnAnnual 0.043)
+- Redevance MF : 6% ✓ (pas besoin de changer)
+
+Ces 4 valeurs étaient **hardcodées** dans `src/onboarding-tour.js demoBpAssumptions()`, jamais resynchronisées lors du refactor v6.35 BP harmonisé.
+
+### Fix
+
+- **`index.html`** : `window.PNL_DEFAULTS = PNL_DEFAULTS` — expose la source de vérité pour que les IIFE modules externes puissent y accéder (même pattern que v6.41 pour customSites / safeStorage).
+- **`src/onboarding-tour.js demoBpAssumptions`** : lit `window.PNL_DEFAULTS.priceBaseTTC / priceStandardHT / targetMembers / churnAnnual / redevanceRate` avec fallback hardcodé v6.35. Plus de dérive possible lors des prochains refactors BP.
+
+### Résultat attendu
+
+Onboarding step 1 affichera désormais :
+- Prix mensuel : **27,8 €** · 22,98 HT
+- Membres cibles A3 : **3 600** par club mature
+- Ramp-up A1/A2 : 70% / 90% (inchangé)
+- Churn annuel : **4.3%** standard low-cost EU
+- Redevance MF : 6% du CA HT → FP France
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+---
+
 ## [v6.52-fix-race-ensure-analysis] — 2026-04-20
 
 ### 🐛 Race condition ensureAnalysis — cache TRI stale indéfiniment
