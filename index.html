@@ -61,15 +61,15 @@
   --mono:'JetBrains Mono','Fira Code',monospace;
 }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-html{height:100%}
-body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hidden;height:100vh;height:100dvh;margin:0;-webkit-font-smoothing:antialiased}
+html,body{height:100%;margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hidden;-webkit-font-smoothing:antialiased}
 
 /* LAYOUT */
-.app{display:grid;grid-template-columns:420px 1fr;grid-template-rows:100vh;grid-template-rows:100dvh;height:100vh;height:100dvh;transition:grid-template-columns .35s ease}
+.app{display:grid;grid-template-columns:420px 1fr;grid-template-rows:100%;height:100%;transition:grid-template-columns .35s ease}
 .app.panel-open{grid-template-columns:420px 1fr 440px}
 
 /* SIDEBAR */
-.sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-height:0;height:100%;z-index:1001;position:relative}
+.sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-height:0;z-index:1001;position:relative}
 .sidebar::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(to bottom,var(--accent),transparent 30%,transparent 70%,var(--accent))}
 
 .sidebar-header{padding:16px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:linear-gradient(135deg,var(--card) 0%,rgba(212,160,23,.04) 100%)}
@@ -233,7 +233,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 .method-weight{display:inline-block;background:rgba(6,182,212,.1);color:var(--cyan);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;font-family:var(--mono)}
 
 /* MAP */
-.map-area{position:relative;height:100%}
+.map-area{position:relative;height:100%;overflow:hidden}
 #map{width:100%;height:100%}
 
 /* Map overlays */

@@ -1,6 +1,49 @@
 
 # Changelog
 
+## [v6.60-prevent-global-scroll-after-analyze] — 2026-04-21
+
+### 🚨 Fix critique — la visualisation se perdait au clic « Analyser »
+
+Paul : « Dès que je clique analyse, la visualisation se perd. »
+
+Dès l'ouverture de la fiche d'analyse détaillée, la sidebar gauche ne descendait plus jusqu'en bas de l'écran : une bande noire apparaissait sous la status-bar, la map semblait décalée, et le layout « sautait » visuellement.
+
+### Cause racine
+
+La pile de map-overlays position-absolute (`#pointBox` + `#sazBox` dans `.map-overlay-tr`) pouvait, quand pleinement peuplée, dépasser la hauteur de `.map-area` (viewport). Comme `.map-area` n'avait pas d'`overflow:hidden` explicite, ces enfants absolute **contribuaient au `scrollHeight` du body**, transformant la page en document scrollable global.
+
+Effet déclencheur : `runSiteAnalysis()` se termine par un `scrollIntoView({block:'start'})` sur `#siteAnalysisCard`. Avec un `scrollHeight` supérieur à la viewport, le navigateur scrollait **toute la fenêtre** (au lieu de scroller uniquement `.sidebar-body`). L'`.app` se retrouvait translatée de ~27 px vers le haut et la status-bar + bas de sidebar sortaient du champ visible → effet « visualisation perdue ».
+
+### Fix `index.html`
+
+```css
+.map-area{position:relative;height:100%;overflow:hidden}
+```
+
+- `overflow:hidden` sur `.map-area` empêche les overlays absolute de contribuer au `scrollHeight` du document.
+- Pas d'impact visuel : les overlays étaient déjà visuellement clippés par `body{overflow:hidden}`, maintenant ils le sont au bon niveau (container map).
+- Plus d'effet yoyo quand `scrollIntoView` s'active.
+
+### Simplification v6.59 bonus
+
+Pendant l'enquête, simplification du layout `.app` :
+- Passage de `100vh/100dvh` à un modèle `html,body{height:100%}` + `.app{height:100%}` → plus robuste, équivalent sur tous browsers, plus besoin de double-déclaration pour fallback.
+- Retrait du `height:100%` redondant sur `.sidebar` (grid stretch auto).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**.
+
+### Vérifié preview
+
+- 1440×900 et 1920×1080 après clic Analyser :
+  - `window.scrollY = 0`
+  - `body.scrollHeight = viewport height` (plus d'overflow parasite)
+  - sidebar + map + right overlay = hauteur complète, status-bar collée au bas.
+
+---
+
 ## [v6.59-full-viewport-height-desktop] — 2026-04-21
 
 ### 🖥️ Fix — sidebar, map et right panel descendent jusqu'en bas de l'écran
