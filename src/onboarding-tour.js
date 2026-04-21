@@ -1193,7 +1193,10 @@
       { lbl: 'Prix mensuel',       val: formatEur(priceTTC), sub: 'TTC · ' + formatEurHT(priceHT), c: '#d4a017' },
       { lbl: 'Membres cibles A3',  val: formatMembers(target), sub: 'par club mature',  c: '#60a5fa' },
       { lbl: 'Ramp-up A1 / A2',    val: '70% / 90%', sub: 'courbe maturité', c: '#34d399' },
-      { lbl: 'Churn annuel',       val: formatPct(churn), sub: 'standard low-cost EU', c: '#f97316' },
+      // v6.54 — Paul raisonne en client additionnel NET (solde entrées - sorties),
+      // pas un churn pur. Valeurs BP Avril 2026. Affichage uniquement, pas utilisé
+      // dans les calculs du modèle (churnAnnual 4.3% sert pour LTV/cohortes engine).
+      { lbl: 'Évolution nette',    val: '-10,7% / -42,4% / -47,8%', sub: 'Y1 / Y2 / Y3 · cohorte low-cost EU', c: '#f97316' },
       { lbl: 'Redevance MF',       val: formatPct(royalty), sub: 'du CA HT → FP France', c: '#a78bfa' },
     ];
     return `

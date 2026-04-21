@@ -1,6 +1,29 @@
 
 # Changelog
 
+## [v6.54-onboarding-churn-cohort-y1-y2-y3] — 2026-04-20
+
+### ✨ Onboarding step 1 : "Évolution nette Y1/Y2/Y3" au lieu de "Churn annuel"
+
+Paul a précisé sa méthodologie BP : il raisonne en **client additionnel NET** (solde entrées − sorties par année), pas en churn pur. Les valeurs à afficher dans l'onboarding sont :
+- Y1 : **-10,7%**
+- Y2 : **-42,4%**
+- Y3 : **-47,8%**
+
+### Changement
+
+**`src/onboarding-tour.js demoBpAssumptions`** :
+- Label **"Churn annuel" → "Évolution nette"**
+- Valeur `-10,7% / -42,4% / -47,8%` (hardcodée)
+- Sub-label `Y1 / Y2 / Y3 · cohorte low-cost EU`
+- **Affichage uniquement** — le modèle interne continue d'utiliser `churnAnnual 4.3%` pour les calculs LTV/cohortes (engine inchangé).
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS** (aucun impact moteur).
+
+---
+
 ## [v6.53-onboarding-bp-values-from-pnl-defaults] — 2026-04-20
 
 ### 🐛 Onboarding tour affichait encore des valeurs BP V17 (pré-v6.35)
