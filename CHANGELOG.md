@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.56-fp-pins-float-idle-animation] — 2026-04-20
+
+### ✨ Tous les pins FP sont dynamiques (float continu desktop + mobile)
+
+Paul veut que **tous les pins soient vivants sur la carte**, pas seulement l'actif. Avant v6.56 : float = uniquement pin actif (pulse continu), autres statiques après drop au mount.
+
+### Changement `src/fp-logos.js`
+
+Animation chainée sur `.fp-logo-pin` (tous les pins) :
+1. **`fpPinDrop`** au mount (0.65s, une seule fois) — drop spring apple-like inchangé
+2. **`fpPinFloat`** infini (3.4s ease-in-out) — micro `translateY -3px` + `scale 1.035` qui respire
+
+**Stagger par index** : `--fp-pin-delay: (num × 0.35) % 2.8 s` injecté inline. Pins 1-5 ont delays 0.35 / 0.70 / 1.05 / 1.40 / 1.75s → respiration organique, pas tous synchronisés.
+
+**Pin actif** (`.fp-pin-active`) : conserve pulse plus marqué (`fpPinPulseSoft` scale 1.06 ↔ 1.16) qui override le float pour rester distinct.
+
+**Hover** : `animation-play-state: paused` + `transform: scale(1.12)` — pause le float et scale up pour feedback clair.
+
+**Desktop + mobile** : le helper `fpLogoPinHTML` est partagé entre `renderTargetPinsDesktop` / `addCustomSiteMarker` (desktop) et `buildTargetPins` (mobile). L'animation s'applique automatiquement aux deux.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Vérifié preview : `animationName: "fpPinDrop, fpPinFloat"`, `iterationCount: "1, infinite"`, `--fp-pin-delay: 0.35s` (pin 1).
+
+---
+
 ## [v6.55-desktop-fp-pins-wait-logos-ready] — 2026-04-20
 
 ### 🐛 Desktop web : pins affichent "FP 1" simplifié au lieu du logo FITNESS PARK

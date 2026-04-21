@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.55-desktop-fp-pins-wait-logos-ready (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.56-fp-pins-float-idle-animation (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```

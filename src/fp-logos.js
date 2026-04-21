@@ -23,11 +23,16 @@
       .fp-logo-pin {
         transform-origin: center;
         transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .28s cubic-bezier(.2,.8,.2,1), filter .2s ease-out;
-        animation: fpPinDrop .65s cubic-bezier(.34,1.56,.64,1) both;
+        /* v6.56 — drop au mount puis float continu (tous les pins sont vivants,
+           pas juste l'actif). Delay stagger via --fp-pin-delay inline (par index). */
+        animation:
+          fpPinDrop .65s cubic-bezier(.34,1.56,.64,1) both,
+          fpPinFloat 3.4s ease-in-out var(--fp-pin-delay, 0s) infinite;
         will-change: transform;
       }
       .fp-logo-pin:hover {
-        transform: scale(1.1);
+        animation-play-state: running, paused; /* pause le float, garde le drop */
+        transform: scale(1.12);
         z-index: 1000;
         filter: brightness(1.06);
       }
@@ -36,7 +41,10 @@
         transition: transform .08s cubic-bezier(.3,0,.7,1);
       }
       .fp-logo-pin.fp-pin-active {
-        animation: fpPinPulseSoft 2.4s cubic-bezier(.4,0,.6,1) infinite;
+        /* Actif: float remplacé par pulse plus marqué (scale plus large). */
+        animation:
+          fpPinDrop .65s cubic-bezier(.34,1.56,.64,1) both,
+          fpPinPulseSoft 2.4s cubic-bezier(.4,0,.6,1) var(--fp-pin-delay, 0s) infinite;
       }
       .fp-logo-pin__swoosh {
         stroke-dasharray: 200;
@@ -49,9 +57,14 @@
         78%  { transform: scale(0.96) translateY(0); }
         100% { transform: scale(1) translateY(0); opacity: 1; }
       }
+      /* v6.56 — float subtil: micro translateY + scale pour donner de la vie. */
+      @keyframes fpPinFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-3px) scale(1.035); }
+      }
       @keyframes fpPinPulseSoft {
         0%, 100% { transform: scale(1.06); }
-        50%      { transform: scale(1.14); }
+        50%      { transform: scale(1.16); }
       }
       @keyframes fpSwooshDraw {
         to { stroke-dashoffset: 0; }
@@ -82,9 +95,14 @@
     const shadow = active
       ? '0 6px 20px rgba(0,0,0,.48),0 0 0 2px rgba(251,191,36,.55),0 0 24px rgba(251,191,36,.42)'
       : '0 4px 12px rgba(0,0,0,.38),0 1px 3px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.9)';
+    // v6.56 — Stagger par num: delay = (num * 0.3s) % 2.5s → effet organique,
+    // pas tous les pins synchronisés dans leur respiration.
+    const staggerDelay = num != null
+      ? ((parseInt(num, 10) * 0.35) % 2.8).toFixed(2) + 's'
+      : '0s';
     // SVG fidèle: cercle #f3f4f6, texte FITNESS PARK italique noir, swoosh jaune.
     // viewBox 200x200 — proportions identiques à l'image de référence.
-    return `<div class="fp-logo-pin${active ? ' fp-pin-active' : ''}" style="width:${size}px;height:${size}px;background:#f3f4f6;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:${shadow};cursor:pointer;position:relative;overflow:visible">
+    return `<div class="fp-logo-pin${active ? ' fp-pin-active' : ''}" style="--fp-pin-delay:${staggerDelay};width:${size}px;height:${size}px;background:#f3f4f6;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:${shadow};cursor:pointer;position:relative;overflow:visible">
       <svg width="${inner}" height="${inner}" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block" aria-label="Fitness Park">
         <text x="100" y="95" font-family="'Helvetica Neue','Arial Black',Inter,sans-serif" font-weight="900" font-style="italic" font-size="30" fill="#1f2937" text-anchor="middle" dominant-baseline="middle" letter-spacing="-1" textLength="170" lengthAdjust="spacingAndGlyphs">FITNESS PARK</text>
         <path class="fp-logo-pin__swoosh" d="M 22 130 Q 62 110, 100 124 T 178 118" stroke="#fbbf24" stroke-width="9" fill="none" stroke-linecap="round"/>
