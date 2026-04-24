@@ -214,8 +214,8 @@
         Loyer <b style="color:var(--white)">${params.loyerM2Month}€/m²/mois</b> (${fmtK(params.loyerM2Month*params.surface)}/mois) ·
         Charges <b style="color:var(--white)">${params.chargesM2Month}€/m²/mois</b> (${fmtK(params.chargesM2Month*params.surface)}/mois)
         <br>Ramp-up identique (${Math.round((global.BPRunner.getBaselineInput('C35')||0.7)*100)}% → ${Math.round((global.BPRunner.getBaselineInput('C36')||0.9)*100)}% → 100%) — seule la <b>cible adhérents</b> diffère entre les 2 scénarios.
-        <br>Source : moteur Excel BP v2Financement mix (3 659 formules, parité 1:1). Recalc ${kpis.a.elapsedMs?.toFixed(0) || '?'}ms × 2.
-        <br><span style="color:var(--gray)">TRI/Payback recalculés avec CAPEX ${fmtK(Math.abs(kpis.a.capexTotal || 0))} en Y1 seulement (retraitement décidé par Paul — la maquette Excel répète =−HYPOTHESES!C81 sur 10 ans dans PL_CLUB_TYPE!C45:L45). Vue consolidée master-franchisé : <b>💰 Éditer BP</b>.</span>
+        <br>Source : moteur Excel BP v2Financement mix, lecture 1:1 (parité golden test 100%). CAPEX ${fmtK(Math.abs(kpis.a.capexTotal || 0))} en Y1. Recalc ${kpis.a.elapsedMs?.toFixed(0) || '?'}ms × 2.
+        <br><span style="color:var(--gray)">Vue consolidée master-franchisé (TRI projet, cashflow multi-clubs, DCF) : bouton <b>💰 Éditer BP</b>.</span>
       </div>
     `;
 

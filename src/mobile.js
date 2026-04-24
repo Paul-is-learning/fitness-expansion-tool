@@ -1722,10 +1722,12 @@
       if (t) {
         const key = siteKeyFor(t);
         window._surfaceOverrides = window._surfaceOverrides || {};
+        const before = window._surfaceOverrides[key] ?? window.PNL_DEFAULTS?.rentSteps?.surface ?? 1400;
         window._surfaceOverrides[key] = v;
         window.persistOverrides?.();
         markOverrideEdited(key, 'surface');
         refreshOverrideBadges(key);
+        try { window.logSliderChangeDebounced?.('surface', before, v, key, t.name); } catch {}
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1742,15 +1744,17 @@
     clearTimeout(chargeDebounce);
     chargeDebounce = setTimeout(() => {
       window._chargeOverride = { chargeTotal: v };
-      // Persist per site (in-memory map + localStorage for cross-session)
       const t = getAllSites()[activeIdx];
       if (t) {
         const key = siteKeyFor(t);
         window._chargeOverrides = window._chargeOverrides || {};
+        const defaultCharge = (window.PNL_DEFAULTS?.rentSteps?.serviceCharge || 0) + (window.PNL_DEFAULTS?.rentSteps?.marketingFee || 0);
+        const before = window._chargeOverrides[key] ?? defaultCharge;
         window._chargeOverrides[key] = v;
         window.persistOverrides?.();
         markOverrideEdited(key, 'charge');
         refreshOverrideBadges(key);
+        try { window.logSliderChangeDebounced?.('charges', before, v, key, t.name); } catch {}
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1771,10 +1775,12 @@
       if (t) {
         const key = siteKeyFor(t);
         window._rentOverrides = window._rentOverrides || {};
+        const before = window._rentOverrides[key] ?? window.PNL_DEFAULTS?.rentSteps?.objectifNego?.[0]?.rent ?? 10.5;
         window._rentOverrides[key] = v;
         window.persistOverrides?.();
         markOverrideEdited(key, 'rent');
         refreshOverrideBadges(key);
+        try { window.logSliderChangeDebounced?.('loyer', before, v, key, t.name); } catch {}
       }
       recomputeCurrentAnalysis(v);
     }, 90);

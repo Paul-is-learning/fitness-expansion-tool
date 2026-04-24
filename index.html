@@ -41,6 +41,7 @@
 <script src="src/audit.js" defer></script>
 <script src="src/auth-guard.js" defer></script>
 <script src="src/cloud-sync.js" defer></script>
+<script src="src/audit-log.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -699,7 +700,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <div class="card">
         <div class="card-header">
           <div class="card-title"><span class="icon">&#9733;</span> <span data-i18n="dmysites.title">Mes sites d'implantation</span> <span id="fpCloudSyncBadge" style="display:inline-block;margin-left:8px;font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(148,163,184,.18);color:var(--gray2);font-weight:600" title="Statut sync cloud">☁ …</span></div>
-          <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()" data-i18n="dmysites.addBtn">+ Ajouter</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="openActivityLog()" title="Journal d'activité multi-user" style="font-size:10px">📋 Activité</button>
+            <button class="btn btn-sm btn-primary admin-only" onclick="startAddSite()" data-i18n="dmysites.addBtn">+ Ajouter</button>
+          </div>
         </div>
         <p style="font-size:11px;color:var(--gray2);margin-bottom:10px" data-i18n="dmysites.hint">Cliquez "Ajouter" puis cliquez sur la carte pour positionner un site. Ou entrez une adresse ci-dessous.</p>
         <div style="display:flex;gap:6px;margin-bottom:12px">
@@ -1762,6 +1766,7 @@ function addCustomSite(lat, lng, name, notes) {
   refreshCustomMarkers(); // re-render avec numérotation continue (v6.32)
   window.cloudSync?.pushNow(); // v6.39: push immédiat (évite que mobile ferme l'app avant debounce)
   window._fpMobileRefreshSites?.(); // v6.37: sync mobile pins quand desktop ajoute
+  try { window.AuditLog?.log({ action: 'site.add', target: cleanName, siteKey: latN.toFixed(3) + ',' + lngN.toFixed(3), meta: { notes: cleanNotes, status: 'prospect' } }); } catch {}
   return site;
 }
 
@@ -1883,12 +1888,14 @@ function removeCustomSite(id) {
   refreshCustomMarkers();
   window.cloudSync?.pushNow(); // v6.39
   window._fpMobileRefreshSites?.(); // v6.37
+  try { window.AuditLog?.log({ action: 'site.remove', target: site.name, siteKey: Number(site.lat).toFixed(3) + ',' + Number(site.lng).toFixed(3) }); } catch {}
 }
 
 function qualifyCustomSite(id, status, rating) {
   const idStr = String(id);
   const site = customSites.find(s => String(s.id) === idStr);
   if (!site) return;
+  const prevStatus = site.status;
   site.status = status;
   site.rating = rating;
   site.updatedAt = Date.now(); // v6.38 CRDT
@@ -1898,6 +1905,7 @@ function qualifyCustomSite(id, status, rating) {
   refreshCustomMarkers();
   window.cloudSync?.pushNow(); // v6.39
   window._fpMobileRefreshSites?.(); // v6.37
+  try { window.AuditLog?.log({ action: 'site.qualify', target: site.name, siteKey: Number(site.lat).toFixed(3) + ',' + Number(site.lng).toFixed(3), field: 'status', before: prevStatus, after: status }); } catch {}
 }
 
 let customMarkersLayer = L.layerGroup();
@@ -1987,6 +1995,7 @@ async function analyzeSiteAt(siteLike) {
     console.error('analyzeSiteAt: site invalide', siteLike);
     return;
   }
+  try { window.AuditLog?.log({ action: 'site.analyze', target: siteLike.name || 'Site', siteKey: Number(siteLike.lat).toFixed(3) + ',' + Number(siteLike.lng).toFixed(3) }); } catch {}
   switchTab('mysites');
   const card = el('siteAnalysisCard');
   if (card) {
@@ -5326,12 +5335,42 @@ function computeExecSummary(r) {
 }
 
 // --- RENT SLIDER: REAL-TIME P&L RECALC ---
+// v6.65 — helper pour logger les 3 sliders (loyer/charges/surface) au
+// relâchement user. Garde le "before" (1re valeur vue) et le "after"
+// (dernière valeur vue) entre les onInput rapides, log au debounce 800ms.
+window._sliderLogTimers = window._sliderLogTimers || {};
+window._sliderLogBefore = window._sliderLogBefore || {};
+function logSliderChangeDebounced(field, before, after, siteKey, siteName) {
+  if (!window.AuditLog) return;
+  const k = field + '|' + (siteKey || 'global');
+  if (!(k in window._sliderLogBefore)) window._sliderLogBefore[k] = before;
+  clearTimeout(window._sliderLogTimers[k]);
+  window._sliderLogTimers[k] = setTimeout(() => {
+    const b = window._sliderLogBefore[k];
+    if (b !== after) {
+      try {
+        window.AuditLog.log({
+          action: 'slider.' + field,
+          target: siteName || '(site inconnu)',
+          siteKey, field, before: b, after,
+        });
+      } catch {}
+    }
+    delete window._sliderLogBefore[k];
+    delete window._sliderLogTimers[k];
+  }, 800);
+}
+window.logSliderChangeDebounced = logSliderChangeDebounced;
+
 function onRentSliderChange(val) {
   const y1 = parseFloat(val);
   window._rentOverride = {y1};
   // Store per-site for persistence (in-memory map + localStorage cross-session)
   if(window._lastCaptageLocation) {
     const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
+    const before = window._rentOverrides[key] ?? PNL_DEFAULTS.rentSteps.objectifNego[0].rent;
+    const siteName = window._lastCaptageLocation.siteName || key;
+    logSliderChangeDebounced('loyer', before, y1, key, siteName);
     window._rentOverrides[key] = y1;
     window.persistOverrides?.();
   }
@@ -5359,6 +5398,9 @@ function onChargeSliderChange(val) {
   if(window._lastCaptageLocation) {
     const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
     window._chargeOverrides = window._chargeOverrides || {};
+    const before = window._chargeOverrides[key] ?? (PNL_DEFAULTS.rentSteps.serviceCharge + PNL_DEFAULTS.rentSteps.marketingFee);
+    const siteName = window._lastCaptageLocation.siteName || key;
+    logSliderChangeDebounced('charges', before, v, key, siteName);
     window._chargeOverrides[key] = v;
     window.persistOverrides?.();
   }
@@ -5379,6 +5421,9 @@ function onSurfaceSliderChange(val) {
   if(window._lastCaptageLocation) {
     const key = window._lastCaptageLocation.lat.toFixed(3) + ',' + window._lastCaptageLocation.lng.toFixed(3);
     window._surfaceOverrides = window._surfaceOverrides || {};
+    const before = window._surfaceOverrides[key] ?? PNL_DEFAULTS.rentSteps.surface;
+    const siteName = window._lastCaptageLocation.siteName || key;
+    logSliderChangeDebounced('surface', before, v, key, siteName);
     window._surfaceOverrides[key] = v;
     window.persistOverrides?.();
   }
@@ -5538,6 +5583,119 @@ function saveSiteAnalysis(name, lat, lng, r, exec) {
 }
 // Exposé global pour mobile.js (autre module) — v6.21 fix persistance post-slider
 window.saveSiteAnalysis = saveSiteAnalysis;
+
+// ─── v6.65 — Modal Journal d'activité multi-user ────────────────────
+function openActivityLog() {
+  let modal = document.getElementById('fpActivityModal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'fpActivityModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:stretch;justify-content:center;padding:24px;font-family:var(--font)';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:100%;max-width:820px;max-height:100%;display:flex;flex-direction:column;overflow:hidden">
+      <header style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--white)">📋 Journal d'activité</div>
+          <div style="font-size:9px;color:var(--gray2);margin-top:2px">Toutes les actions des utilisateurs (100 dernières)</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button onclick="openActivityLog()" title="Rafraîchir" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--gray);padding:5px 10px;cursor:pointer;font-size:10px">↻</button>
+          <button onclick="document.getElementById('fpActivityModal')?.remove()" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--gray);width:32px;height:32px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
+        </div>
+      </header>
+      <div id="fpActivityBody" style="padding:12px 18px;overflow-y:auto;flex:1">
+        <div style="text-align:center;color:var(--gray2);font-size:10px;padding:20px">Chargement…</div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  document.addEventListener('keydown', function h(e) { if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', h); }});
+  renderActivityLog();
+}
+window.openActivityLog = openActivityLog;
+
+async function renderActivityLog() {
+  const body = document.getElementById('fpActivityBody');
+  if (!body) return;
+  if (!window.AuditLog?.fetch) {
+    body.innerHTML = '<div style="color:var(--red);font-size:10px;padding:20px;text-align:center">Module AuditLog non chargé.</div>';
+    return;
+  }
+  const resp = await window.AuditLog.fetch();
+  if (resp.error) {
+    body.innerHTML = `<div style="color:var(--yellow);font-size:10px;padding:20px;text-align:center">⚠ Backend audit non disponible (${resp.error}).<br>Les logs seront synchronisés au prochain accès prod.</div>`;
+    return;
+  }
+  const entries = (resp.entries || []).slice().reverse();  // plus récent en premier
+  if (!entries.length) {
+    body.innerHTML = '<div style="color:var(--gray2);font-size:10px;padding:20px;text-align:center">Aucune activité encore enregistrée.</div>';
+    return;
+  }
+  const shortUser = (email) => {
+    if (!email) return '?';
+    const local = String(email).split('@')[0];
+    return local.charAt(0).toUpperCase() + local.slice(1, 10);
+  };
+  const timeAgo = (ts) => {
+    if (!ts) return '';
+    const d = Date.now() - ts;
+    const s = Math.round(d / 1000);
+    if (s < 60) return 'à l\u2019instant';
+    const m = Math.round(s / 60);
+    if (m < 60) return 'il y a ' + m + ' min';
+    const h = Math.round(m / 60);
+    if (h < 24) return 'il y a ' + h + ' h';
+    const day = Math.round(h / 24);
+    if (day < 7) return 'il y a ' + day + ' j';
+    const dt = new Date(ts);
+    return dt.getDate() + '/' + (dt.getMonth() + 1) + '/' + String(dt.getFullYear()).slice(2);
+  };
+  const actionIcon = (a) => {
+    if (a?.startsWith('slider')) return '🎛️';
+    if (a === 'site.add') return '➕';
+    if (a === 'site.remove') return '🗑️';
+    if (a === 'site.qualify') return '🏷️';
+    if (a === 'site.analyze') return '🔍';
+    if (a?.startsWith('bp')) return '🏦';
+    return '•';
+  };
+  const fmtVal = (v) => {
+    if (v == null) return '—';
+    if (typeof v === 'number') {
+      if (Math.abs(v) >= 1000) return v.toLocaleString('fr-FR');
+      return String(v);
+    }
+    return String(v);
+  };
+  body.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--gray2);font-size:8px;letter-spacing:0.5px">
+          <th style="text-align:left;padding:6px 8px">QUAND</th>
+          <th style="text-align:left;padding:6px 8px">QUI</th>
+          <th style="text-align:left;padding:6px 8px">ACTION</th>
+          <th style="text-align:left;padding:6px 8px">SITE</th>
+          <th style="text-align:left;padding:6px 8px">CHAMP</th>
+          <th style="text-align:right;padding:6px 8px">AVANT → APRÈS</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(e => `
+          <tr style="border-bottom:1px solid rgba(71,85,115,.15)">
+            <td style="padding:6px 8px;color:var(--gray2);white-space:nowrap" title="${new Date(e.ts).toLocaleString('fr-FR')}">${timeAgo(e.ts)}</td>
+            <td style="padding:6px 8px;color:var(--accent);font-weight:700">${shortUser(e.user)}</td>
+            <td style="padding:6px 8px;color:var(--white)">${actionIcon(e.action)} ${e.action || '—'}</td>
+            <td style="padding:6px 8px;color:var(--white)">${(e.target || '—').replace(/</g,'&lt;')}</td>
+            <td style="padding:6px 8px;color:var(--gray)">${e.field || '—'}</td>
+            <td style="padding:6px 8px;text-align:right;color:var(--gray)">${(e.before != null || e.after != null) ? `<span style="color:var(--red)">${fmtVal(e.before)}</span> → <span style="color:var(--green)">${fmtVal(e.after)}</span>` : '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:8px;color:var(--gray2);margin-top:12px;text-align:center">${entries.length} entrées · dernière maj ${new Date(resp.ts).toLocaleString('fr-FR')}</div>
+  `;
+}
 
 // v6.64 — persistance des 2 scénarios BP par site (appelée par BPSiteUI après
 // chaque run). On stocke un sous-objet minimal (valeurs clés Y5 + TRI +

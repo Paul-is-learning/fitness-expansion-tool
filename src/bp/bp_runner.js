@@ -142,43 +142,25 @@
 
   function extractKPIs() {
     // PL_CLUB_TYPE (club unitaire) : A1..A10 = cols C..L.
-    // C'est le VRAI P&L pertinent pour analyser un site — PL_CONSO cumule
-    // plusieurs clubs ouverts sur l'horizon du master-franchisé et gonfle
-    // artificiellement les chiffres Y5 (~ 5-6× un club seul).
+    // Lecture 1:1 avec l'Excel — après correction Paul du CAPEX Y1-only
+    // (D45..L45 vides, plus de duplication 10×).
     const kCols = ['C','D','E','F','G','H','I','J','K','L'];
     const rowCa     = findRow(plClubRowsCache, ['total ca - ligne p&l', 'total ca -', 'total ca  -', 'total ca']);
     const rowEb     = findRow(plClubRowsCache, ['ebitda']);                // row 34
     const rowMarg   = findRow(plClubRowsCache, ['marge ebitda']);          // row 35
     const rowNet    = findRow(plClubRowsCache, ['resultat net']);          // row 41
-    const rowOpCF   = findRow(plClubRowsCache, ['operating cf', 'operating cash flow']);
+    const rowCapex  = findRow(plClubRowsCache, ['capex club', 'capex', 'investissement']);
+    const rowNetCF  = findRow(plClubRowsCache, ['net cash flow (annuel)', 'net cash flow annuel', 'cash flow annuel']);
+    const rowCumul  = findRow(plClubRowsCache, ['net cash flow (cumule)', 'cash flow (cumule)', 'cash flow cumule']);
+
     const ca     = readRowPerYear('PL_CLUB_TYPE', rowCa,    kCols);
     const ebitda = readRowPerYear('PL_CLUB_TYPE', rowEb,    kCols);
     const marg   = readRowPerYear('PL_CLUB_TYPE', rowMarg,  kCols);
     const net    = readRowPerYear('PL_CLUB_TYPE', rowNet,   kCols);
-    const opCF   = readRowPerYear('PL_CLUB_TYPE', rowOpCF,  kCols);
-
-    // RETRAITEMENT CAPEX — la maquette Excel répète `=-HYPOTHESES!$C$81`
-    // dans PL_CLUB_TYPE!C45..L45, ce qui comptabilise 10× le CAPEX sur
-    // l'horizon. Décision Paul : le CAPEX est **Y1 uniquement**. On lit
-    // la valeur brute dans HYPOTHESES!C81 et on la met uniquement en Y1.
-    // Le net CF / cumul / payback / TRI sont recalculés ici (pas lus dans
-    // les rows 47-48 qui héritent du bug).
-    const capexTotal = getVal('HYPOTHESES', 'C81');  // ex: 1176000
-    const capexY1 = (capexTotal != null && isFinite(capexTotal)) ? -Math.abs(capexTotal) : 0;
-    const capex = Array(kCols.length).fill(0);
-    capex[0] = capexY1;
-
-    // Operating CF par année : préfère row 46 (Operating CF) qui est =EBITDA
-    // dans la maquette, sinon fallback EBITDA.
-    const opCFClean = (opCF || []).map((v, i) => (v != null ? v : (ebitda[i] || 0)));
-
-    // Net CF par année = Op CF + CAPEX (Y1 seul)
-    const netCF = opCFClean.map((v, i) => v + (capex[i] || 0));
-
-    // Cumul net CF recalculé
-    const cumul = [];
-    let sum = 0;
-    for (const v of netCF) { sum += v; cumul.push(sum); }
+    // Cellules vides (D45..L45 après fix Paul) → 0 dans contexte numérique Excel.
+    const capex  = readRowPerYear('PL_CLUB_TYPE', rowCapex, kCols).map(v => v == null ? 0 : v);
+    const netCF  = readRowPerYear('PL_CLUB_TYPE', rowNetCF, kCols).map(v => v == null ? 0 : v);
+    const cumul  = readRowPerYear('PL_CLUB_TYPE', rowCumul, kCols).map(v => v == null ? 0 : v);
 
     // Payback (par club) = 1re année où cash cumulé >= 0.
     let payback = null;
@@ -186,11 +168,11 @@
       if (cumul[i] != null && cumul[i] >= 0) { payback = i + 1; break; }
     }
 
-    // TRI par club = IRR(netCF). Y0 = CAPEX, Yi = Op CF après impôt (approx
-    // via le netCF retraité). Pour un IRR bancable on prendrait le résultat
-    // net + DAP, mais ici on reste sur le cash flow simple Op CF - CAPEX Y1.
+    // TRI par club = IRR(netCF) sur 10 ans. Excel n'a pas de ligne TRI par
+    // club (PL_CLUB_TYPE), on le calcule ici via BPEngine IRR qui matche
+    // Excel à 1e-9.
     let tri10Club = null;
-    if (netCF.every(v => v != null)) {
+    if (netCF.length && netCF.every(v => isFinite(v))) {
       tri10Club = irr(netCF);
     }
 
@@ -201,7 +183,7 @@
       tri10Consolidated: getVal('DCF_COMPARAISON', 'E42'),  // dispo pour info
       paybackYear: payback,
       capex, netCF,
-      capexTotal: capexY1,
+      capexTotal: capex[0],
     };
   }
 

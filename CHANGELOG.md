@@ -1,6 +1,66 @@
 
 # Changelog
 
+## [v6.65-audit-log-bp-excel-fixed] — 2026-04-24
+
+### 📋 Journal d'activité multi-user + Excel BP corrigé à la source
+
+Paul a demandé "qui a fait quoi quand" + reconfirmé que le CAPEX répété dans l'Excel était un bug. Double livraison.
+
+### 1. Journal d'activité cross-user (`/api/audit`)
+
+- **`api/audit.js`** — Serverless Function (Node, Vercel) :
+  - `GET /api/audit` → `{entries, ts}` (dernières 500, FIFO purge)
+  - `POST /api/audit {user, entry}` → append stamped avec user (whitelist 4 emails) + ts serveur
+  - Storage : `fp:audit:log` single KV key, cap 500 entries / 2 MB
+  - Cap d'une entrée : 8 KB
+
+- **`src/audit-log.js`** — client API :
+  - `window.AuditLog.log({action, target, field?, before?, after?, siteKey?, meta?})` — push async debouncé 300ms
+  - `window.AuditLog.fetch()` — récupère les logs pour UI
+  - Mode offline : queue persistée dans `localStorage.fpAuditQueue` (cap 50), flush dès que connectivité revient. `pagehide` handler pour survie onglet-fermé.
+  - Lecture user depuis `localStorage.fpCurrentUser` (même pattern que cloud-sync v6.40).
+
+- **Hooks** :
+  - 3 sliders desktop (`onRentSliderChange` / `onChargeSliderChange` / `onSurfaceSliderChange`) et 3 sliders mobile (`src/mobile.js`) → `logSliderChangeDebounced('loyer'|'charges'|'surface', before, after, siteKey, siteName)` avec debounce 800 ms (skip si valeur identique → zéro spam quand l'user bouge et revient).
+  - `addCustomSite` → `site.add`
+  - `removeCustomSite` → `site.remove` (garde le tombstone CRDT séparé)
+  - `qualifyCustomSite` → `site.qualify` avec before/after du statut
+  - `analyzeSiteAt` (flow unifié TARGET + custom) → `site.analyze`
+
+- **UI — Modal "📋 Activité"** :
+  - Bouton dans la card "Mes sites d'implantation" (header).
+  - Modal plein écran 820 px : tableau QUAND / QUI / ACTION / SITE / CHAMP / AVANT → APRÈS, ordonné du plus récent au plus ancien.
+  - "Quand" en temps relatif ("il y a 3 min", "hier") avec tooltip timestamp absolu.
+  - Icônes par type d'action (🎛️ slider, ➕ ajout, 🗑️ suppression, 🏷️ qualification, 🔍 analyse, 🏦 BP).
+  - Bouton ↻ refresh en live.
+  - Escape key + click outside ferme le modal.
+
+### 2. Excel BP corrigé à la source (Paul)
+
+- **`PL_CLUB_TYPE!D45:L45`** — était rempli avec `=-HYPOTHESES!$C$81` → CAPEX 1.18M€ répété 10 ans. Paul a vidé ces cellules (CAPEX Y1 uniquement, C45). Bug de la maquette audité en v6.64.1, fixé à la source par Paul.
+- `tools/excel_to_ir.py` régénère `src/bp/bp_ir.json` : **3 649 formules** (vs 3 659 avant — 10 dupliquées retirées, bon signe).
+- `bp_runner.js extractKPIs()` — **retraitement CAPEX retiré**, on lit directement `PL_CLUB_TYPE!C45:L45` (D..L = 0 après fix) + `row 47` (netCF) + `row 48` (cumul). Parité 1:1 avec Excel retrouvée. TRI par club = `IRR(netCF row 47)`.
+- `bp_site_ui.js` — note en bas du bloc BP simplifiée : « Source : moteur Excel BP v2Financement mix, lecture 1:1 (parité golden test 100%). CAPEX X€ en Y1. »
+
+### Tests
+
+- `tests/bp/bp_parity.html` → **3 649 / 3 649 PASS** (89 ms eval, tolérance 0.01€)
+- `tests/analysis.html` → **197 / 197 PASS**
+
+### Fiabilisation — état de l'outil après v6.65
+
+| Critère | État |
+|---|---|
+| Parité Excel | ✅ 100 % (3 649/3 649 1:1) |
+| Moteur (DAG + propagation) | ✅ |
+| Sync cross-device (sites + sliders) | ✅ v6.29 + v6.49 |
+| Journal d'activité | ✅ v6.65 (queue offline + KV serveur + UI) |
+| Sync cloud `fpSiteAnalyses` | ⏳ non fait (non-bloquant — recalculable à partir des inputs qui sont déjà synchros) |
+| RLS Supabase + export Excel bancable | ⏳ réservé au jalon "présentation investisseur" |
+
+---
+
 ## [v6.64.1-bp-site-club-type-capex-y1] — 2026-04-24
 
 ### 🩹 Fix post-review Paul — BP du site : chiffres par club honnêtes
