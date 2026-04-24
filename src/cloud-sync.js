@@ -162,6 +162,7 @@
       ['rent',    '_rentOverrides'],
       ['charge',  '_chargeOverrides'],
       ['surface', '_surfaceOverrides'],
+      ['radius',  '_radiusOverrides'],  // v6.65.1
     ];
     for (const [rKey, wKey] of maps) {
       const rObj = remote[rKey];
@@ -172,6 +173,20 @@
           lObj[k] = rObj[k];
           changes++;
         }
+      }
+    }
+    // v6.65.1 — capture rates (global, pas par site). LWW simple.
+    if (remote.captureRates && typeof remote.captureRates === 'object') {
+      const before = window._captureRatesOverride || {};
+      const after = remote.captureRates;
+      let rateChanges = 0;
+      for (const k of ['premium', 'midPremium', 'mid', 'independent', 'lowcost']) {
+        if (before[k] !== after[k]) rateChanges++;
+      }
+      if (rateChanges > 0) {
+        window._captureRatesOverride = after;
+        try { window.applyCaptureRatesOverride?.(); } catch {}
+        changes += rateChanges;
       }
     }
     // v6.61 — merge metadata "qui a édité" (LWW par entrée via at-timestamp)
@@ -269,6 +284,8 @@
         rent:    window._rentOverrides    || {},
         charge:  window._chargeOverrides  || {},
         surface: window._surfaceOverrides || {},
+        radius:  window._radiusOverrides  || {},   // v6.65.1 rayon par site
+        captureRates: window._captureRatesOverride || null, // v6.65.1 taux global
         meta:    (function(){
           try {
             const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
@@ -354,6 +371,8 @@
         rent:    window._rentOverrides    || {},
         charge:  window._chargeOverrides  || {},
         surface: window._surfaceOverrides || {},
+        radius:  window._radiusOverrides  || {},   // v6.65.1 rayon par site
+        captureRates: window._captureRatesOverride || null, // v6.65.1 taux global
         meta:    (function(){
           try {
             const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;

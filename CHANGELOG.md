@@ -1,6 +1,53 @@
 
 # Changelog
 
+## [v6.65.1-sync-radius-capture-rates] — 2026-04-24
+
+### 🩹 Fix sync cross-device Paul — rayon de captage + taux de capture
+
+Paul a pointé qu'en v6.65 je disais "loyer/charges/surface synchronisés" mais qu'il avait dit "loyer/surface/captage". J'ai re-audité : le **rayon de captage** par site et les **5 taux de capture** par segment concurrent n'étaient **ni persistés ni synchronisés**. Ces deux paramètres déterminent le nombre de membres captés (`r.realiste`) utilisé par le scénario B du BP du site → Mac et iPhone pouvaient afficher des scénarios différents.
+
+### Livrables
+
+- **`index.html`** :
+  - `window._radiusOverrides` (par site, clé `lat.toFixed(3),lng.toFixed(3)`) et `window._captureRatesOverride` (global, `{premium, midPremium, mid, independent, lowcost}`) chargés depuis `safeStorage` au boot, persistés via `persistOverrides()`.
+  - `applyCaptureRatesOverride()` exposée globalement + appelée au boot pour réappliquer les taux au dict `CAPTURE_RATES`.
+  - Les 3 fonctions slider captage (`updateCaptageRadius`, `updateCaptageRadiusSite`, `updateCaptureRates`, `updateCaptureRatesSite`) :
+    - Capturent `before` pour audit log
+    - Persistent la nouvelle valeur (`_radiusOverrides[siteKey] = r` ou `_captureRatesOverride = {...}`)
+    - Appellent `persistOverrides()` → localStorage + push cloud debouncé
+    - Logent via `logSliderChangeDebounced('rayon' | 'taux capture', ...)`
+  - `showCaptageForPoint()` restore le rayon sauvegardé du site + positionne les 2 sliders DOM (captageRadiusSlider + captageRadiusSliderSite) à la bonne valeur.
+  - `fp:overrides-updated` handler : lit `_radiusOverrides[siteKey]` pour re-render avec la valeur synchro (au lieu de `last.radius` figé).
+
+- **`src/cloud-sync.js`** :
+  - `mergeOverrides()` étendu : `radius` (par site, LWW simple) + `captureRates` (global, LWW simple, appelle `applyCaptureRatesOverride` pour réappliquer au dict).
+  - `pushNow()` push payload étendu `{rent, charge, surface, radius, captureRates, meta}`.
+
+### Tests effectués en preview
+- Change slider rayon 3 km → 2 km sur Hala Laminor → `_radiusOverrides['44.426,26.149'] = 2000`, localStorage OK, `captageMembers` 7 093 → 5 734 (cohérent avec rayon réduit).
+- Reload : slider restauré à 2 km + label "2 km", scénario B garde 5 734 mbr.
+- Change taux premium 12 % → 20 % : `_captureRatesOverride.premium = 20`, `CAPTURE_RATES.premium.rate = 0.20` appliqué direct.
+- Reload : override restauré, `applyCaptureRatesOverride` au boot réinjecte 0.20.
+
+### Tests
+- `tests/analysis.html` → **197/197 PASS**.
+
+### État après v6.65.1
+
+| Critère | Avant | Après v6.65.1 |
+|---|---|---|
+| Sync sites custom | ✅ v6.29 | ✅ |
+| Sync loyer/charges/surface | ✅ v6.49 | ✅ |
+| Sync rayon de captage | ❌ | ✅ |
+| Sync taux de capture | ❌ | ✅ |
+| Journal d'activité | ✅ v6.65 | ✅ (étendu aux 2 nouveaux sliders) |
+| Parité Excel | ✅ v6.65 | ✅ |
+
+**Tous les inputs des 2 scénarios BP sont maintenant synchronisés Mac ↔ iPhone.**
+
+---
+
 ## [v6.65-audit-log-bp-excel-fixed] — 2026-04-24
 
 ### 📋 Journal d'activité multi-user + Excel BP corrigé à la source

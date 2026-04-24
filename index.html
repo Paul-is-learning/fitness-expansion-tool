@@ -4084,6 +4084,18 @@ const CAPTURE_RATES = {
   boutique: {rate:0.02, reason:'Expérience unique non substituable'},
 };
 
+// v6.65.1 — applique les overrides cloud/localStorage sur les rates au boot.
+// Est aussi rappelée par cloud-sync quand un autre device push de nouveaux taux.
+window.applyCaptureRatesOverride = function applyCaptureRatesOverride() {
+  const o = window._captureRatesOverride;
+  if (!o) return;
+  if (o.premium     != null) CAPTURE_RATES.premium.rate      = o.premium / 100;
+  if (o.midPremium  != null) CAPTURE_RATES['mid-premium'].rate = o.midPremium / 100;
+  if (o.mid         != null) CAPTURE_RATES.mid.rate          = o.mid / 100;
+  if (o.independent != null) CAPTURE_RATES.independent.rate  = o.independent / 100;
+  if (o.lowcost     != null) CAPTURE_RATES.lowcost.rate      = o.lowcost / 100;
+};
+
 function distanceDecay(dist, driveMins) {
   // Use real driving time if available (Google Distance Matrix)
   if(driveMins !== undefined) {
@@ -4768,16 +4780,24 @@ window._surfaceOverride = null;// {surface: number} — overrides club surface m
 window._rentOverrides    = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpRentOverrides', {})    || {}) : {};
 window._chargeOverrides  = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpChargeOverrides', {})  || {}) : {};
 window._surfaceOverrides = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpSurfaceOverrides', {}) || {}) : {};
+// v6.65.1 — rayon de captage par site (m) + taux de capture par segment (global).
+window._radiusOverrides  = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpRadiusOverrides', {})  || {}) : {};
+window._captureRatesOverride = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpCaptureRates', null) || null) : null;
+// Si override présent au boot (cross-device ou session précédente), applique-les.
+if (typeof window.applyCaptureRatesOverride === 'function') window.applyCaptureRatesOverride();
 
-/** Persist the 3 per-site override maps to localStorage. Cheap (< 1 KB).
+/** Persist the 5 override structures to localStorage. Cheap (< 2 KB).
  *  v6.49 — également poussés cloud (via cloudSync.push, debounce 700ms pour
- *  coalesce les rapid slider moves). Pull des overrides au polling 5s + boot. */
+ *  coalesce les rapid slider moves). Pull des overrides au polling 5s + boot.
+ *  v6.65.1 — inclut radius + capture rates (manquaient avant). */
 let _overridesPushTimer = null;
 window.persistOverrides = function persistOverrides() {
   if (typeof safeStorage !== 'undefined') {
     safeStorage.set('fpRentOverrides',    window._rentOverrides    || {});
     safeStorage.set('fpChargeOverrides',  window._chargeOverrides  || {});
     safeStorage.set('fpSurfaceOverrides', window._surfaceOverrides || {});
+    safeStorage.set('fpRadiusOverrides',  window._radiusOverrides  || {});
+    if (window._captureRatesOverride) safeStorage.set('fpCaptureRates', window._captureRatesOverride);
   }
   // Debounce cloud push — les sliders peuvent fire 10+ events en quelques ms.
   if (_overridesPushTimer) clearTimeout(_overridesPushTimer);
@@ -4800,7 +4820,15 @@ window.addEventListener('fp:overrides-updated', () => {
     const card = document.getElementById('siteAnalysisCard');
     const last = window._lastCaptageLocation;
     if (card && card.style.display !== 'none' && last && typeof renderCaptageAnalysis === 'function') {
-      renderCaptageAnalysis(last.containerId, last.lat, last.lng, last.radius);
+      // v6.65.1 — prend le radius synchro cloud s'il existe pour ce site
+      const key = last.lat.toFixed(3) + ',' + last.lng.toFixed(3);
+      const effectiveRadius = (window._radiusOverrides && window._radiusOverrides[key]) || last.radius;
+      renderCaptageAnalysis(last.containerId, last.lat, last.lng, effectiveRadius);
+      // Sync sliders DOM à la nouvelle valeur
+      if (effectiveRadius !== last.radius) {
+        ['captageRadiusSliderSite', 'captageRadiusSlider'].forEach(id => { const s = el(id); if (s) s.value = effectiveRadius; });
+        ['captageRadiusValSite', 'captageRadiusVal'].forEach(id => { const v = el(id); if (v) v.textContent = (effectiveRadius/1000) + ' km'; });
+      }
     }
   } catch (e) { console.warn('[fp:overrides-updated] desktop re-analysis failed:', e); }
 });
@@ -6991,6 +7019,13 @@ async function runSiteAnalysis(site) {
 let lastCaptagePoint = null;
 
 function updateCaptureRates() {
+  const before = { ...(window._captureRatesOverride || {
+    premium: Math.round((CAPTURE_RATES.premium?.rate || 0) * 100),
+    midPremium: Math.round((CAPTURE_RATES['mid-premium']?.rate || 0) * 100),
+    mid: Math.round((CAPTURE_RATES.mid?.rate || 0) * 100),
+    independent: Math.round((CAPTURE_RATES.independent?.rate || 0) * 100),
+    lowcost: Math.round((CAPTURE_RATES.lowcost?.rate || 0) * 100),
+  })};
   CAPTURE_RATES.premium.rate = parseInt(el('crPrem').value)/100;
   CAPTURE_RATES['mid-premium'].rate = parseInt(el('crMidP').value)/100;
   CAPTURE_RATES.mid.rate = parseInt(el('crMid').value)/100;
@@ -7001,6 +7036,21 @@ function updateCaptureRates() {
   el('crMidVal').textContent=el('crMid').value+'%';
   el('crIndVal').textContent=el('crInd').value+'%';
   el('crLowVal').textContent=el('crLow').value+'%';
+  // v6.65.1 — persist + cloud sync + audit log
+  window._captureRatesOverride = {
+    premium: parseInt(el('crPrem').value),
+    midPremium: parseInt(el('crMidP').value),
+    mid: parseInt(el('crMid').value),
+    independent: parseInt(el('crInd').value),
+    lowcost: parseInt(el('crLow').value),
+  };
+  window.persistOverrides?.();
+  try {
+    const after = window._captureRatesOverride;
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      logSliderChangeDebounced?.('taux capture', JSON.stringify(before), JSON.stringify(after), 'global', 'Taux capture concurrents');
+    }
+  } catch {}
   // Re-compute captage
   if(lastCaptagePoint) {
     const r = parseInt(el('captageRadiusSlider')?.value || 3000);
@@ -7012,27 +7062,66 @@ function updateCaptageRadius() {
   const r = parseInt(el('captageRadiusSlider').value);
   el('captageRadiusVal').textContent = (r/1000) + ' km';
   if(lastCaptagePoint) {
+    // v6.65.1 — persist per-site + cloud sync + audit log
+    const key = lastCaptagePoint.lat.toFixed(3) + ',' + lastCaptagePoint.lng.toFixed(3);
+    const before = window._radiusOverrides[key] ?? 3000;
+    const siteName = window._lastCaptageLocation?.siteName || key;
+    window._radiusOverrides[key] = r;
+    window.persistOverrides?.();
+    try { logSliderChangeDebounced?.('rayon', before, r, key, siteName); } catch {}
     renderCaptageAnalysis('captageContent', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
   }
 }
 
 function showCaptageForPoint(lat, lng) {
   lastCaptagePoint = {lat, lng};
+  // v6.65.1 — si un rayon custom a été sauvegardé pour ce site, le restaurer
+  // dans le slider + l'utiliser pour le render (sinon default 3000m).
+  const key = lat.toFixed(3) + ',' + lng.toFixed(3);
+  const savedRadius = (window._radiusOverrides && window._radiusOverrides[key]) || null;
+  const effectiveRadius = savedRadius || parseInt(el('captageRadiusSlider')?.value || 3000);
+  if (savedRadius) {
+    const sSite = el('captageRadiusSliderSite');
+    const vSite = el('captageRadiusValSite');
+    if (sSite) sSite.value = savedRadius;
+    if (vSite) vSite.textContent = (savedRadius / 1000) + ' km';
+    const sMain = el('captageRadiusSlider');
+    const vMain = el('captageRadiusVal');
+    if (sMain) sMain.value = savedRadius;
+    if (vMain) vMain.textContent = (savedRadius / 1000) + ' km';
+  }
   // Render in Mes Sites tab
   const cc = el('captageCard');
-  if(cc) {cc.style.display='block'; renderCaptageAnalysis('captageContent', lat, lng, parseInt(el('captageRadiusSlider')?.value||3000));}
+  if(cc) {cc.style.display='block'; renderCaptageAnalysis('captageContent', lat, lng, effectiveRadius);}
   // Render in Fiche Site tab
   const cs = el('captageCardSite');
-  if(cs) {cs.style.display='block'; renderCaptageAnalysis('captageContentSite', lat, lng, parseInt(el('captageRadiusSliderSite')?.value||3000));}
+  if(cs) {cs.style.display='block'; renderCaptageAnalysis('captageContentSite', lat, lng, effectiveRadius);}
 }
 
 function updateCaptageRadiusSite() {
   const r = parseInt(el('captageRadiusSliderSite').value);
   el('captageRadiusValSite').textContent = (r/1000) + ' km';
-  if(lastCaptagePoint) renderCaptageAnalysis('captageContentSite', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
+  if(lastCaptagePoint) {
+    // v6.65.1 — persist per-site + cross-device sync + audit log
+    const key = lastCaptagePoint.lat.toFixed(3) + ',' + lastCaptagePoint.lng.toFixed(3);
+    const before = window._radiusOverrides[key] ?? 3000;
+    const siteName = window._lastCaptageLocation?.siteName || key;
+    window._radiusOverrides[key] = r;
+    window.persistOverrides?.();
+    try { logSliderChangeDebounced?.('rayon', before, r, key, siteName); } catch {}
+    renderCaptageAnalysis('captageContentSite', lastCaptagePoint.lat, lastCaptagePoint.lng, r);
+  }
 }
 
 function updateCaptureRatesSite() {
+  // v6.65.1 — capture "before" pour audit log (avant mutation des rates)
+  const beforeRates = {
+    premium: Math.round((CAPTURE_RATES.premium?.rate || 0) * 100),
+    midPremium: Math.round((CAPTURE_RATES['mid-premium']?.rate || 0) * 100),
+    mid: Math.round((CAPTURE_RATES.mid?.rate || 0) * 100),
+    independent: Math.round((CAPTURE_RATES.independent?.rate || 0) * 100),
+    lowcost: Math.round((CAPTURE_RATES.lowcost?.rate || 0) * 100),
+  };
   CAPTURE_RATES.premium.rate = parseInt(el('crPremS').value)/100;
   CAPTURE_RATES['mid-premium'].rate = parseInt(el('crMidPS').value)/100;
   CAPTURE_RATES.mid.rate = parseInt(el('crMidS').value)/100;
@@ -7049,6 +7138,23 @@ function updateCaptureRatesSite() {
   if(el('crMid')){el('crMid').value=el('crMidS').value;el('crMidVal').textContent=el('crMidS').value+'%'}
   if(el('crInd')){el('crInd').value=el('crIndS').value;el('crIndVal').textContent=el('crIndS').value+'%'}
   if(el('crLow')){el('crLow').value=el('crLowS').value;el('crLowVal').textContent=el('crLowS').value+'%'}
+  // v6.65.1 — persist globalement (pas par site, ces sliders sont globaux) + cloud sync
+  window._captureRatesOverride = {
+    premium: parseInt(el('crPremS').value),
+    midPremium: parseInt(el('crMidPS').value),
+    mid: parseInt(el('crMidS').value),
+    independent: parseInt(el('crIndS').value),
+    lowcost: parseInt(el('crLowS').value),
+  };
+  window.persistOverrides?.();
+  // Log : un seul log agrégé par vague d'input (via debounce dans AuditLog.log interne)
+  try {
+    const afterRates = { ...window._captureRatesOverride, midPremium: window._captureRatesOverride.midPremium };
+    const changed = Object.keys(beforeRates).filter(k => beforeRates[k] !== afterRates[k]);
+    if (changed.length) {
+      logSliderChangeDebounced?.('taux capture', JSON.stringify(beforeRates), JSON.stringify(afterRates), 'global', 'Taux capture concurrents');
+    }
+  } catch {}
   if(lastCaptagePoint) {
     renderCaptageAnalysis('captageContentSite', lastCaptagePoint.lat, lastCaptagePoint.lng, parseInt(el('captageRadiusSliderSite')?.value||3000));
     renderCaptageAnalysis('captageContent', lastCaptagePoint.lat, lastCaptagePoint.lng, parseInt(el('captageRadiusSlider')?.value||3000));
