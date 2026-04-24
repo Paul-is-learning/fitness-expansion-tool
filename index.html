@@ -70,8 +70,16 @@ html,body{height:100%;margin:0}
 body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hidden;-webkit-font-smoothing:antialiased}
 
 /* LAYOUT */
-.app{display:grid;grid-template-columns:420px 1fr;grid-template-rows:100%;height:100%;transition:grid-template-columns .35s ease}
-.app.panel-open{grid-template-columns:420px 1fr 440px}
+.app{display:grid;grid-template-columns:520px 1fr;grid-template-rows:100%;height:100%;transition:grid-template-columns .45s cubic-bezier(.34,1.08,.44,1)}
+.app.panel-open{grid-template-columns:520px 1fr 440px}
+/* v6.65.3 — mode "analyse" : sidebar s'agrandit, map se réduit pour une lecture data-centric */
+.app.is-analyzing{grid-template-columns:minmax(760px, 70%) 1fr}
+.app.is-analyzing.panel-open{grid-template-columns:minmax(760px, 60%) 1fr 380px}
+.app.is-analyzing #mapWrap,
+.app.is-analyzing .map-container{opacity:.78;transition:opacity .45s ease}
+.app.is-analyzing .map-container:hover{opacity:1}
+#fpRestoreMapBtn{position:fixed;top:14px;right:14px;z-index:1050;display:none;align-items:center;gap:6px;padding:8px 14px;background:linear-gradient(135deg,rgba(30,41,59,.95),rgba(17,24,39,.95));border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:0.3px;box-shadow:0 4px 20px rgba(0,0,0,.4);backdrop-filter:blur(8px);transition:all .2s ease}
+#fpRestoreMapBtn:hover{background:var(--accent);color:#000;transform:translateY(-1px)}
 
 /* SIDEBAR */
 .sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-height:0;z-index:1001;position:relative}
@@ -296,7 +304,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 .marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:var(--accent)!important;color:white!important;font-weight:700!important;font-family:var(--font)!important}
 
 /* Responsive */
-@media(max-width:1200px){.app{grid-template-columns:360px 1fr}.app.panel-open{grid-template-columns:360px 1fr 380px}}
+@media(max-width:1200px){
+  .app{grid-template-columns:440px 1fr}
+  .app.panel-open{grid-template-columns:440px 1fr 380px}
+  .app.is-analyzing{grid-template-columns:minmax(640px, 66%) 1fr}
+  .app.is-analyzing.panel-open{grid-template-columns:minmax(640px, 58%) 1fr 340px}
+}
 @media(max-width:768px){
   .app{grid-template-columns:1fr!important;grid-template-rows:auto 1fr}
   .app.panel-open{grid-template-columns:1fr!important}
@@ -445,6 +458,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
   </div>
 </div>
 
+<button id="fpRestoreMapBtn" type="button" onclick="setAnalyzingLayout(false)" title="Rétablir la vue carte (Escape)">🗺️ Vue carte</button>
 <div class="app" id="app" style="display:none">
 <!-- ================================================================
      SIDEBAR
@@ -1996,6 +2010,8 @@ async function analyzeSiteAt(siteLike) {
     return;
   }
   try { window.AuditLog?.log({ action: 'site.analyze', target: siteLike.name || 'Site', siteKey: Number(siteLike.lat).toFixed(3) + ',' + Number(siteLike.lng).toFixed(3) }); } catch {}
+  // v6.65.3 — bascule le layout en mode data-centric : sidebar élargie, map réduite.
+  try { setAnalyzingLayout(true); } catch {}
   switchTab('mysites');
   const card = el('siteAnalysisCard');
   if (card) {
@@ -5611,6 +5627,36 @@ function saveSiteAnalysis(name, lat, lng, r, exec) {
 }
 // Exposé global pour mobile.js (autre module) — v6.21 fix persistance post-slider
 window.saveSiteAnalysis = saveSiteAnalysis;
+
+// ─── v6.65.3 — Bascule layout "mode analyse" (sidebar élargie, map réduite) ──
+window.setAnalyzingLayout = function(on) {
+  if (window.innerWidth <= 768) return;  // mobile intact (grid 1fr forcé par @media)
+  const app = document.querySelector('.app');
+  if (!app) return;
+  const was = app.classList.contains('is-analyzing');
+  if (on) app.classList.add('is-analyzing');
+  else app.classList.remove('is-analyzing');
+  // Leaflet recalcule la taille du container après la transition CSS (450ms).
+  if (was !== on) {
+    setTimeout(() => {
+      try { if (typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize(true); } catch {}
+    }, 500);
+  }
+  const btn = document.getElementById('fpRestoreMapBtn');
+  if (btn) btn.style.display = on ? 'inline-flex' : 'none';
+};
+window.addEventListener('resize', () => {
+  if (window.innerWidth <= 768) {
+    const a = document.querySelector('.app');
+    if (a && a.classList.contains('is-analyzing')) a.classList.remove('is-analyzing');
+  }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('bpSiteFullscreenModal') && !document.getElementById('fpActivityModal')) {
+    const a = document.querySelector('.app');
+    if (a && a.classList.contains('is-analyzing')) setAnalyzingLayout(false);
+  }
+});
 
 // ─── v6.65 — Modal Journal d'activité multi-user ────────────────────
 function openActivityLog() {

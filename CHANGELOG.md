@@ -1,6 +1,42 @@
 
 # Changelog
 
+## [v6.65.3-sidebar-data-centric] — 2026-04-24
+
+### 🖥️ Sidebar data-centric + mode "Analyse" qui réduit la carte
+
+Paul a demandé plus de largeur pour la data :
+1. Sidebar élargie de base (meilleur affichage des données dès le démarrage).
+2. Quand on clique « Analyser » → la sidebar s'agrandit fortement et la carte se réduit, pour offrir une lecture data-centric propice.
+
+### Changements
+
+- **`.app` grid (desktop > 1200 px)** : `420px 1fr` → **`520px 1fr`** (sidebar de base).
+- **`.app.is-analyzing`** (nouvelle classe, desktop only) : `minmax(760px, 70%) 1fr` — sidebar prend 70 % du viewport, carte réduite à 30 %. Avec `.panel-open` : `minmax(760px, 60%) 1fr 380px`.
+- **Tablet (≤ 1200 px)** : `360px 1fr` → **`440px 1fr`** base, `minmax(640px, 66%) 1fr` en analyse.
+- **Mobile (≤ 768 px)** : intact (1 col), guard JS supprime `.is-analyzing` si on passe sous 768 px.
+- Transition fluide (`cubic-bezier(.34,1.08,.44,1)` 450 ms).
+- `#mapWrap / .map-container` passe à `opacity: .78` en mode analyse (focus data) — reprend `1` au hover pour rester interactif.
+
+### Toggle
+
+- `window.setAnalyzingLayout(on)` : add/remove `.is-analyzing` + `map.invalidateSize(true)` après 500 ms (Leaflet recalcule sa bbox post-transition).
+- `analyzeSiteAt()` appelle `setAnalyzingLayout(true)` avant `switchTab('mysites')`.
+- **Bouton flottant** `#fpRestoreMapBtn` "🗺️ Vue carte" en haut à droite (position fixed, z-index 1050), apparaît uniquement en mode analyse, hover → fond doré. Clic → `setAnalyzingLayout(false)`.
+- **Raccourci Escape** ferme le mode analyse (skippé si un modal BP ou Activité est ouvert).
+- **Resize listener** : si viewport passe ≤ 768 px, retire automatiquement `.is-analyzing`.
+
+### Pourquoi un toggle class et pas `display:none` sur la map
+
+Les pins / clusters / layers Leaflet ont des références DOM qui se cassent si on met `#mapWrap` en `display:none` (le container perd ses dimensions, invalidateSize ne sauve pas tout). Un toggle de grid-template-columns garde la carte vivante et interactive, juste compressée.
+
+### Tests manuels preview
+
+- 1440 × 900 : sidebar base = 520 px ✅. `setAnalyzingLayout(true)` → 1 008 px + map 432 px ✅. Bouton Vue carte visible. `setAnalyzingLayout(false)` → retour à 520 px ✅.
+- Mobile (375 × 812) : pas de `.is-analyzing` appliqué, layout 1 col intact ✅.
+
+---
+
 ## [v6.65.2-bp-dashboard-dataviz] — 2026-04-24
 
 ### 📊 Dashboard Data-Viz plein écran pour le BP du site
