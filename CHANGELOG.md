@@ -1,6 +1,46 @@
 
 # Changelog
 
+## [v6.64.1-bp-site-club-type-capex-y1] — 2026-04-24
+
+### 🩹 Fix post-review Paul — BP du site : chiffres par club honnêtes
+
+Paul a regardé la v6.64 : « 17.42M€ EBITDA Y5 Laminor ne peut pas faire ça mec. » — Il avait raison, on lisait `PL_CONSO` (cumul master-franchisé multi-clubs) au lieu de `PL_CLUB_TYPE` (un club seul). Puis « Pas de capex tous les ans — Cf BP excel » : la maquette Excel répète `=-HYPOTHESES!$C$81` dans toutes les colonnes de `PL_CLUB_TYPE!C45:L45`, comptabilisant 10× le CAPEX sur l'horizon. Fix en 2 temps :
+
+**1. Lecture PL_CLUB_TYPE au lieu de PL_CONSO**
+- `bp_runner.js extractKPIs()` lit maintenant `PL_CLUB_TYPE` (un club, 10 ans) :
+  - CA : row 12 "TOTAL CA - Ligne P&L"
+  - EBITDA : row 34
+  - Marge EBITDA : row 35
+  - Résultat net : row 41
+  - Operating CF : row 46
+- Hala Laminor captage 7 093 mbr : EBITDA Y5 passe de 17.42M€ (consolidé 5 clubs) → **1.56M€ (1 club)**. Marge EBITDA 59.4%. Cohérent benchmark OnAir Montreuil (44% mature).
+
+**2. Retraitement CAPEX Y1-uniquement**
+- Le Excel source a `PL_CLUB_TYPE!C45..L45 = -HYPOTHESES!$C$81` → CAPEX 1.18M€ répété 10×. Le bon comportement : CAPEX payé en Y1, 0 ensuite.
+- `bp_runner.js` ignore les rows 45, 47, 48 de la maquette et reconstitue : `capex[0] = -HYPOTHESES!C81`, `capex[1..9] = 0`, puis `netCF[i] = opCF[i] + capex[i]`, cumul recalculé, payback = 1re année cumul ≥ 0, TRI = `IRR(netCF)` via `BPEngine._internals.irr`.
+- Résultat Hala Laminor :
+  ```
+  CAPEX       -1.22 M€ Y1 (0 ensuite)
+  A · BP 3600    B · 7093      Δ
+  EBITDA Y5   596 k€         1.56 M€       +960 k€ (+161%)
+  Marge       44.4%          59.4%         +15.0 pp
+  Net Y5      311 k€         1.12 M€       +806 k€
+  TRI 10a     35.6%          113.3%        +77.7 pp
+  Payback     A4             A3            -1 an
+  ```
+- TRI et payback ré-affichés dans le comparatif (ils étaient retirés en v6.64 pour cause de données non-interprétables).
+
+**3. UI — transparence sur le retraitement**
+- Note en bas du bloc BP du site : « TRI/Payback recalculés avec CAPEX X€ en Y1 seulement (la maquette Excel répète =−HYPOTHESES!C81 sur 10 ans dans PL_CLUB_TYPE!C45:L45). Vue consolidée master-franchisé : 💰 Éditer BP. »
+- Honnêteté analytique > parité 1:1 muette : quand la source est cassée on le dit et on corrige explicitement.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Zéro régression.
+
+---
+
 ## [v6.64-bp-site-2-scenarios] — 2026-04-24
 
 ### 🏦 BP du site — 2 scénarios comparés par site (desktop + mobile)

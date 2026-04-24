@@ -133,7 +133,7 @@
           ${renderKPIRow('EBITDA Y5',        a.ebitda5,       b.ebitda5,       fmtK)}
           ${renderKPIRow('Marge EBITDA Y5',  a.ebitdaMargin5, b.ebitdaMargin5, fmtPct)}
           ${renderKPIRow('Résultat net Y5',  a.netResult5,    b.netResult5,    fmtK)}
-          ${renderKPIRow('TRI 10a (Mix)',    a.tri10,         b.tri10,         fmtPct)}
+          ${renderKPIRow('TRI 10 ans',       a.tri10,         b.tri10,         fmtPct)}
           <tr>
             <td style="padding:4px 6px;color:var(--gray2);font-size:8px;font-weight:600">Payback</td>
             <td style="padding:4px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--accent)">${a.paybackYear ? 'A' + a.paybackYear : '> A10'}</td>
@@ -141,7 +141,7 @@
             <td style="padding:4px 6px;text-align:right;font-size:9px;font-weight:700;color:${deltaColor(a.paybackYear, b.paybackYear, true)}">${
               (a.paybackYear != null && b.paybackYear != null)
                 ? ((b.paybackYear - a.paybackYear) === 0 ? '=' : (b.paybackYear - a.paybackYear < 0 ? '' : '+') + (b.paybackYear - a.paybackYear) + ' an')
-                : '–'
+                : (a.paybackYear == null && b.paybackYear != null) ? 'débloque' : '–'
             }</td>
           </tr>
         </tbody>
@@ -209,12 +209,13 @@
 
     const overrides = `
       <div style="font-size:7px;color:var(--gray2);margin-top:8px;line-height:1.5;padding:6px 8px;background:var(--bg2);border-radius:4px">
-        <b style="color:var(--gray)">Variables site appliquées au BP</b> —
-        Surface: <b style="color:var(--white)">${fmtNb(params.surface)} m²</b> ·
-        Loyer: <b style="color:var(--white)">${params.loyerM2Month}€/m²/mois</b> (${fmtK(params.loyerM2Month*params.surface)}/mois) ·
-        Charges: <b style="color:var(--white)">${params.chargesM2Month}€/m²/mois</b> (${fmtK(params.chargesM2Month*params.surface)}/mois)
-        <br>Ramp-up identique (${Math.round((global.BPRunner.getBaselineInput('C35')||0.7)*100)}% → ${Math.round((global.BPRunner.getBaselineInput('C36')||0.9)*100)}% → 100%) — seule la <b>cible adhérents</b> diffère entre les 2 scénarios. Source : moteur Excel BP v2Financement mix (3 659 formules, parité 1:1).
-        <br>Recalc : ${kpis.a.elapsedMs?.toFixed(0) || '?'}ms × 2 scénarios.
+        <b style="color:var(--gray)">Vue P&L club unitaire (PL_CLUB_TYPE)</b> — 1 club, 10 ans.
+        <br>Variables site appliquées : Surface <b style="color:var(--white)">${fmtNb(params.surface)} m²</b> ·
+        Loyer <b style="color:var(--white)">${params.loyerM2Month}€/m²/mois</b> (${fmtK(params.loyerM2Month*params.surface)}/mois) ·
+        Charges <b style="color:var(--white)">${params.chargesM2Month}€/m²/mois</b> (${fmtK(params.chargesM2Month*params.surface)}/mois)
+        <br>Ramp-up identique (${Math.round((global.BPRunner.getBaselineInput('C35')||0.7)*100)}% → ${Math.round((global.BPRunner.getBaselineInput('C36')||0.9)*100)}% → 100%) — seule la <b>cible adhérents</b> diffère entre les 2 scénarios.
+        <br>Source : moteur Excel BP v2Financement mix (3 659 formules, parité 1:1). Recalc ${kpis.a.elapsedMs?.toFixed(0) || '?'}ms × 2.
+        <br><span style="color:var(--gray)">TRI/Payback recalculés avec CAPEX ${fmtK(Math.abs(kpis.a.capexTotal || 0))} en Y1 seulement (retraitement décidé par Paul — la maquette Excel répète =−HYPOTHESES!C81 sur 10 ans dans PL_CLUB_TYPE!C45:L45). Vue consolidée master-franchisé : <b>💰 Éditer BP</b>.</span>
       </div>
     `;
 

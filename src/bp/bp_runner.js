@@ -128,43 +128,80 @@
     return cols.map(c => getVal(sheetName, c + row));
   }
 
-  function extractKPIs() {
-    // PL_CONSO : A1..A10 = cols D..M
-    const cCols = ['D','E','F','G','H','I','J','K','L','M'];
-    const rowCa     = findRow(plConsoRowsCache, ['total ca consolide', 'ca conso']);
-    const rowEb     = findRow(plConsoRowsCache, ['ebitda consolide', 'ebitda conso']);
-    const rowMarg   = findRow(plConsoRowsCache, ['marge ebitda / ca conso', 'marge ebitda']);
-    const rowNet    = findRow(plConsoRowsCache, ['resultat net consolide', 'resultat net conso']);
-    const rowCumul  = findRow(plConsoRowsCache, ['net cash flow cumule']);
-    const ca     = readRowPerYear('PL_CONSO', rowCa,    cCols);
-    const ebitda = readRowPerYear('PL_CONSO', rowEb,    cCols);
-    const marg   = readRowPerYear('PL_CONSO', rowMarg,  cCols);
-    const net    = readRowPerYear('PL_CONSO', rowNet,   cCols);
-    const cumul  = readRowPerYear('PL_CONSO', rowCumul, cCols);
+  // IRR par méthode Newton-Raphson + bissection (copié/adapté du moteur BPEngine).
+  // L'outil a déjà IRR en tant que fonction Excel (cashflows annuels) — on la
+  // réutilise via BPEngine._internals.irr pour rester 1:1 avec Excel.
+  function irr(cashflows) {
+    if (!cashflows || cashflows.length < 2) return null;
+    const fn = global.BPEngine?._internals?.irr;
+    if (typeof fn === 'function') {
+      try { const v = fn(cashflows); return isFinite(v) ? v : null; } catch { return null; }
+    }
+    return null;
+  }
 
-    // Payback = 1re année où cumul >= 0
+  function extractKPIs() {
+    // PL_CLUB_TYPE (club unitaire) : A1..A10 = cols C..L.
+    // C'est le VRAI P&L pertinent pour analyser un site — PL_CONSO cumule
+    // plusieurs clubs ouverts sur l'horizon du master-franchisé et gonfle
+    // artificiellement les chiffres Y5 (~ 5-6× un club seul).
+    const kCols = ['C','D','E','F','G','H','I','J','K','L'];
+    const rowCa     = findRow(plClubRowsCache, ['total ca - ligne p&l', 'total ca -', 'total ca  -', 'total ca']);
+    const rowEb     = findRow(plClubRowsCache, ['ebitda']);                // row 34
+    const rowMarg   = findRow(plClubRowsCache, ['marge ebitda']);          // row 35
+    const rowNet    = findRow(plClubRowsCache, ['resultat net']);          // row 41
+    const rowOpCF   = findRow(plClubRowsCache, ['operating cf', 'operating cash flow']);
+    const ca     = readRowPerYear('PL_CLUB_TYPE', rowCa,    kCols);
+    const ebitda = readRowPerYear('PL_CLUB_TYPE', rowEb,    kCols);
+    const marg   = readRowPerYear('PL_CLUB_TYPE', rowMarg,  kCols);
+    const net    = readRowPerYear('PL_CLUB_TYPE', rowNet,   kCols);
+    const opCF   = readRowPerYear('PL_CLUB_TYPE', rowOpCF,  kCols);
+
+    // RETRAITEMENT CAPEX — la maquette Excel répète `=-HYPOTHESES!$C$81`
+    // dans PL_CLUB_TYPE!C45..L45, ce qui comptabilise 10× le CAPEX sur
+    // l'horizon. Décision Paul : le CAPEX est **Y1 uniquement**. On lit
+    // la valeur brute dans HYPOTHESES!C81 et on la met uniquement en Y1.
+    // Le net CF / cumul / payback / TRI sont recalculés ici (pas lus dans
+    // les rows 47-48 qui héritent du bug).
+    const capexTotal = getVal('HYPOTHESES', 'C81');  // ex: 1176000
+    const capexY1 = (capexTotal != null && isFinite(capexTotal)) ? -Math.abs(capexTotal) : 0;
+    const capex = Array(kCols.length).fill(0);
+    capex[0] = capexY1;
+
+    // Operating CF par année : préfère row 46 (Operating CF) qui est =EBITDA
+    // dans la maquette, sinon fallback EBITDA.
+    const opCFClean = (opCF || []).map((v, i) => (v != null ? v : (ebitda[i] || 0)));
+
+    // Net CF par année = Op CF + CAPEX (Y1 seul)
+    const netCF = opCFClean.map((v, i) => v + (capex[i] || 0));
+
+    // Cumul net CF recalculé
+    const cumul = [];
+    let sum = 0;
+    for (const v of netCF) { sum += v; cumul.push(sum); }
+
+    // Payback (par club) = 1re année où cash cumulé >= 0.
     let payback = null;
     for (let i = 0; i < cumul.length; i++) {
       if (cumul[i] != null && cumul[i] >= 0) { payback = i + 1; break; }
     }
 
-    // Club type (référence, utile pour le tableau côte à côte)
-    const kCols = ['C','D','E','F','G','H','I','J','K','L'];
-    const rowClubCa  = findRow(plClubRowsCache, ['total ca club', 'ca total', 'ca club']);
-    const rowClubEb  = findRow(plClubRowsCache, ['ebitda club', 'ebitda']);
-    const rowClubNet = findRow(plClubRowsCache, ['resultat net club', 'resultat net', 'net']);
+    // TRI par club = IRR(netCF). Y0 = CAPEX, Yi = Op CF après impôt (approx
+    // via le netCF retraité). Pour un IRR bancable on prendrait le résultat
+    // net + DAP, mais ici on reste sur le cash flow simple Op CF - CAPEX Y1.
+    let tri10Club = null;
+    if (netCF.every(v => v != null)) {
+      tri10Club = irr(netCF);
+    }
 
     return {
       ca, ebitda, ebitdaMargin: marg, netResult: net, netCashCumul: cumul,
       ca5: ca[4], ebitda5: ebitda[4], ebitdaMargin5: marg[4], netResult5: net[4],
-      tri5:  getVal('DCF_COMPARAISON', 'E28'),
-      tri10: getVal('DCF_COMPARAISON', 'E42'),
+      tri10: tri10Club,
+      tri10Consolidated: getVal('DCF_COMPARAISON', 'E42'),  // dispo pour info
       paybackYear: payback,
-      club: {
-        ca:     readRowPerYear('PL_CLUB_TYPE', rowClubCa,  kCols),
-        ebitda: readRowPerYear('PL_CLUB_TYPE', rowClubEb,  kCols),
-        net:    readRowPerYear('PL_CLUB_TYPE', rowClubNet, kCols),
-      },
+      capex, netCF,
+      capexTotal: capexY1,
     };
   }
 
