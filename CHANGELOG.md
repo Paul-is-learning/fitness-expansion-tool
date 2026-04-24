@@ -1,6 +1,46 @@
 
 # Changelog
 
+## [v6.65.2-bp-dashboard-dataviz] — 2026-04-24
+
+### 📊 Dashboard Data-Viz plein écran pour le BP du site
+
+Paul a demandé un mode "Infographie Full-Screen" pour le BP du site. Choix archi : **enrichir le modal fullscreen existant** (bouton ⛶ Agrandir de v6.64) plutôt que refactorer le layout desktop avec un toggle `.dashboard-expanded` — les interactions Leaflet (pins, cluster, layers) se cassent si on met la carte en `display:none`. Modal = zéro risque mobile/desktop.
+
+### Refonte `buildDashboardHTML` dans `src/bp/bp_site_ui.js`
+
+- **Bandeau KPI hero (4 cards en grille)** :
+  1. Verdict prime de localisation (phrase gradient + accent couleur)
+  2. EBITDA Y5 : BP → Outil avec Δ localisation en bas
+  3. TRI 10 ans : BP → Outil avec écart en pp
+  4. Payback : BP → Outil avec accélération en années
+  - Chiffres 26-32 px, palette doré (BP) vs vert (Outil), cards à gradient `rgba(30,41,59,.85)`.
+- **Tableau comparaison Y5** complet (CA, EBITDA, Marge, Résultat net, TRI, Payback) : chiffres 15 px, `font-variant-numeric:tabular-nums` pour alignement, delta coloré.
+- **Graphique A1→A10 pleine largeur** : hauteur 380 px, CA lignes pleines + EBITDA lignes pointillées, palette harmonisée.
+- **Tableau détaillé A1→A10** : 10 lignes × 10 colonnes (CA BP, CA Outil, EBITDA BP, EBITDA Outil, Δ EBITDA, Marge BP, Marge Outil, Net BP, Net Outil).
+- **Tuiles inputs** (4 cards) : Surface, Loyer, Charges, Captage outil — chiffres 20 px + unité + sous-libellé.
+- **Footer meta** : source moteur Excel, parité 100 %, CAPEX Y1, ramp-up identique.
+
+### Modal plein écran
+
+- `max-width: 1600px` (vs 1200 avant), padding `20 px`, bordure `14 px`, shadow `24px 80px`.
+- Header gradient doré/vert + titre `16 px` + sous-titre `Dashboard Data-Viz` + bouton ✕ arrondi.
+- Body scrollable, `padding: 22px 24px`.
+- Escape key + click outside ferme (déjà en place depuis v6.64).
+
+### Garanties préservées
+
+- `render()` inline (fiche site compacte) **inchangé** — aucun impact sur desktop sidebar gauche ni sur mobile bottom sheet.
+- Toute la logique métier (run2Scenarios, buildVerdict, drawChart) reste identique.
+- Chart.js instance gérée via `Chart.getChart(canvas) → destroy()` avant redraw (pas de memory leak).
+
+### Tests
+
+- `tests/analysis.html` → **197/197 PASS**.
+- Preview desktop (1440 × 900) : modal rend correctement, scroll fluide, chart lisible, lisible à 2 m (typo Data-Viz).
+
+---
+
 ## [v6.65.1-sync-radius-capture-rates] — 2026-04-24
 
 ### 🩹 Fix sync cross-device Paul — rayon de captage + taux de capture
