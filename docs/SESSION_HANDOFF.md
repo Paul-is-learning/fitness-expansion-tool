@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.62-bp-engine-excel-transpiler-P1 (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.63-bp-editor-live-P2a (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```

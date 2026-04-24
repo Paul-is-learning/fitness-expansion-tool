@@ -1,6 +1,55 @@
 
 # Changelog
 
+## [v6.63-bp-editor-live-P2a] — 2026-04-24
+
+### 🎛️ Phase 2a — éditeur BP live fonctionnel
+
+Livraison d'une UI complète branchée sur le moteur Excel→JS : **`/structure-couts.html`**. Paul bouge un slider, tous les KPIs se recalculent en temps réel.
+
+### Livrables
+
+- **`src/bp/bp_inputs.js`** — 42 inputs métadonnés (hors headers de section), typés strict (coord Excel, label, unité, type eur/pct/nb, min/max/step, baseline, groupe). Groupés en 8 sections visuelles : Franchise & redevances / Fiscalité / Commercial & offre / Ramp-up & croissance / Ressources humaines / Loyer & surface / OPEX opérationnels / CAPEX & leasing.
+
+- **`structure-couts.html`** — page éditeur autonome :
+  - Layout 2 colonnes : sidebar inputs + main content KPIs/tables
+  - Panneau KPI sticky (CA A5, EBITDA A5, Marge EBITDA A5, TRI 10a, Payback, Recalc ms)
+  - Deltas live vs baseline colorés (vert/rouge/gris)
+  - Alertes automatiques : TRI < WACC (12%), Marge EBITDA < 20%, EBITDA négatif, TRI > 25% (✅)
+  - P&L consolidée A1→A10 (CA, EBITDA, Marge, Résultat net)
+  - P&L club type A1→A10
+  - DCF comparaison BPI/Mix/Voblig sur horizons 5/7/10 ans
+  - Recalcul incrémental via topo sort déjà calculé (on ne ré-évalue que les formules, pas le DAG)
+  - Bouton "↺ Tout reset" pour revenir aux valeurs baseline Excel
+
+### Mécanique de recalc
+
+À chaque modification de slider :
+1. Override `model.values['HYPOTHESES!C42'] = 40` (nouvelle valeur directe)
+2. Re-évalue TOUTES les formules dans l'ordre topologique déjà calculé (pas besoin de re-parser ni de re-builder le DAG)
+3. Rafraîchit les KPIs + tables + alertes
+
+**Perf mesurée** : recalc complet des 3 659 formules en **~5-15ms**. Objectif < 10ms incrémental tenu avec marge. Zéro freeze UI même en maintenant un slider.
+
+### Heuristique robuste de lookup de ligne
+
+Les P&L sont trouvées par pattern matching sur les labels col A (insensible à la casse, préfixes numérotés ignorés). Parcours par **ordre de priorité des patterns** (pas ordre des labels) pour éviter que `"ca conso"` matche `"2. CA CONSOLIDE"` (header de section) au lieu de `"TOTAL CA CONSOLIDE"`.
+
+### URL
+
+- Preview live : `http://localhost:8091/structure-couts.html`
+- Prod : `https://fitnesspark.isseo-dev.com/structure-couts.html`
+
+### Prochain : P2b — intégration SPA + Supabase
+
+- Route dans l'app existante (onglet ou modal) au lieu d'une page standalone
+- Waterfall CA → EBITDA → RN
+- Courbe cashflow cumulé graphique
+- Supabase `fp_ro_site_cost_scenarios` avec 8 scénarios prédéfinis + RLS owner-write
+- Export Excel formula-identique + PDF one-pager bancable
+
+---
+
 ## [v6.62-bp-engine-excel-transpiler-P1] — 2026-04-24
 
 ### 🧮 Phase 1 — moteur Excel → JS 1:1 pour BP Romania

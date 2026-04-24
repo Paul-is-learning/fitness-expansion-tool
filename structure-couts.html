@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structure coûts BP — Fitness Park Romania</title>
+<style>
+  :root {
+    --bg: #06080f; --bg2: #0a0e1a; --card: #111827; --card2: #1e293b;
+    --border: #334155; --border-hi: #475569;
+    --white: #f1f5f9; --gray: #94a3b8; --gray2: #64748b;
+    --accent: #d4a017; --accent-glow: rgba(212,160,23,.3);
+    --green: #10b981; --red: #ef4444; --yellow: #eab308; --blue: #60a5fa; --purple: #a78bfa;
+    --radius: 10px;
+    --font: 'Inter', -apple-system, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box }
+  html, body { height: 100%; margin: 0 }
+  body {
+    font-family: var(--font); background: var(--bg); color: var(--white);
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+
+  /* Layout : topbar (auto) + sidebar inputs / main content */
+  .app { display: grid; grid-template-columns: 420px 1fr; grid-template-rows: auto 1fr; height: 100%; min-height: 0 }
+  .app > .sidebar, .app > .main { min-height: 0 }
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr } }
+
+  /* HEADER / topbar */
+  .topbar {
+    grid-column: 1/-1;
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--card) 0%, rgba(212,160,23,.04) 100%);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .topbar h1 { font-size: 14px; font-weight: 800; margin: 0; letter-spacing: .3px }
+  .topbar .sub { font-size: 10px; color: var(--gray); }
+  .topbar .spacer { flex: 1 }
+  .topbar .status { font-size: 10px; color: var(--green); padding: 4px 10px; background: rgba(16,185,129,.1); border-radius: 12px; border: 1px solid rgba(16,185,129,.3); }
+  .topbar .status.warn { color: var(--yellow); background: rgba(234,179,8,.1); border-color: rgba(234,179,8,.3) }
+  .topbar .status.err { color: var(--red); background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3) }
+  .topbar button { padding: 6px 12px; background: var(--card2); color: var(--white); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 11px; font-family: var(--font); }
+  .topbar button:hover { border-color: var(--accent); }
+
+  /* Sidebar inputs */
+  .sidebar {
+    background: var(--card); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 12px 16px 80px;
+  }
+  .sidebar h2 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--gray2);
+    margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .sidebar h2:first-child { margin-top: 0 }
+
+  .input-row { margin-bottom: 14px }
+  .input-row .lbl {
+    font-size: 11.5px; color: var(--white); font-weight: 500;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;
+  }
+  .input-row .val {
+    font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent);
+    font-family: var(--mono); font-size: 11.5px;
+  }
+  .input-row .val.modified { color: var(--yellow); }
+  .input-row input[type=range] {
+    width: 100%; accent-color: var(--accent); margin: 0; height: 4px;
+  }
+  .input-row .meta {
+    font-size: 9px; color: var(--gray2); display: flex; justify-content: space-between; margin-top: 2px;
+  }
+  .input-row .ref { color: var(--accent); font-family: var(--mono); font-size: 8px }
+  .input-row.modified { border-left: 2px solid var(--yellow); padding-left: 8px; margin-left: -10px; }
+
+  /* Main content */
+  .main { overflow-y: auto; padding: 20px 24px 60px; }
+
+  /* KPI panel sticky top */
+  .kpi-panel {
+    position: sticky; top: -1px; z-index: 10; margin: -20px -24px 24px; padding: 16px 24px;
+    background: rgba(10,14,26,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+  }
+  .kpi .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--gray2); }
+  .kpi .v { font-size: 22px; font-weight: 900; line-height: 1.15; margin-top: 2px; font-family: var(--mono); }
+  .kpi .delta { font-size: 10px; margin-top: 2px; color: var(--gray); font-variant-numeric: tabular-nums; }
+  .kpi .v.ok { color: var(--green); }
+  .kpi .v.warn { color: var(--yellow); }
+  .kpi .v.err { color: var(--red); }
+  .kpi .delta.up { color: var(--green); }
+  .kpi .delta.down { color: var(--red); }
+
+  /* Tables / sections */
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--accent); margin: 0 0 12px }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  table th, table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid rgba(71,85,115,.2); font-variant-numeric: tabular-nums; }
+  table th { color: var(--gray2); text-transform: uppercase; font-size: 9.5px; letter-spacing: .4px; font-weight: 700; text-align: right; }
+  table td:first-child, table th:first-child { text-align: left; color: var(--white); font-weight: 600; }
+  table tr:hover td { background: rgba(212,160,23,.04); }
+  .delta-cell { font-size: 9.5px; color: var(--gray2); display: block; }
+  .delta-cell.up { color: var(--green) }
+  .delta-cell.down { color: var(--red) }
+
+  /* Alerts */
+  .alerts { margin-bottom: 16px }
+  .alert { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; gap: 10px; }
+  .alert.warn { background: rgba(234,179,8,.08); border: 1px solid rgba(234,179,8,.3); color: var(--yellow); }
+  .alert.critical { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.35); color: var(--red); }
+  .alert.ok { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.3); color: var(--green); }
+
+  /* Toast reset */
+  .toolbar { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .toolbar button { padding: 6px 14px; background: var(--card2); color: var(--white); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 11px; }
+  .toolbar button:hover { border-color: var(--accent) }
+  .toolbar button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700 }
+  .toolbar .version { margin-left: auto; color: var(--gray2); font-size: 10px; font-family: var(--mono); align-self: center; }
+
+  /* Loading */
+  .loading { padding: 40px; text-align: center; color: var(--gray) }
+  .spinner { width: 28px; height: 28px; margin: 0 auto 12px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="topbar">
+    <h1 style="color:var(--accent)">STRUCTURE COÛTS BP</h1>
+    <span class="sub">MF FP Romania · moteur Excel→JS 1:1 · <span id="modelVersion">v6.63</span></span>
+    <span class="spacer"></span>
+    <span class="status" id="engineStatus">Chargement…</span>
+    <button onclick="resetAll()">↺ Tout reset</button>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="loading"><div class="spinner"></div>Chargement inputs…</div>
+  </aside>
+
+  <main class="main">
+    <div class="kpi-panel">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="k">CA conso A5</div><div class="v" id="kpi_ca5">–</div><div class="delta" id="dlt_ca5">base</div></div>
+        <div class="kpi"><div class="k">EBITDA A5</div><div class="v" id="kpi_ebitda5">–</div><div class="delta" id="dlt_ebitda5">–</div></div>
+        <div class="kpi"><div class="k">Marge EBITDA A5</div><div class="v" id="kpi_margin5">–</div><div class="delta" id="dlt_margin5">–</div></div>
+        <div class="kpi"><div class="k">TRI Mix (10a)</div><div class="v" id="kpi_tri">–</div><div class="delta" id="dlt_tri">–</div></div>
+        <div class="kpi"><div class="k">Payback</div><div class="v" id="kpi_payback">–</div><div class="delta" id="dlt_payback">–</div></div>
+        <div class="kpi"><div class="k">Recalc</div><div class="v" id="kpi_recalc" style="font-size:20px">–</div><div class="delta">ms</div></div>
+      </div>
+    </div>
+
+    <div class="alerts" id="alerts"></div>
+
+    <div class="toolbar">
+      <span class="version">Vérité : MF FP - BP RO - v2Financement mix.xlsx</span>
+    </div>
+
+    <!-- P&L CONSO annuelle -->
+    <div class="section">
+      <h3>P&L consolidée · A1 → A10</h3>
+      <div id="tablePLConso">–</div>
+    </div>
+
+    <!-- P&L Club type -->
+    <div class="section">
+      <h3>P&L club type · A1 → A10</h3>
+      <div id="tablePLClub">–</div>
+    </div>
+
+    <!-- DCF comparaison -->
+    <div class="section">
+      <h3>DCF comparaison · TRI par structure de financement</h3>
+      <div id="tableDCF">–</div>
+    </div>
+
+  </main>
+</div>
+
+<script src="src/bp/engine.js"></script>
+<script src="src/bp/bp_inputs.js"></script>
+<script src="config.js"></script>
+<script>
+// =======================================================================
+// BP EDITOR — structure-couts.html
+// =======================================================================
+// Charge le IR source, instancie un modèle BPEngine, laisse l'utilisateur
+// modifier les 41 inputs de HYPOTHESES, et recalcule en live tous les KPIs.
+// =======================================================================
+
+let model = null;
+let baselineValues = null;  // snapshot valeurs avant toute modif
+let currentOverrides = {};   // {C15: 50000, ...}
+let recalcTimer = null;
+
+async function boot() {
+  try {
+    const ir = await fetch('src/bp/bp_ir.json?v=' + Date.now()).then(r => r.json());
+    model = new window.BPEngine.Model(ir);
+    const t0 = performance.now();
+    model.evaluateAll();
+    const ms = (performance.now() - t0).toFixed(1);
+    document.getElementById('engineStatus').textContent = `OK · ${ir.stats.total_formulas} formules · ${ms}ms`;
+    document.getElementById('modelVersion').textContent = (typeof MODEL_VERSION !== 'undefined') ? MODEL_VERSION : '—';
+    baselineValues = snapshotKPIs();
+    buildSidebar();
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('engineStatus').textContent = 'ERROR : ' + e.message;
+    document.getElementById('engineStatus').className = 'status err';
+  }
+}
+
+function fmtValue(input, value) {
+  if (value === null || value === undefined) return '—';
+  if (input.type === 'pct') return (value * 100).toFixed(input.step < 0.01 ? 2 : 1) + '%';
+  if (input.type === 'eur') {
+    if (Math.abs(value) >= 1000) return new Intl.NumberFormat('fr-FR').format(Math.round(value));
+    return value.toFixed(input.step < 1 ? 2 : 0);
+  }
+  if (input.type === 'nb') return new Intl.NumberFormat('fr-FR').format(Math.round(value));
+  return String(value);
+}
+
+function buildSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '';
+  const groups = {};
+  for (const inp of window.BPInputs.list) (groups[inp.group] = groups[inp.group] || []).push(inp);
+  for (const [gname, items] of Object.entries(groups)) {
+    const h = document.createElement('h2'); h.textContent = gname; sb.appendChild(h);
+    for (const inp of items) {
+      const cur = currentOverrides[inp.coord] ?? inp.baseline;
+      const row = document.createElement('div');
+      row.className = 'input-row';
+      row.dataset.coord = inp.coord;
+      row.innerHTML = `
+        <div class="lbl">
+          <span>${inp.label}<span class="ref"> · ${inp.coord}</span></span>
+          <span class="val" data-val>${fmtValue(inp, cur)} <span style="color:var(--gray2);font-weight:400">${inp.unit}</span></span>
+        </div>
+        <input type="range" min="${inp.min}" max="${inp.max}" step="${inp.step}" value="${cur}" data-coord="${inp.coord}">
+        <div class="meta"><span>${fmtValue(inp, inp.min)}</span><span>baseline: ${fmtValue(inp, inp.baseline)}</span><span>${fmtValue(inp, inp.max)}</span></div>
+      `;
+      const range = row.querySelector('input[type=range]');
+      range.addEventListener('input', e => onSliderInput(inp, e.target.value, row));
+      sb.appendChild(row);
+    }
+  }
+}
+
+function onSliderInput(input, rawVal, row) {
+  const v = (input.type === 'nb') ? parseInt(rawVal, 10) : parseFloat(rawVal);
+  if (v === input.baseline) {
+    delete currentOverrides[input.coord];
+    row.classList.remove('modified');
+    row.querySelector('[data-val]').classList.remove('modified');
+  } else {
+    currentOverrides[input.coord] = v;
+    row.classList.add('modified');
+    row.querySelector('[data-val]').classList.add('modified');
+  }
+  row.querySelector('[data-val]').innerHTML = `${fmtValue(input, v)} <span style="color:var(--gray2);font-weight:400">${input.unit}</span>`;
+  scheduleRecalc();
+}
+
+function scheduleRecalc() {
+  clearTimeout(recalcTimer);
+  recalcTimer = setTimeout(recalcNow, 120);
+}
+
+function recalcNow() {
+  // Apply overrides to model.values BEFORE re-evaluate
+  for (const [coord, v] of Object.entries(currentOverrides)) {
+    const key = 'HYPOTHESES!' + coord;
+    model.values[key] = v;
+  }
+  const t0 = performance.now();
+  // Re-evaluate in topo order (keeps formulas intact, just reads new input values)
+  for (const k of model.order) {
+    const entry = model.formulas[k];
+    if (entry.parseError) continue;
+    const ctx = { sheet: entry.sheet, get: (sh, coord) => {
+      const kk = sh + '!' + coord.replace(/\$/g,'').toUpperCase();
+      return (kk in model.values) ? model.values[kk] : 0;
+    }};
+    try {
+      model.values[k] = window.BPEngine.evaluate(entry.ast, ctx);
+    } catch (e) {
+      model.values[k] = e;
+    }
+  }
+  const ms = performance.now() - t0;
+  document.getElementById('kpi_recalc').textContent = ms.toFixed(1);
+  renderAll();
+}
+
+function getVal(sheet, coord) {
+  const v = model.values[sheet + '!' + coord];
+  if (v instanceof Error) return null;
+  return v;
+}
+
+function snapshotKPIs() {
+  return {
+    ca5: getVal('PL_CONSO', 'H7'),   // placeholder — on ajustera si besoin
+    ebitda5: 0, tri: 0, payback: 0,
+  };
+}
+
+// --- KPI extraction ---
+// On lit les cellules strict du fichier v2Financement mix. Références vérifiées
+// via audit manuel EXEC_SUMMARY + PL_CONSO :
+//   PL_CONSO: row 7 = Total ouvertures, ca/ebitda/net par an en lignes plus bas
+//   EXEC_SUMMARY: résumés CA/EBITDA/Net/Marge
+
+function extractKPIs() {
+  // EXEC_SUMMARY block "PL CLUB TYPE" — déjà agrégé (lignes 22-30 pour club, 34+ pour MF)
+  // EXEC_SUMMARY!D22 = CA club A1, E22 = A2, ..., M22 = A10
+  // EXEC_SUMMARY!D26 = EBITDA club A1
+  // Pour le conso : on le tire de PL_CONSO directement (C7:M7 = ouvertures)
+  // Les lignes PL_CONSO CA/EBITDA/NET sont à découvrir dynamiquement
+  const plcElems = findPLConsoRows();
+  const plc = {
+    ca:  plcElems.ca,
+    ebitda: plcElems.ebitda,
+    ebitdaMargin: plcElems.ebitdaMargin,
+    netResult: plcElems.netResult,
+    netCashCumul: plcElems.netCashCumul,
+  };
+  // DCF TRI Mix = 02_DCF_Mix!I121 (horizon 10 ans — v_excel baseline 0.80)
+  // Voir audit : DCF_COMPARAISON!E42 = TRI 10a Mix
+  const tri10 = getVal('DCF_COMPARAISON', 'E42');
+  const tri5  = getVal('DCF_COMPARAISON', 'E28');
+  // Payback MF = EXEC_SUMMARY à trouver — prenons le cumulatif cash positif
+  return { plc, tri10, tri5 };
+}
+
+function findPLConsoRows() {
+  // Heuristique : on cherche dans PL_CONSO les labels connus en col A
+  const cells = model.ir.sheets.PL_CONSO.cells;
+  const labelMap = {};  // label lowercase → row
+  for (const [coord, c] of Object.entries(cells)) {
+    if (c.t !== 's' || !coord.startsWith('A')) continue;
+    const row = parseInt(coord.slice(1), 10);
+    labelMap[(c.v || '').toString().toLowerCase().trim()] = row;
+  }
+  // v6.63 : patterns par ordre de priorité — on parcourt pattern par pattern
+  // et on retient le premier label qui matche. Evite que "ca conso" matche A19
+  // "2. CA CONSOLIDE" (header de section) au lieu de A23 "TOTAL CA CONSOLIDE".
+  const findRow = patterns => {
+    for (const p of patterns) {
+      const needle = p.toLowerCase();
+      for (const [lbl, row] of Object.entries(labelMap)) {
+        if (lbl.includes(needle)) return row;
+      }
+    }
+    return null;
+  };
+  // Columns A1..A10 = C..M (PL_CONSO layout)
+  const cols = ['D','E','F','G','H','I','J','K','L','M']; // A1..A10
+  const build = row => {
+    if (!row) return { perYear: Array(10).fill(null), a5: null };
+    const perYear = cols.map(c => getVal('PL_CONSO', c + row));
+    return { row, perYear, a5: perYear[4] };
+  };
+  return {
+    ca: build(findRow(['total ca consolide', 'ca conso'])),
+    ebitda: build(findRow(['ebitda consolide', 'ebitda conso'])),
+    ebitdaMargin: build(findRow(['marge ebitda / ca conso', 'marge ebitda'])),
+    netResult: build(findRow(['resultat net consolide', 'resultat net conso'])),
+    netCashCumul: build(findRow(['net cash flow cumule'])),
+  };
+}
+
+function renderAll() {
+  const kpis = extractKPIs();
+  const plc = kpis.plc;
+
+  // KPI panel
+  setKPI('kpi_ca5', 'dlt_ca5', plc.ca.a5, baselineValues._baseCa5, fmtMoney, { unit: 'EUR' });
+  setKPI('kpi_ebitda5', 'dlt_ebitda5', plc.ebitda.a5, baselineValues._baseEbitda5, fmtMoney);
+  setKPI('kpi_margin5', 'dlt_margin5', plc.ebitdaMargin.a5, baselineValues._baseMargin5, fmtPct);
+  setKPI('kpi_tri', 'dlt_tri', kpis.tri10, baselineValues._baseTri10, fmtPct);
+  // Payback = première année où Net Cash Flow cumulé > 0
+  const cum = plc.netCashCumul?.perYear || [];
+  let pb = null;
+  for (let i = 0; i < cum.length; i++) {
+    if (cum[i] != null && cum[i] >= 0) { pb = 'A' + (i + 1); break; }
+  }
+  document.getElementById('kpi_payback').textContent = pb || '> A10';
+  document.getElementById('dlt_payback').textContent = 'cash > 0';
+
+  // Premier render : on fixe les baselines
+  if (!baselineValues._fixed) {
+    baselineValues._baseCa5 = plc.ca.a5;
+    baselineValues._baseEbitda5 = plc.ebitda.a5;
+    baselineValues._baseMargin5 = plc.ebitdaMargin.a5;
+    baselineValues._baseTri10 = kpis.tri10;
+    baselineValues._fixed = true;
+    // re-render avec deltas corrects
+    return renderAll();
+  }
+
+  // Alerts
+  renderAlerts(kpis);
+
+  // Tables
+  renderPLTable('tablePLConso', plc);
+  renderClubType();
+  renderDCF();
+}
+
+function setKPI(vId, dId, val, baseVal, fmt, _) {
+  const vEl = document.getElementById(vId);
+  const dEl = document.getElementById(dId);
+  if (val == null) { vEl.textContent = '–'; dEl.textContent = '–'; return; }
+  vEl.textContent = fmt(val);
+  if (val > 0) vEl.className = 'v ok';
+  else if (val < 0) vEl.className = 'v err';
+  else vEl.className = 'v';
+  if (baseVal == null) { dEl.textContent = 'base'; dEl.className='delta'; return; }
+  const delta = val - baseVal;
+  const pct = baseVal !== 0 ? (delta / Math.abs(baseVal)) * 100 : 0;
+  dEl.textContent = (delta >= 0 ? '+' : '') + fmt(delta) + (Math.abs(pct) > 0.1 ? ` (${(delta >= 0 ? '+' : '')}${pct.toFixed(1)}%)` : '');
+  dEl.className = 'delta ' + (delta > 0 ? 'up' : (delta < 0 ? 'down' : ''));
+}
+
+function fmtMoney(v) {
+  if (v == null || !isFinite(v)) return '–';
+  const abs = Math.abs(v);
+  if (abs >= 1e6) return (v / 1e6).toFixed(2) + 'M€';
+  if (abs >= 1e3) return (v / 1e3).toFixed(1) + 'k€';
+  return Math.round(v).toLocaleString('fr-FR') + '€';
+}
+function fmtPct(v) {
+  if (v == null || !isFinite(v)) return '–';
+  return (v * 100).toFixed(1) + '%';
+}
+
+function renderAlerts(kpis) {
+  const alerts = [];
+  const marg = kpis.plc.ebitdaMargin.a5;
+  if (marg != null && marg < 0.20) alerts.push({ level: 'warn', msg: `Marge EBITDA A5 = ${fmtPct(marg)} (< 20% seuil sain)` });
+  if (kpis.plc.ebitda.a5 != null && kpis.plc.ebitda.a5 < 0) alerts.push({ level: 'critical', msg: 'EBITDA A5 négatif — BP non bancable en l\'état' });
+  if (kpis.tri10 != null && kpis.tri10 < 0.12) alerts.push({ level: 'warn', msg: `TRI 10a = ${fmtPct(kpis.tri10)} (< WACC 12%)` });
+  if (kpis.tri10 != null && kpis.tri10 > 0.25) alerts.push({ level: 'ok', msg: `TRI 10a = ${fmtPct(kpis.tri10)} — profil très attractif` });
+  const box = document.getElementById('alerts');
+  box.innerHTML = alerts.map(a => `<div class="alert ${a.level}">${a.level === 'critical' ? '🚨' : a.level === 'ok' ? '✅' : '⚠️'} ${a.msg}</div>`).join('');
+}
+
+function renderPLTable(id, plc) {
+  const cols = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'];
+  let html = '<table><thead><tr><th>Ligne</th>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  const rows = [
+    ['CA conso', plc.ca.perYear, fmtMoney],
+    ['EBITDA', plc.ebitda.perYear, fmtMoney],
+    ['Marge EBITDA', plc.ebitdaMargin.perYear, fmtPct],
+    ['Résultat net', plc.netResult.perYear, fmtMoney],
+  ];
+  for (const [label, vals, fmt] of rows) {
+    html += `<tr><td>${label}</td>` + vals.map(v => `<td>${fmt(v)}</td>`).join('') + '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById(id).innerHTML = html;
+}
+
+function renderClubType() {
+  // PL_CLUB_TYPE rows : cible A1..A10 in cols C..L (club type, 10 ans ou 5 ans ?)
+  const sheet = model.ir.sheets.PL_CLUB_TYPE.cells;
+  const labelMap = {};
+  for (const [coord, c] of Object.entries(sheet)) {
+    if (c.t !== 's' || !coord.startsWith('A')) continue;
+    const row = parseInt(coord.slice(1), 10);
+    labelMap[(c.v || '').toString().toLowerCase().trim()] = row;
+  }
+  const findRow = patterns => {
+    for (const [lbl, row] of Object.entries(labelMap)) for (const p of patterns) if (lbl.includes(p.toLowerCase())) return row;
+    return null;
+  };
+  const caRow = findRow(['ca total', 'ca club']);
+  const ebRow = findRow(['ebitda']);
+  const netRow = findRow(['resultat net', 'net']);
+  const cols = ['C','D','E','F','G','H','I','J','K','L'];
+  const build = r => r ? cols.map(c => getVal('PL_CLUB_TYPE', c + r)) : Array(10).fill(null);
+  const rows = [
+    ['CA club', build(caRow), fmtMoney],
+    ['EBITDA club', build(ebRow), fmtMoney],
+    ['Résultat net', build(netRow), fmtMoney],
+  ];
+  let html = '<table><thead><tr><th>Ligne</th>' + ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'].map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  for (const [l, v, f] of rows) html += `<tr><td>${l}</td>` + v.map(x => `<td>${f(x)}</td>`).join('') + '</tr>';
+  html += '</tbody></table>';
+  document.getElementById('tablePLClub').innerHTML = html;
+}
+
+function renderDCF() {
+  // DCF_COMPARAISON : C/D/E = BPI/Mix/Voblig ; lignes : TRI 5a (28), TRI 7a (35), TRI 10a (42)
+  // VAN : à trouver
+  const struct = ['BPI', 'Mix', 'Voblig'];
+  const cols = ['C','D','E'];
+  const triRows = { '5 ans': 28, '7 ans': 35, '10 ans': 42 };
+  let html = '<table><thead><tr><th>Horizon</th>' + struct.map(s => `<th>${s}</th>`).join('') + '</tr></thead><tbody>';
+  for (const [label, row] of Object.entries(triRows)) {
+    html += `<tr><td>TRI ${label}</td>` + cols.map(c => `<td>${fmtPct(getVal('DCF_COMPARAISON', c + row))}</td>`).join('') + '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('tableDCF').innerHTML = html;
+}
+
+function resetAll() {
+  currentOverrides = {};
+  document.querySelectorAll('.input-row').forEach(row => {
+    const coord = row.dataset.coord;
+    const inp = window.BPInputs.byCoord[coord];
+    const range = row.querySelector('input[type=range]');
+    range.value = inp.baseline;
+    row.classList.remove('modified');
+    row.querySelector('[data-val]').classList.remove('modified');
+    row.querySelector('[data-val]').innerHTML = `${fmtValue(inp, inp.baseline)} <span style="color:var(--gray2);font-weight:400">${inp.unit}</span>`;
+  });
+  recalcNow();
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
