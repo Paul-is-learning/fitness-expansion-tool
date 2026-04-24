@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>BP Parity Test — FP Romania</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background:#0a0e1a; color:#e4e7ec; padding:20px; margin:0; }
+  h1 { color:#d4a017; font-size:18px; margin:0 0 12px }
+  .hero { display:flex; gap:24px; margin:14px 0; align-items:baseline }
+  .hero .stat { font-size:32px; font-weight:800 }
+  .hero .stat.ok { color:#10b981 }
+  .hero .stat.fail { color:#ef4444 }
+  .hero .label { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px }
+  button { padding:10px 20px; background:#d4a017; color:#0a0e1a; border:0; border-radius:6px; font-weight:700; cursor:pointer }
+  button:hover { background:#e6b422 }
+  #log { background:#1e293b; padding:10px; border-radius:6px; font-family: 'JetBrains Mono', monospace; font-size:11px; max-height:60vh; overflow:auto; white-space:pre-wrap; border:1px solid #334155 }
+  .diff { padding:4px 8px; border-bottom:1px solid #334155 }
+  .diff .k { color:#d4a017; font-weight:700 }
+  .diff .d { color:#ef4444 }
+  .reason-num { color:#fbbf24 }
+  .reason-parse { color:#ef4444 }
+  .reason-eval { color:#f97316 }
+  .group-head { color:#60a5fa; font-weight:700; padding:8px 0 2px }
+  .tabs { display:flex; gap:8px; margin:10px 0 }
+  .tabs button { padding:6px 14px; font-size:11px }
+</style>
+</head>
+<body>
+<h1>BP Parity — golden test moteur Excel→JS</h1>
+<div style="font-size:11px;color:#94a3b8">Source : <code>src/bp/bp_ir.json</code> · Ruleset : tolérance 0.01 EUR, 1 cell ≠ = FAIL</div>
+
+<div class="hero" id="hero">
+  <div><div class="stat" id="total">–</div><div class="label">Total formules</div></div>
+  <div><div class="stat ok" id="passN">–</div><div class="label">Pass</div></div>
+  <div><div class="stat fail" id="failN">–</div><div class="label">Fail</div></div>
+  <div><div class="stat" id="pct">–</div><div class="label">Pass rate</div></div>
+  <div><div class="stat" id="duration">–</div><div class="label">Durée</div></div>
+</div>
+
+<div class="tabs">
+  <button onclick="runTest()">▶ Run test</button>
+  <button onclick="filterDiffs('num')">Num diffs</button>
+  <button onclick="filterDiffs('parse')">Parse err</button>
+  <button onclick="filterDiffs('eval')">Eval err</button>
+  <button onclick="filterDiffs('err')">Excel err</button>
+  <button onclick="filterDiffs('null')">Null/empty</button>
+  <button onclick="filterDiffs('mismatch')">Mismatch</button>
+  <button onclick="filterDiffs('')">All</button>
+</div>
+
+<div id="log"></div>
+
+<script src="../../src/bp/engine.js"></script>
+<script>
+let currentReport = null;
+
+async function runTest() {
+  const log = document.getElementById('log');
+  log.textContent = 'Loading bp_ir.json...';
+  const t0 = performance.now();
+  const ir = await fetch('../../src/bp/bp_ir.json').then(r => r.json());
+  log.textContent += '\nIR loaded: ' + ir.stats.total_formulas + ' formulas · ' + ir.stats.total_cells + ' cells';
+
+  const t1 = performance.now();
+  const model = new BPEngine.Model(ir);
+  log.textContent += '\nIndexing done in ' + (performance.now() - t1).toFixed(1) + 'ms';
+
+  const t2 = performance.now();
+  try {
+    model.evaluateAll();
+  } catch (e) {
+    log.textContent += '\nEVAL ABORT: ' + e.message;
+    return;
+  }
+  const evalMs = performance.now() - t2;
+  log.textContent += '\nEvaluate all in ' + evalMs.toFixed(1) + 'ms';
+
+  const report = model.diffAgainstExcel(0.01);
+  currentReport = report;
+  const t3 = performance.now();
+
+  document.getElementById('total').textContent = report.total;
+  document.getElementById('passN').textContent = report.pass;
+  document.getElementById('failN').textContent = report.fail;
+  document.getElementById('pct').textContent = (100 * report.pass / report.total).toFixed(1) + '%';
+  document.getElementById('duration').textContent = (t3 - t0).toFixed(0) + 'ms';
+
+  // Group fails by reason
+  const byReason = {};
+  for (const d of report.diffs) {
+    const r = d.reason || 'other';
+    (byReason[r] = byReason[r] || []).push(d);
+  }
+  log.textContent = `Pass: ${report.pass}/${report.total} · Fail: ${report.fail}\n`;
+  log.textContent += `Parse errors: ${report.parseErrors} · Eval errors: ${report.evalErrors}\n`;
+  log.textContent += `Eval time: ${evalMs.toFixed(1)}ms\n\n`;
+
+  for (const [reason, diffs] of Object.entries(byReason)) {
+    log.textContent += `=== ${reason} (${diffs.length}) ===\n`;
+    for (const d of diffs.slice(0, 30)) {
+      log.textContent += `${d.key}  got=${JSON.stringify(d.got)}  exp=${JSON.stringify(d.exp)}`;
+      if (d.delta !== undefined) log.textContent += `  Δ=${d.delta.toExponential(3)}`;
+      if (d.err) log.textContent += `  err=${d.err}`;
+      log.textContent += `\n    ${d.formula}\n`;
+    }
+    if (diffs.length > 30) log.textContent += `... (+${diffs.length - 30} more)\n`;
+    log.textContent += '\n';
+  }
+}
+
+function filterDiffs(reason) {
+  if (!currentReport) return;
+  const log = document.getElementById('log');
+  log.textContent = '';
+  for (const d of currentReport.diffs) {
+    if (reason && d.reason !== reason) continue;
+    log.textContent += `${d.key}  got=${JSON.stringify(d.got)}  exp=${JSON.stringify(d.exp)}`;
+    if (d.delta !== undefined) log.textContent += `  Δ=${d.delta.toExponential(3)}`;
+    if (d.err) log.textContent += `  err=${d.err}`;
+    log.textContent += `\n    ${d.formula}\n`;
+  }
+}
+
+// Auto-run on load
+window.addEventListener('load', () => setTimeout(runTest, 100));
+</script>
+</body>
+</html>

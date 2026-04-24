@@ -1,6 +1,55 @@
 
 # Changelog
 
+## [v6.62-bp-engine-excel-transpiler-P1] — 2026-04-24
+
+### 🧮 Phase 1 — moteur Excel → JS 1:1 pour BP Romania
+
+Paul a livré un cahier des charges niveau audit bancaire / due diligence fonds : transpiler le BP `MF FP - BP RO - v2Financement mix.xlsx` en moteur JS qui reproduit **exactement** les valeurs Excel, avec test de non-régression bloquant (1 cellule ≠ = FAIL).
+
+### Livrables P1
+
+- **`tools/excel_to_ir.py`** — extrait l'Excel en IR JSON (cells + formules + valeurs baseline Excel) sans toucher au fichier source. Détection heuristique des cellules-note texte (préfixées `= ` mais formattées en Text) pour éviter faux positifs.
+- **`src/bp/bp_ir.json`** — IR de 5 560 cellules, 3 659 formules, 47 inputs candidats identifiés (HYPOTHESES col C lignes 14-100).
+- **`src/bp/engine.js`** — moteur pur JS :
+  - Tokenizer + parser récursif-descente (Excel precedence)
+  - Support `=` `<>` `<` `<=` `>` `>=` `+` `-` `*` `/` `^` `&` `%` `-` unaire
+  - Refs A1/$A$1, ranges A1:C3, sheet-qualified `SHEET!A1` et `'Sheet with space'!A1`
+  - Array literals `{1,2,3,4,5,6}` (pour `IRR(CHOOSE({...}, ...))`)
+  - Fonctions : `SUM IF MAX MIN IFERROR CHOOSE SUMPRODUCT ROUND ABS IRR NPV`
+  - `CHOOSE` avec index array → retourne array (formule matricielle)
+  - `IRR` : Newton-Raphson + fallback bissection (matche Excel à 1e-9)
+  - DAG builder + topological sort Kahn + détection de cycles
+  - Model class : indexation + parse all + build DAG + evaluate all + diff vs Excel
+- **`tests/bp/bp_parity.html`** — golden test browser : charge IR, évalue 3659 formules, compare cell-par-cell avec `v_excel`, groupe les diffs par raison (num/parse/eval/err/null/mismatch).
+
+### Résultat golden test
+
+```
+Total formules : 3 659
+Pass            : 3 659  (100.0%)
+Fail            : 0
+Eval time       : 19.4 ms   (budget < 50 ms respecté avec marge)
+```
+
+Zéro écart cellule-par-cellule, tolérance 0.01 EUR. Le moteur est **1:1** avec l'Excel source de vérité.
+
+### Fichiers / complexité
+
+- 9 onglets transpilés : EXEC_SUMMARY, HYPOTHESES, PL_CLUB_TYPE, PL_MF, PL_CONSO, DCF_COMPARAISON, 01_DCF_BPI, 02_DCF_Mix, 03_DCF_Voblig
+- Vocabulaire Excel : SUM(248) IF(117) MAX(68) IRR(18) CHOOSE(18) IFERROR(15) SUMPRODUCT(11) ROUND(4). Pas de VLOOKUP/INDEX/MATCH/SUMIFS/array formulas/OFFSET/INDIRECT — vocabulaire minimaliste, transpilation droite.
+
+### Prochaines phases
+
+- **P2** — UI : route `/sites/[id]/analyse/structure-couts`, forms inputs (47 candidats), Web Worker recalc, panneau KPI sticky, waterfall, alertes DSCR/EBITDA/TRI. Supabase table `fp_ro_site_cost_scenarios` avec RLS owner-write.
+- **P3** — exports : Excel formula-identique + PDF one-pager bancable (palette pitch FP noir/or).
+
+### Tests existants
+
+`tests/analysis.html` → 197/197 PASS. Zéro régression.
+
+---
+
 ## [v6.61-override-tracking-editedby] — 2026-04-24
 
 ### 🎛️ Refonte durable — KPIs live + traçabilité overrides (mobile)
