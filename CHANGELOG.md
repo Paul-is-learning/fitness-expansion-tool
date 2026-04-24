@@ -1,6 +1,64 @@
 
 # Changelog
 
+## [v6.61-override-tracking-editedby] — 2026-04-24
+
+### 🎛️ Refonte durable — KPIs live + traçabilité overrides (mobile)
+
+Paul : « Lors de la modif des valeurs, 1) les KPIs doivent se mettre à jour automatiquement et 2) les valeurs restent enregistrées. Mécanisme d'enregistrement qui indique qui a édité. Fluide, pas d'erreur possible, durable et inébranlable. »
+
+Avant, sur mobile, on avait observé que les KPIs hero (TRI Equity / NPV / Members / SAZ) pouvaient rester affichés à leur valeur **sans override** alors que les sliders reflétaient des overrides persistés. Cause : race entre l'ouverture du detail et le restore des overrides, plus un `updateDetailHero` dépendant d'un sélecteur CSS fragile (`div[style*="grid-template-columns"] > div`).
+
+### Fix 1 — Hero cards avec `data-fp-hero` attributes (src/mobile.js)
+
+Chaque carte hero porte maintenant des data-attributes dédiés :
+
+```html
+<div data-fp-hero="members">
+  <div data-fp-hero-value>7 093</div>
+  <div data-fp-hero-sub>4 256 – 9 221</div>
+</div>
+```
+
+`updateDetailHero` cible directement ces attrs — plus de sélecteur fragile sensible au reformat. Sub-texts (« Projet: +56.4% · Payback 6 mois ») mis à jour **en synchrone** avec la valeur principale pour éviter toute dissonance visuelle. `refreshCard(activeIdx)` est appelé à la fin pour garder la peek card du bas alignée.
+
+### Fix 2 — Force recompute à l'ouverture du detail
+
+`buildDetail()` appelle désormais `restoreSiteOverrides(key)` + `ensureAnalysis(activeIdx)` **avant** de lire `analyses[activeIdx]`. Impossible d'afficher un hero calculé sans les overrides persistés (élimine la race au boot / premier rendu).
+
+### Feature — Tracking "qui a édité quoi, quand"
+
+Nouveau storage : `fpOverrideMeta` = `{[siteKey]: {rent:{by,at}, charge:{by,at}, surface:{by,at}}}`.
+
+- Chaque slider (rent / charge / surface) appelle `markOverrideEdited(key, kind)` dans son handler → stamp `{by: currentUser.email, at: Date.now()}`.
+- Sous chaque slider, badge discret : **"Modifié par Paul · il y a 3 min"** (ou "Valeur par défaut" si aucun override).
+- `fmtTimeAgo` : à l'instant / il y a X min / il y a X h / il y a X j / date.
+
+### Sync cloud — meta synchronisée entre devices
+
+`src/cloud-sync.js` `mergeOverrides` + push/beacon incluent maintenant `meta` dans le payload `overrides`. Résolution LWW **par entrée** (comparaison des `at` timestamps). Backend `api/sync.js` transparent — il stocke l'objet overrides opaquement, pas besoin de modif serveur.
+
+### API JS exposée
+
+```js
+window.fpOverrideMeta.load()                      // → {[key]: {rent:{by,at},...}}
+window.fpOverrideMeta.mark(siteKey, 'rent')       // stamp manuellement
+window.fpOverrideMeta.clear(siteKey, 'charge')    // clear (si reset)
+window.fpOverrideMeta.clear(siteKey)              // clear full site
+```
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. (Prérequis : localStorage overrides vides avant de lancer la suite — attendu, les tests sont des baselines sans override.)
+
+### Vérifié preview mobile (375×812)
+
+- État Paul reproduit (rent=18, surface=2000, charge=5.5 pré-persistés) → hero affiche 47.2% / 2.2M€ (au lieu des 84.6% / 4.8M€ default) dès l'ouverture.
+- Slider bougé → hero + peek card + sub-texts + badge « Modifié par X à l'instant » mis à jour sous 400ms.
+- localStorage `fpOverrideMeta` peuplé correctement, cloud push inclut meta.
+
+---
+
 ## [v6.60-prevent-global-scroll-after-analyze] — 2026-04-21
 
 ### 🚨 Fix critique — la visualisation se perdait au clic « Analyser »

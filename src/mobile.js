@@ -23,6 +23,87 @@
   // HTML escape alias — use for any user-provided string (custom site names, notes).
   const _esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(s) : String(s == null ? '' : s));
 
+  // ─── v6.61 OVERRIDE METADATA — qui a modifié quoi, quand ──────────
+  // Structure : { [siteKey]: { rent: {by,at}, charge: {by,at}, surface: {by,at} } }
+  // Persisté séparément des valeurs (fpRentOverrides etc.) pour ne pas casser
+  // le format existant ni le cloud-sync CRDT actuel.
+  const OVERRIDE_META_KEY = 'fpOverrideMeta';
+  function loadOverrideMeta() {
+    try {
+      const s = (typeof safeStorage !== 'undefined') ? safeStorage : { get: () => null };
+      return s.get(OVERRIDE_META_KEY, {}) || {};
+    } catch { return {}; }
+  }
+  function saveOverrideMeta(meta) {
+    try {
+      const s = (typeof safeStorage !== 'undefined') ? safeStorage : null;
+      if (s) s.set(OVERRIDE_META_KEY, meta);
+      else localStorage.setItem(OVERRIDE_META_KEY, JSON.stringify(meta));
+    } catch {}
+  }
+  function getCurrentEditorEmail() {
+    try {
+      const u = window.currentUser?.email;
+      if (u) return String(u).trim().toLowerCase();
+      const stored = localStorage.getItem('fpCurrentUser');
+      if (stored) {
+        const p = JSON.parse(stored);
+        if (p?.email) return String(p.email).trim().toLowerCase();
+      }
+    } catch {}
+    return 'utilisateur';
+  }
+  function markOverrideEdited(siteKey, kind) {
+    if (!siteKey || !kind) return;
+    const meta = loadOverrideMeta();
+    meta[siteKey] = meta[siteKey] || {};
+    meta[siteKey][kind] = { by: getCurrentEditorEmail(), at: Date.now() };
+    saveOverrideMeta(meta);
+  }
+  function clearOverrideMeta(siteKey, kind) {
+    if (!siteKey) return;
+    const meta = loadOverrideMeta();
+    if (!meta[siteKey]) return;
+    if (kind) delete meta[siteKey][kind]; else delete meta[siteKey];
+    saveOverrideMeta(meta);
+  }
+  window.fpOverrideMeta = { load: loadOverrideMeta, mark: markOverrideEdited, clear: clearOverrideMeta };
+
+  // Display helper: "il y a 3 min", "hier", "Paul · 2h"
+  function fmtTimeAgo(ts) {
+    if (!ts) return '';
+    const d = Date.now() - ts;
+    const s = Math.round(d / 1000);
+    if (s < 60) return 'à l\u2019instant';
+    const m = Math.round(s / 60);
+    if (m < 60) return 'il y a ' + m + ' min';
+    const h = Math.round(m / 60);
+    if (h < 24) return 'il y a ' + h + ' h';
+    const day = Math.round(h / 24);
+    if (day < 7) return 'il y a ' + day + ' j';
+    const dt = new Date(ts);
+    return dt.getDate() + '/' + (dt.getMonth() + 1);
+  }
+  // "Paul" from "paulbecaud@isseo-dev.com"
+  function shortEditorName(email) {
+    if (!email || email === 'utilisateur') return 'utilisateur';
+    const local = String(email).split('@')[0];
+    // Nicer: paulbecaud → Paul, pbecaud → P. Becaud, ulysse.gaspard0 → Ulysse, tomescumh → Tomescu
+    const m = local.match(/^([a-z]+)/i);
+    const first = m ? m[1] : local;
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  }
+  function overrideBadgeHTML(siteKey, kind) {
+    const meta = loadOverrideMeta();
+    const info = meta?.[siteKey]?.[kind];
+    if (!info || !info.by) {
+      return '<span style="font-size:9px;color:var(--gray2);font-weight:500">Valeur par défaut</span>';
+    }
+    const name = shortEditorName(info.by);
+    const when = fmtTimeAgo(info.at);
+    return `<span style="font-size:9px;color:var(--accent);font-weight:600" data-fp-editor="${kind}">Modifié par ${_esc(name)} · ${when}</span>`;
+  }
+
   // State machine: peek | summary | detail
   let state = 'peek';
   let sheet = null;
@@ -765,8 +846,13 @@
     if (!det) return;
     const sites = getAllSites();
     const t = sites[activeIdx];
-    const a = analyses[activeIdx];
     if (!t) return;
+    // v6.61 — restore + ensureAnalysis AVANT de lire analyses[activeIdx].
+    // Garantit que les KPI hero reflètent les overrides persistés (même
+    // si la fiche avait été cachée au boot avec un ovSig obsolète).
+    try { restoreSiteOverrides(siteKeyFor(t)); } catch {}
+    try { ensureAnalysis(activeIdx); } catch {}
+    const a = analyses[activeIdx];
     if (!a || !a.raw) {
       det.innerHTML = '<p style="padding:40px 20px;text-align:center;color:var(--gray)">Calcul en cours…</p>';
       setTimeout(() => { ensureAnalysis(activeIdx); buildDetail(); }, 600);
@@ -808,27 +894,27 @@
         </button>
       </div>
 
-      <!-- KEY METRICS HERO -->
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
-        <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
+      <!-- KEY METRICS HERO — data-fp-hero pour refresh robuste (v6.61) -->
+      <div id="fpDetailHeroGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
+        <div data-fp-hero="members" style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
           <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.members')}</div>
-          <div style="font-size:26px;font-weight:900;color:var(--white);line-height:1.1;margin-top:4px">${fmtNum(a.members)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">${fmtNum(r.pessimiste)} – ${fmtNum(r.optimiste)}</div>
+          <div data-fp-hero-value style="font-size:26px;font-weight:900;color:var(--white);line-height:1.1;margin-top:4px">${fmtNum(a.members)}</div>
+          <div data-fp-hero-sub style="font-size:10px;color:var(--gray);margin-top:2px">${fmtNum(r.pessimiste)} – ${fmtNum(r.optimiste)}</div>
         </div>
-        <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div data-fp-hero="irr" style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
           <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">TRI Equity</div>
-          <div style="font-size:26px;font-weight:900;color:${(a.irrEquity ?? a.irrBase) > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtPct(a.irrEquity ?? a.irrBase)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">Projet: ${fmtPct(a.irrBase)} · ${_t('detail.hero.payback')}${pbSuffix}</div>
+          <div data-fp-hero-value style="font-size:26px;font-weight:900;color:${(a.irrEquity ?? a.irrBase) > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtPct(a.irrEquity ?? a.irrBase)}</div>
+          <div data-fp-hero-sub style="font-size:10px;color:var(--gray);margin-top:2px">Projet: ${fmtPct(a.irrBase)} · ${_t('detail.hero.payback')}${pbSuffix}</div>
         </div>
-        <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div data-fp-hero="npv" style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
           <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.npv5yr')}</div>
-          <div style="font-size:22px;font-weight:900;color:${a.npvBase > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtM(a.npvBase)}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.scenarioBase')}</div>
+          <div data-fp-hero-value style="font-size:22px;font-weight:900;color:${a.npvBase > 0 ? '#34d399' : '#f87171'};line-height:1.1;margin-top:4px">${fmtM(a.npvBase)}</div>
+          <div data-fp-hero-sub style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.scenarioBase')}</div>
         </div>
-        <div style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div data-fp-hero="saz" style="background:linear-gradient(135deg,rgba(30,41,59,.8) 0%,rgba(17,24,39,.4) 100%);border:1px solid var(--border);border-radius:12px;padding:14px">
           <div style="font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('detail.hero.sazScore')}</div>
-          <div style="font-size:26px;font-weight:900;color:var(--accent);line-height:1.1;margin-top:4px">${Math.round(score)}<span style="font-size:13px;color:var(--gray2);font-weight:600">/100</span></div>
-          <div style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.zoneAttractiveness')}</div>
+          <div data-fp-hero-value style="font-size:26px;font-weight:900;color:var(--accent);line-height:1.1;margin-top:4px">${Math.round(score)}<span style="font-size:13px;color:var(--gray2);font-weight:600">/100</span></div>
+          <div data-fp-hero-sub style="font-size:10px;color:var(--gray);margin-top:2px">${_t('detail.hero.zoneAttractiveness')}</div>
         </div>
       </div>
 
@@ -1166,6 +1252,12 @@
     const currentCharge = window._chargeOverride?.chargeTotal ?? 5.5; // 5 SC + 0.5 MF default
     const defaultSurface = (typeof PNL_DEFAULTS !== 'undefined' && PNL_DEFAULTS?.rentSteps?.surface) || 1449;
     const currentSurface = window._surfaceOverride?.surface ?? defaultSurface;
+    // v6.61 — badges "Modifié par X il y a Y" pour chaque override
+    const activeT = getAllSites()[activeIdx];
+    const sKey = activeT ? siteKeyFor(activeT) : '';
+    const rentBadge    = overrideBadgeHTML(sKey, 'rent');
+    const chargeBadge  = overrideBadgeHTML(sKey, 'charge');
+    const surfaceBadge = overrideBadgeHTML(sKey, 'surface');
 
     return `
       <!-- Cashflow sparkline (CAF annuelle) — wrapped in container for live update -->
@@ -1187,6 +1279,7 @@
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
           <span>5 €</span><span>${_t('slider.rent.marketHint')}</span><span>25 €</span>
         </div>
+        <div id="fpRentBadge" style="margin-top:6px;text-align:right">${rentBadge}</div>
 
         <!-- Charges slider (service charges + marketing fee) -->
         <div style="height:1px;background:var(--border);margin:12px 0"></div>
@@ -1204,6 +1297,7 @@
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
           <span>0 €</span><span>${_t('slider.charge.standardHint')}</span><span>12 €</span>
         </div>
+        <div id="fpChargeBadge" style="margin-top:6px;text-align:right">${chargeBadge}</div>
 
         <!-- Surface slider (m²) -->
         <div style="height:1px;background:var(--border);margin:12px 0"></div>
@@ -1221,6 +1315,7 @@
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);margin-top:2px">
           <span>500 m²</span><span>${_t('slider.surface.refHint')}</span><span>3 000 m²</span>
         </div>
+        <div id="fpSurfaceBadge" style="margin-top:6px;text-align:right">${surfaceBadge}</div>
 
         <div id="fpRentAllInHint" style="margin-top:10px;padding:8px 10px;background:rgba(212,160,23,.08);border-radius:6px;font-size:10px;color:var(--gray)">
           ${_t('slider.allInY1.prefix')}<b style="color:var(--accent);font-size:12px">${(currentRent + currentCharge).toFixed(1)} €/m²</b> × ${fmtNum(currentSurface)} m² = <b style="color:var(--accent)">${fmtM(Math.round(currentSurface * (currentRent + currentCharge) * 12))}${_t('slider.allInY1.perYear')}</b>
@@ -1586,10 +1681,12 @@
       // Persist per site (in-memory map + localStorage for cross-session)
       const t = getAllSites()[activeIdx];
       if (t) {
-        const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
+        const key = siteKeyFor(t);
         window._surfaceOverrides = window._surfaceOverrides || {};
         window._surfaceOverrides[key] = v;
         window.persistOverrides?.();
+        markOverrideEdited(key, 'surface');
+        refreshOverrideBadges(key);
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1609,10 +1706,12 @@
       // Persist per site (in-memory map + localStorage for cross-session)
       const t = getAllSites()[activeIdx];
       if (t) {
-        const key = t.lat.toFixed(3) + ',' + t.lng.toFixed(3);
+        const key = siteKeyFor(t);
         window._chargeOverrides = window._chargeOverrides || {};
         window._chargeOverrides[key] = v;
         window.persistOverrides?.();
+        markOverrideEdited(key, 'charge');
+        refreshOverrideBadges(key);
       }
       recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5));
     }, 90);
@@ -1635,9 +1734,22 @@
         window._rentOverrides = window._rentOverrides || {};
         window._rentOverrides[key] = v;
         window.persistOverrides?.();
+        markOverrideEdited(key, 'rent');
+        refreshOverrideBadges(key);
       }
       recomputeCurrentAnalysis(v);
     }, 90);
+  }
+
+  // v6.61 — refresh the 3 override badges (rent/charge/surface) without rebuilding the card
+  function refreshOverrideBadges(key) {
+    if (!key) return;
+    const rb = qs('#fpRentBadge');
+    const cb = qs('#fpChargeBadge');
+    const sb = qs('#fpSurfaceBadge');
+    if (rb) rb.innerHTML = overrideBadgeHTML(key, 'rent');
+    if (cb) cb.innerHTML = overrideBadgeHTML(key, 'charge');
+    if (sb) sb.innerHTML = overrideBadgeHTML(key, 'surface');
   }
   function recomputeCurrentAnalysis(rentY1) {
     try {
@@ -1699,33 +1811,46 @@
     if (card) animateSparkline(card);
   }
 
+  // v6.61 — update robuste via data-fp-hero attrs (plus de fragile sélecteur
+  // basé sur inline style). Garanti de matcher le markup de buildDetail.
   function updateDetailHero(r, a, prev) {
+    if (!a) return;
     const container = qs('#fpDetail');
     if (!container) return;
-    // Find the 4 hero cards — they have labels in uppercase
-    const heroCards = qsa('#fpDetail > div[style*="grid-template-columns"] > div');
-    // Cards order: Membres, IRR, NPV, SAZ
-    if (heroCards.length >= 4) {
-      const mNode = heroCards[0].querySelector('div[style*="font-size:26px"]');
-      const iNode = heroCards[1].querySelector('div[style*="font-size:26px"]');
-      const nNode = heroCards[2].querySelector('div[style*="font-size:22px"]');
-      const sNode = heroCards[3].querySelector('div[style*="font-size:26px"]');
-      if (mNode) animateNumber(mNode, prev.oldMembers || 0, a.members, 500, (v) => fmtNum(v));
-      if (iNode) {
-        // v6.46 — hero affiche IRR Equity (TRI leveragé)
-        const irrShown = (a.irrEquity ?? a.irrBase);
-        iNode.style.color = (irrShown > 0 ? '#34d399' : '#f87171');
-        animateNumber(iNode, prev.oldIrr || 0, irrShown, 500, (v) => fmtPct(v));
-      }
-      if (nNode) {
-        nNode.style.color = (a.npvBase > 0 ? '#34d399' : '#f87171');
-        animateNumber(nNode, prev.oldNpv || 0, a.npvBase, 500, (v) => fmtM(v));
-      }
-      if (sNode) sNode.textContent = Math.round(a.score);
-      // Also update Payback hint
-      const pbHint = heroCards[1].querySelector('div[style*="font-size:10px"][style*="color:var(--gray)"]');
-      if (pbHint) pbHint.textContent = _t('detail.hero.payback') + ' ' + (a.beBase ? a.beBase + ' ' + _t('detail.hero.paybackMonths') : _t('detail.hero.paybackNA'));
+
+    // Sélecteurs directs via data-attrs — pas d'ambiguïté possible
+    const heroVal = kind => qs(`[data-fp-hero="${kind}"] [data-fp-hero-value]`, container);
+    const heroSub = kind => qs(`[data-fp-hero="${kind}"] [data-fp-hero-sub]`, container);
+
+    const mNode = heroVal('members');
+    const iNode = heroVal('irr');
+    const nNode = heroVal('npv');
+    const sNode = heroVal('saz');
+
+    if (mNode) animateNumber(mNode, prev.oldMembers || 0, a.members, 500, (v) => fmtNum(v));
+    if (iNode) {
+      const irrShown = (a.irrEquity ?? a.irrBase);
+      iNode.style.color = (irrShown > 0 ? '#34d399' : '#f87171');
+      animateNumber(iNode, prev.oldIrr || 0, irrShown, 500, (v) => fmtPct(v));
     }
+    if (nNode) {
+      nNode.style.color = (a.npvBase > 0 ? '#34d399' : '#f87171');
+      animateNumber(nNode, prev.oldNpv || 0, a.npvBase, 500, (v) => fmtM(v));
+    }
+    if (sNode) sNode.textContent = Math.round(a.score);
+
+    // Sub-texts (projet IRR, payback, etc.) — toujours synchrones pour matcher la valeur affichée
+    const mSub = heroSub('members');
+    if (mSub && r) mSub.textContent = `${fmtNum(r.pessimiste)} – ${fmtNum(r.optimiste)}`;
+
+    const iSub = heroSub('irr');
+    if (iSub) {
+      const pb = a.beBase ? a.beBase + ' ' + _t('detail.hero.paybackMonths') : _t('detail.hero.paybackNA');
+      iSub.textContent = `Projet: ${fmtPct(a.irrBase)} · ${_t('detail.hero.payback')} ${pb}`;
+    }
+
+    // Refresh aussi la peek card du site actif pour garder header + KPIs aligned
+    try { refreshCard(activeIdx); } catch {}
   }
 
   function updatePnLInline(r) {

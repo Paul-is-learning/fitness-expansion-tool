@@ -174,6 +174,31 @@
         }
       }
     }
+    // v6.61 — merge metadata "qui a édité" (LWW par entrée via at-timestamp)
+    if (remote.meta && typeof remote.meta === 'object') {
+      try {
+        const safeS = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
+        const localMeta = (safeS ? safeS.get('fpOverrideMeta', {}) : JSON.parse(localStorage.getItem('fpOverrideMeta') || '{}')) || {};
+        let metaChanges = 0;
+        for (const siteKey in remote.meta) {
+          const rSite = remote.meta[siteKey] || {};
+          const lSite = localMeta[siteKey] || (localMeta[siteKey] = {});
+          for (const kind of ['rent', 'charge', 'surface']) {
+            const rE = rSite[kind];
+            const lE = lSite[kind];
+            if (rE && (!lE || (rE.at || 0) > (lE.at || 0))) {
+              lSite[kind] = { by: rE.by, at: rE.at };
+              metaChanges++;
+            }
+          }
+        }
+        if (metaChanges > 0) {
+          if (safeS) safeS.set('fpOverrideMeta', localMeta);
+          else localStorage.setItem('fpOverrideMeta', JSON.stringify(localMeta));
+          changes += metaChanges;
+        }
+      } catch (e) { console.warn('[cloud-sync] meta merge failed', e); }
+    }
     if (changes > 0) {
       try { window.persistOverrides?.(); } catch {}
       // Signal aux UIs ouvertes qu'elles doivent recalculer (rent/charge/surface sliders).
@@ -244,6 +269,12 @@
         rent:    window._rentOverrides    || {},
         charge:  window._chargeOverrides  || {},
         surface: window._surfaceOverrides || {},
+        meta:    (function(){
+          try {
+            const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
+            return s ? (s.get('fpOverrideMeta', {}) || {}) : JSON.parse(localStorage.getItem('fpOverrideMeta') || '{}');
+          } catch { return {}; }
+        })(),
       };
       const r2 = await fetch(ENDPOINT, {
         method: 'POST',
@@ -323,6 +354,12 @@
         rent:    window._rentOverrides    || {},
         charge:  window._chargeOverrides  || {},
         surface: window._surfaceOverrides || {},
+        meta:    (function(){
+          try {
+            const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
+            return s ? (s.get('fpOverrideMeta', {}) || {}) : JSON.parse(localStorage.getItem('fpOverrideMeta') || '{}');
+          } catch { return {}; }
+        })(),
       };
       const payload = JSON.stringify({ user, sites: window.customSites, overrides });
       const blob = new Blob([payload], { type: 'application/json' });

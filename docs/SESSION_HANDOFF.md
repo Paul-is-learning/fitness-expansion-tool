@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.60-prevent-global-scroll-after-analyze (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.61-override-tracking-editedby (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
