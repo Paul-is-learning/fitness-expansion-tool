@@ -1112,6 +1112,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     </div>
   </div>
   <div class="map-overlay-bl">
+    <!-- v6.63 — Bouton BP Editor : ouvre la page structure-couts (moteur Excel→JS) -->
+    <a href="/structure-couts.html" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:8px;margin-bottom:8px;padding:10px 16px;background:linear-gradient(135deg, #d4a017 0%, #b8860b 100%);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#0a0e1a;font-family:var(--font);font-size:12px;font-weight:800;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 14px rgba(212,160,23,.35);transition:transform .15s, box-shadow .2s;text-decoration:none"
+       onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(212,160,23,.55)'"
+       onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(212,160,23,.35)'"
+       title="Éditeur BP — moteur Excel→JS 1:1 (3659 formules live)">
+      💰 Éditer BP <span style="background:rgba(10,14,26,.25);padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px">NEW</span>
+    </a>
     <!-- Bouton Démo : ouvre un panel dépliable (Visite guidée + 'Comment ça marche ?') -->
     <button id="fpDemoBtn" onclick="showDemoPanel()"
             style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:8px 14px;background:linear-gradient(135deg, rgba(212,160,23,.18) 0%, rgba(212,160,23,.08) 100%);border:1px solid rgba(212,160,23,.5);border-radius:10px;color:var(--accent);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .15s, box-shadow .2s, background .2s"
