@@ -840,6 +840,32 @@
     }
   }
 
+  // v6.64 — lazy render du BP du site quand l'accordion s'ouvre la 1re fois.
+  // Réexécuté si les sliders loyer/charges/surface/captage ont changé depuis
+  // le dernier render (dataset.sig stocke une signature des 4 variables).
+  function lazyRenderBPSiteMobile(item, t, r) {
+    if (!window.BPSiteUI) return;
+    const body = item.querySelector('.fp-accordion-body');
+    const host = body && body.querySelector('#bpSiteContentMobile');
+    if (!host) return;
+    const siteKey = (typeof siteKeyFor === 'function') ? siteKeyFor(t) : (t.lat.toFixed(3) + ',' + t.lng.toFixed(3));
+    const rentOverrides = window._rentOverrides || {};
+    const chargeOverrides = window._chargeOverrides || {};
+    const surfaceOverrides = window._surfaceOverrides || {};
+    const surface = surfaceOverrides[siteKey] ?? window.PNL_DEFAULTS?.rentSteps?.surface ?? 1449;
+    const loyerM2 = rentOverrides[siteKey] ?? window.PNL_DEFAULTS?.rentSteps?.objectifNego?.[0]?.rent ?? 10.5;
+    const chargesM2 = chargeOverrides[siteKey] ?? ((window.PNL_DEFAULTS?.rentSteps?.serviceCharge || 0) + (window.PNL_DEFAULTS?.rentSteps?.marketingFee || 0));
+    const captageMembers = r?.realiste;
+    const sig = [surface, loyerM2, chargesM2, captageMembers, t.name].join('|');
+    if (host.dataset.sig === sig) return;
+    host.dataset.sig = sig;
+    window.BPSiteUI.render('bpSiteContentMobile', {
+      siteName: t.name, siteKey,
+      surface, loyerM2Month: loyerM2, chargesM2Month: chargesM2,
+      captageMembers,
+    }, { canvasId: 'bpSiteChartMobile' });
+  }
+
   // ─── DETAIL VIEW (accordion) ──────────────────────────────────
   function buildDetail() {
     const det = qs('#fpDetail');
@@ -999,6 +1025,18 @@
           </div>
         </div>
 
+        <div class="fp-accordion-item" data-sec="bpsite">
+          <div class="fp-accordion-head">
+            <div class="icon">🏦</div>
+            <div class="lbl">BP du site — 2 scénarios</div>
+            <div class="hint">BP vs Outil</div>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="fp-accordion-body">
+            <div id="bpSiteContentMobile"></div>
+          </div>
+        </div>
+
         <div class="fp-accordion-item" data-sec="financing">
           <div class="fp-accordion-head">
             <div class="icon">🏦</div>
@@ -1116,6 +1154,7 @@
           setTimeout(() => {
             if (item.dataset.sec === 'saz') animateSazRadial(item);
             if (item.dataset.sec === 'pnl') animateSparkline(item);
+            if (item.dataset.sec === 'bpsite') lazyRenderBPSiteMobile(item, t, r);
           }, 120);
         }
       });

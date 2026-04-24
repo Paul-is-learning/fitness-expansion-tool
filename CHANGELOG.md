@@ -1,6 +1,64 @@
 
 # Changelog
 
+## [v6.64-bp-site-2-scenarios] — 2026-04-24
+
+### 🏦 BP du site — 2 scénarios comparés par site (desktop + mobile)
+
+Quand Paul analyse un site, le moteur Excel BP (3 659 formules) tourne automatiquement avec **les 3 variables du site** (surface, loyer €/m²/mois, charges €/m²/mois) injectées dans `HYPOTHESES!C50/C51/C52`, puis 2 scénarios côte à côte :
+
+- **Scénario A · BP Franchise** : `targetMembers = C34 baseline (3600)` — projection du BP officiel appliqué à ce local.
+- **Scénario B · Projection outil** : `targetMembers = captage calculé par l'outil` (SAZ/démographie/concurrence) — ce que la réalité terrain prédit.
+
+Ramp-up **identique** (70% / 90% / 100%) entre les deux → le delta est une **prime de localisation pure**, non polluée par des hypothèses supplémentaires. Honnêteté analytique > richesse visuelle.
+
+### Livrables
+
+- **`src/bp/bp_runner.js`** — wrapper singleton autour de `BPEngine.Model`. Charge `bp_ir.json` une seule fois (lazy `init()`), snapshot des valeurs baseline, `run({surface, loyerM2Month, chargesM2Month, targetMembers})` restore→apply→re-evaluate topo sans rebuild DAG. Extrait les KPIs via `findPLConsoRows()` heuristique de labels col A. **Perf 15-21 ms par scénario** (objectif < 25 ms tenu avec marge).
+
+- **`src/bp/bp_site_ui.js`** — module UI autonome :
+  - `render(containerId, params, {canvasId?})` — async, trigger les 2 runs, inject verdict + KPI duels + Chart.js + tableau A1→A10
+  - `openFullscreen()` — modal plein écran 1200px (même contenu, courbes plus grandes, tableau ouvert par défaut)
+  - Verdict 1 phrase auto-graduée : « Site surperforme le BP franchise de +XX% EBITDA Y5 (±Xk€) »
+  - Delta < 2% = neutre (gris), > 0 = vert, < 0 = rouge
+  - Chart.js `Chart.getChart(canvas)` pour destroy-then-redraw (pas de memory leak)
+
+- **`index.html`** — bloc inline injecté dans `renderCaptageAnalysis` (entre P&L et BRIDGE CA), avec bouton ⛶ Agrandir. Fallback nom de site étendu à `TARGETS.find()` (avant : seulement `_lastCaptageLocation.siteName` + `customSites.find()` → nom générique pour TARGETS).
+
+- **`src/mobile.js`** — nouvel accordéon `data-sec="bpsite"` entre le P&L 3 scénarios et Financement. Render lazy au 1er open (signature `surface|loyer|charges|captage|name` pour re-render seulement si les inputs changent).
+
+- **Persistance** — `window.saveBPSiteScenarios(params, kpis)` écrit `bpSite.{inputs, scenarioA, scenarioB, savedAt}` dans chaque entrée `fpSiteAnalyses`. Permet au ranking de cross-référencer le delta de localisation sans ré-exécuter Excel.
+
+### Résultat exemple (Hala Laminor)
+
+```
+BP Franchise (3600 mbr)   |  Projection outil (7093 mbr)  |  Δ
+CA Y5        16.70 M€     |  32.21 M€                     |  +15.51 M€
+EBITDA Y5    5.97 M€      |  17.42 M€                     |  +11.44 M€  (+192%)
+Marge EBITDA 35.8%        |  54.1%                        |  +18.3 pp
+TRI 10a      76.6%        |  132.0%                       |  +55.4 pp
+Payback      A8           |  A4                           |  -4 an
+```
+
+Verdict auto : « Site surperforme le BP franchise de +192% EBITDA Y5 (+11.44M€). »
+
+### Cohabitation avec le reste de l'app
+
+- Les sliders loyer/charges/surface existants propagent leurs valeurs au BP du site via `window._rentOverrides[siteKey]` etc. → bouger un slider déclenche déjà `renderCaptageAnalysis` qui re-render le BP.
+- Aucune modification des ratios `PNL_DEFAULTS` (figés post-OnAir v6.25). Le moteur BP est une source de vérité parallèle (Excel 1:1), il ne cannibalise pas le P&L 3 scénarios de l'outil.
+
+### Tests
+
+`tests/analysis.html` → **197/197 PASS**. Zéro régression sur le modèle existant.
+
+### Prochain — P2c possible
+
+- Waterfall CA→EBITDA→Résultat net Y5 pour chaque scénario
+- Sensibilité univariée : courbe « delta EBITDA Y5 si captage ± 10% »
+- Export PDF du comparatif 2 scénarios (one-pager bancable)
+
+---
+
 ## [v6.63-bp-editor-live-P2a] — 2026-04-24
 
 ### 🎛️ Phase 2a — éditeur BP live fonctionnel

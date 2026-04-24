@@ -44,6 +44,10 @@
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
+<script src="src/bp/engine.js" defer></script>
+<script src="src/bp/bp_inputs.js" defer></script>
+<script src="src/bp/bp_runner.js" defer></script>
+<script src="src/bp/bp_site_ui.js" defer></script>
 <script src="src/mobile.js" defer></script>
 <style>
 /* ================================================================
@@ -5535,6 +5539,35 @@ function saveSiteAnalysis(name, lat, lng, r, exec) {
 // Exposé global pour mobile.js (autre module) — v6.21 fix persistance post-slider
 window.saveSiteAnalysis = saveSiteAnalysis;
 
+// v6.64 — persistance des 2 scénarios BP par site (appelée par BPSiteUI après
+// chaque run). On stocke un sous-objet minimal (valeurs clés Y5 + TRI +
+// payback) pour que le ranking puisse afficher le "delta localisation" sans
+// avoir à ré-exécuter le moteur Excel.
+window.saveBPSiteScenarios = function(params, kpis) {
+  if (!params || !kpis || !isFinite(params.surface)) return;
+  const lat = window._lastCaptageLocation?.lat;
+  const lng = window._lastCaptageLocation?.lng;
+  if (!isFinite(lat) || !isFinite(lng)) return;
+  const idx = window._siteAnalyses.findIndex(s => Math.abs(s.lat - lat) < 0.001 && Math.abs(s.lng - lng) < 0.001);
+  if (idx < 0) return;
+  const packKPI = k => ({
+    ca5: k.ca5, ebitda5: k.ebitda5, ebitdaMargin5: k.ebitdaMargin5,
+    netResult5: k.netResult5, tri10: k.tri10, paybackYear: k.paybackYear,
+  });
+  window._siteAnalyses[idx].bpSite = {
+    inputs: {
+      surface: params.surface,
+      loyerM2Month: params.loyerM2Month,
+      chargesM2Month: params.chargesM2Month,
+      captageMembers: params.captageMembers,
+    },
+    scenarioA: packKPI(kpis.a),
+    scenarioB: packKPI(kpis.b),
+    savedAt: Date.now(),
+  };
+  try { localStorage.setItem('fpSiteAnalyses', JSON.stringify(window._siteAnalyses)); } catch {}
+};
+
 function renderSiteRanking() {
   const analyses = window._siteAnalyses;
   if (analyses.length < 2) return '';
@@ -5962,7 +5995,10 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   window._lastCaptageData = {r, avgPrice: r.avgQuartierPrice, containerId};
 
   // Save to multi-site ranking
-  const siteName = window._lastCaptageLocation?.siteName || customSites.find(s => Math.abs(s.lat-lat)<0.001 && Math.abs(s.lng-lng)<0.001)?.name || `Site ${lat.toFixed(3)},${lng.toFixed(3)}`;
+  const siteName = window._lastCaptageLocation?.siteName
+    || customSites.find(s => Math.abs(s.lat-lat)<0.001 && Math.abs(s.lng-lng)<0.001)?.name
+    || (typeof TARGETS !== 'undefined' ? TARGETS.find(t => Math.abs(t.lat-lat)<0.001 && Math.abs(t.lng-lng)<0.001)?.name : null)
+    || `Site ${lat.toFixed(3)},${lng.toFixed(3)}`;
   window._lastCaptageLocation.siteName = siteName;
   saveSiteAnalysis(siteName, lat, lng, r, exec);
 
@@ -6220,6 +6256,19 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           <input id="surfaceSlider" type="range" min="800" max="2500" step="50" value="${window._surfaceOverride?.surface ?? PNL_DEFAULTS.rentSteps.surface}" style="flex:1;accent-color:var(--accent);height:5px;cursor:pointer" oninput="onSurfaceSliderChange(this.value)">
           <span style="font-size:7px;color:var(--gray2)">2500</span>
         </div>
+      </div>
+    </div>
+
+    <div style="background:linear-gradient(135deg,rgba(212,160,23,.07),rgba(16,185,129,.04));border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);letter-spacing:0.5px">🏦 BP DU SITE — 2 SCÉNARIOS</div>
+          <div style="font-size:8px;color:var(--gray2);margin-top:2px">BP Franchise (cible ${fmt(3600)} mbr) vs Projection outil (${fmt(r.realiste)} mbr) — loyer/charges/surface du site appliqués aux deux</div>
+        </div>
+        <button onclick="BPSiteUI.openFullscreen()" style="font-size:8px;padding:5px 10px;background:transparent;border:1px solid var(--accent);border-radius:5px;color:var(--accent);cursor:pointer;font-family:var(--font);font-weight:700;flex-shrink:0;white-space:nowrap">⛶ Agrandir</button>
+      </div>
+      <div id="bpSiteContent">
+        <div style="padding:16px;color:var(--gray2);font-size:9px;text-align:center">Initialisation du moteur BP…</div>
       </div>
     </div>
 
@@ -6537,6 +6586,22 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
             y: { ticks: { color:'#94a3b8', font:{size:8}, callback: v => v+'k€' }, grid: { color:'#1e293b' } }
           }
         }
+      });
+    }
+
+    // === BP DU SITE — 2 scénarios côte à côte (v6.64) ===
+    if (window.BPSiteUI && document.getElementById('bpSiteContent')) {
+      const siteName = window._lastCaptageLocation?.siteName
+        || (typeof customSites !== 'undefined' ? customSites.find(s => Math.abs(s.lat - lat) < 0.001 && Math.abs(s.lng - lng) < 0.001)?.name : null)
+        || (typeof TARGETS !== 'undefined' ? TARGETS.find(t => Math.abs(t.lat - lat) < 0.001 && Math.abs(t.lng - lng) < 0.001)?.name : null)
+        || 'Site';
+      const surface = window._surfaceOverride?.surface ?? PNL_DEFAULTS.rentSteps.surface;
+      const loyerM2 = window._rentOverride?.y1 ?? PNL_DEFAULTS.rentSteps.objectifNego[0].rent;
+      const chargesM2 = window._chargeOverride?.chargeTotal ?? (PNL_DEFAULTS.rentSteps.serviceCharge + PNL_DEFAULTS.rentSteps.marketingFee);
+      BPSiteUI.render('bpSiteContent', {
+        siteName, siteKey: lat.toFixed(3) + ',' + lng.toFixed(3),
+        surface, loyerM2Month: loyerM2, chargesM2Month: chargesM2,
+        captageMembers: r.realiste,
       });
     }
   }, 100);
