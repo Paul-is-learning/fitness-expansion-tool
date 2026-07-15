@@ -155,6 +155,12 @@ ${topComps.length ? `<table><tr><th>Club</th><th class="num">Membres est.</th><t
   <tr><td>FCFE (k€)</td>${(pb.annualFCFE || []).map(v => `<td class="num"${v < 0 ? ' style="color:#b91c1c"' : ''}>${F(Math.round(v / 1000))}</td>`).join('')}</tr>
 </table>
 <p style="font-size:8pt;color:#6b7280">DSCR : ${dscrTip} · Breakeven M${pb.breakevenMonth ?? '—'} · NPV@12% ${kE(pb.npv)} · MOIC ${pb.moic != null ? pb.moic.toFixed(1) + '×' : 'n/a'} · Valeur de sortie ${kE(pb.terminalValue)}</p>
+${(() => { try {
+  const be = (typeof window.computeBreakEvenMembers === 'function') ? window.computeBreakEvenMembers('fcfe', 4) : null;
+  if (be == null) return '';
+  const cushion = Math.round((r.realiste / be - 1) * 100);
+  return `<p style="font-size:9pt;margin-top:4px"><b>Point mort : ${F(be)} adhérents</b> (FCFE neutre en croisière, dette incluse) — le site en vise ${F(r.realiste)}, soit un coussin de sécurité de <b>${cushion >= 0 ? '+' : ''}${cushion}%</b>.</p>`;
+} catch { return ''; } })()}
 </div>
 </div>
 

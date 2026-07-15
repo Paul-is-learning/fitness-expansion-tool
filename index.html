@@ -5018,6 +5018,39 @@ function getEffectiveExitMultiple() {
     ? window._exitMultipleOverride.x : PNL_DEFAULTS.exitMultiple;
 }
 
+// ═══ v6.76 — POINT MORT EN ADHÉRENTS ═══════════════════════════════
+// Combien de membres STABILISÉS faut-il pour être neutre sur l'année ?
+//   kind 'ebitda' → équilibre opérationnel (EBITDA annuel = 0)
+//   kind 'fcfe'   → équilibre bas de page (EBITDA − leasing − service
+//                   de dette = 0) — le "résultat bas de page" de Paul.
+// Méthode : INVERSION du moteur réel. On construit une cohorte plate de
+// M membres sur 60 mois, on la passe dans buildPnL (qui applique TOUS
+// les réglages courants : loyer/charges/surface du site, financement,
+// CAPEX/sortie sandbox), et on cherche M par bisection jusqu'à ce que
+// l'agrégat de l'année visée soit nul. Zéro réimplémentation → toujours
+// cohérent avec le P&L affiché.
+// yearIdx 0..4 (A1..A5) — le point mort varie avec l'année : paliers de
+// loyer, OPEX 20%→12%, staff +6%/an, leasing A1-A5, dette sur sa durée.
+function computeBreakEvenMembers(kind, yearIdx) {
+  const arpu = getFP_MONTHLY_HT();
+  if (!arpu || arpu <= 0) return null;
+  const evalM = (M) => {
+    const cohort = Array.from({ length: 60 }, (_, i) => ({ month: i + 1, monthlyCA: M * arpu, netMembers: M, arpu }));
+    const p = buildPnL(cohort, 0);
+    const months = p.monthly.slice(yearIdx * 12, yearIdx * 12 + 12);
+    return months.reduce((a, m) => a + (kind === 'fcfe' ? m.cashFlowEquity : m.ebitda), 0);
+  };
+  let lo = 0, hi = 10000;
+  if (evalM(hi) < 0) return null;      // jamais rentable même à 10 000 mbr
+  if (evalM(0) >= 0) return 0;
+  for (let it = 0; it < 20; it++) {
+    const mid = (lo + hi) / 2;
+    if (evalM(mid) >= 0) hi = mid; else lo = mid;
+  }
+  return Math.ceil(hi);
+}
+window.computeBreakEvenMembers = computeBreakEvenMembers;
+
 /**
  * Build a 60-month P&L + IRR/NPV for a site given its member cohort trajectory.
  * Pure function — reads PNL_DEFAULTS + window overrides (_rentOverride, _chargeOverride, _surfaceOverride).
@@ -5915,6 +5948,8 @@ function updateFinancingDisplay(p) {
   }
   if (e('fin-kpi-moic'))    { e('fin-kpi-moic').textContent    = p.moic != null ? p.moic.toFixed(1) + '×' : 'n/a'; e('fin-kpi-moic').style.color = (p.moic || 0) >= 2 ? 'var(--green)' : 'var(--yellow)'; }
   if (e('fin-kpi-pbeq'))    { e('fin-kpi-pbeq').textContent    = p.paybackEquityMonth ? 'M' + p.paybackEquityMonth : '>60M'; e('fin-kpi-pbeq').style.color = p.paybackEquityMonth ? 'var(--green)' : 'var(--red)'; }
+  // v6.76 — bloc point mort en adhérents (dépend des mêmes réglages)
+  try { renderBreakEvenBlock(); } catch {}
   // Ligne "vs Référence BP" — écart des réglages courants vs BP verrouillé
   const refEl = e('pnl-ref-delta');
   if (refEl) {
@@ -5939,6 +5974,72 @@ function updateFinancingDisplay(p) {
   }
 }
 window.updateFinancingDisplay = updateFinancingDisplay;
+
+// ═══ v6.76 — rendu du bloc POINT MORT (fiche site) ═════════════════
+function renderBreakEvenBlock() {
+  const box = document.getElementById('pnl-breakeven-block');
+  if (!box) return;
+  const r = window._lastCaptageData?.r;
+  if (!r) { box.innerHTML = ''; return; }
+  const fin = getEffectiveFinancing();
+  const debtOn = fin.enabled !== false && fin.loanRatio > 0;
+
+  // FCFE par année (A1..A5) + EBITDA croisière
+  const beFcfe = [0, 1, 2, 3, 4].map(y => computeBreakEvenMembers('fcfe', y));
+  const beEbitda5 = computeBreakEvenMembers('ebitda', 4);
+  const beCruise = beFcfe[4];
+  const realiste = r.realiste || 0;
+  const cushion = beCruise ? Math.round((realiste / beCruise - 1) * 100) : null;
+  const cushionCol = cushion == null ? 'var(--gray2)' : cushion >= 50 ? 'var(--green)' : cushion >= 20 ? 'var(--yellow)' : 'var(--red)';
+
+  // Jauge : point mort vs membres réalistes (échelle max = max des deux × 1.15)
+  const gaugeMax = Math.max(realiste, beCruise || 0) * 1.15 || 1;
+  const pctBE = Math.min(100, Math.round((beCruise || 0) / gaugeMax * 100));
+  const pctReal = Math.min(100, Math.round(realiste / gaugeMax * 100));
+
+  box.innerHTML = `
+    <div style="background:#10b98108;border:1px solid #10b98130;border-radius:6px;padding:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:8px;font-weight:700;color:var(--green)">🎯 POINT MORT — adhérents requis pour être neutre en FCFE (bas de page${debtOn ? ', dette incluse' : ', 100% equity'})</div>
+        <div style="font-size:9px;font-weight:800;color:${cushionCol}">${cushion != null ? 'coussin ' + (cushion >= 0 ? '+' : '') + cushion + '%' : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center">
+          <div style="font-size:15px;font-weight:900;color:var(--white)">${beCruise != null ? fmt(beCruise) : '—'}</div>
+          <div style="font-size:6.5px;color:var(--gray2)">POINT MORT FCFE · CROISIÈRE (A5)</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center">
+          <div style="font-size:15px;font-weight:900;color:var(--gray)">${beFcfe[0] != null ? fmt(beFcfe[0]) : '—'}</div>
+          <div style="font-size:6.5px;color:var(--gray2)">POINT MORT FCFE · ANNÉE 1${debtOn ? ' (dette + leasing)' : ' (leasing)'}</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center">
+          <div style="font-size:15px;font-weight:900;color:var(--gray)">${beEbitda5 != null ? fmt(beEbitda5) : '—'}</div>
+          <div style="font-size:6.5px;color:var(--gray2)">POINT MORT EBITDA · opérationnel</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center;border:1px solid ${cushionCol}40">
+          <div style="font-size:15px;font-weight:900;color:${cushionCol}">${fmt(realiste)}</div>
+          <div style="font-size:6.5px;color:var(--gray2)">MEMBRES RÉALISTES DU SITE</div>
+        </div>
+      </div>
+      <div style="position:relative;height:14px;background:var(--bg);border-radius:7px;overflow:visible;margin:2px 0 12px">
+        <div style="position:absolute;left:0;width:${pctReal}%;height:100%;background:linear-gradient(90deg,${cushionCol}55,${cushionCol}99);border-radius:7px"></div>
+        ${beCruise != null ? `<div style="position:absolute;left:${pctBE}%;top:-3px;bottom:-3px;width:2px;background:var(--red)" title="Point mort FCFE croisière: ${fmt(beCruise)} adhérents"></div>
+        <div style="position:absolute;left:${pctBE}%;top:14px;transform:translateX(-50%);font-size:7px;color:var(--red);font-weight:700;white-space:nowrap">↑ ${fmt(beCruise)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:4px">
+        ${beFcfe.map((v, y) => `
+          <div style="flex:1;text-align:center;background:var(--bg);border-radius:4px;padding:3px 2px" title="Point mort FCFE en année ${y + 1} — paliers loyer, OPEX ${Math.round((PNL_DEFAULTS.opexOpsRateByYear[y] || .12) * 100)}%, staff +6%/an${y < PNL_DEFAULTS.leasingYears ? ', leasing' : ''}${debtOn && y < fin.loanTermYears ? ', dette' : ''}">
+            <div style="font-size:6.5px;color:var(--gray2)">A${y + 1}</div>
+            <div style="font-size:9px;font-weight:800;color:${v != null && realiste >= v ? 'var(--green)' : 'var(--red)'}">${v != null ? fmt(v) : '—'}</div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:7px;color:var(--gray2);line-height:1.4">
+        Calcul par inversion du moteur : cohorte stable de M membres → P&L complet avec TES réglages (loyer/charges/surface du site, ${debtOn ? Math.round(fin.equityRatio * 100) + '% equity / ' + Math.round(fin.loanRatio * 100) + '% dette @ ' + (fin.loanRate * 100).toFixed(1) + '%' : '100% fonds propres'}) → M tel que le FCFE annuel = 0.
+        Le point mort baisse avec les années (OPEX dégressifs) puis remonte si palier de loyer — vert = les membres réalistes couvrent l'année.
+      </div>
+    </div>`;
+}
+window.renderBreakEvenBlock = renderBreakEvenBlock;
 
 // --- MULTI-SITE RANKING ---
 // Store all analyzed sites for comparison
@@ -6859,6 +6960,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff 3 ETP plug ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k A1 (+${Math.round((PNL_DEFAULTS.staff?.inflationRate||0.06)*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRateByYear[0]*100)}%→${Math.round(PNL_DEFAULTS.opexOpsRateByYear[4]*100)}% CA | Redev ${Math.round(PNL_DEFAULTS.redevanceRate*100)}%+${Math.round(PNL_DEFAULTS.fondsPubRate*100)}% | CIT ${Math.round(PNL_DEFAULTS.citRate*100)}% | WACC ${Math.round(PNL_DEFAULTS.discountRate*100)}%
       </div>
       <div id="pnl-ref-delta" style="font-size:8px;margin-top:6px;padding:6px 8px;background:var(--bg2);border-radius:5px;line-height:1.5"></div>
+      <div id="pnl-breakeven-block" style="margin-top:8px"></div>
       <div id="rent-block" style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div style="font-size:8px;font-weight:700;color:var(--accent)">LOYER — Ajustable en direct (${PNL_DEFAULTS.rentSteps.surface} m²)</div>

@@ -1,6 +1,37 @@
 
 # Changelog
 
+## [v6.76-breakeven-members] — 2026-07-15
+
+### 🎯 POINT MORT EN ADHÉRENTS — combien de membres pour être neutre en FCFE ?
+
+Demande Paul : « définir mon point mort sur la base du nombre d'adhérents
+requis — neutre en résultat bas de page (FCFE) ».
+
+**Méthode : inversion du moteur réel.** Cohorte stable de M membres → P&L
+complet (buildPnL avec TOUS les réglages courants : loyer/charges/surface du
+site, financement dette on/off) → bisection sur M jusqu'à FCFE annuel = 0.
+Zéro réimplémentation → toujours cohérent avec le P&L affiché. ~2 ms/calcul.
+
+**Bloc "🎯 POINT MORT" sur chaque fiche site** :
+- Point mort FCFE en croisière (A5) et en année 1, point mort EBITDA
+  (opérationnel), membres réalistes du site + **coussin de sécurité %**.
+- Jauge visuelle (barre membres réalistes vs marqueur rouge du point mort).
+- Table A1→A5 (le point mort évolue : OPEX dégressifs vs paliers de loyer
+  et staff +6%/an), vert/rouge par année.
+- Se recalcule en direct avec chaque slider et le toggle dette.
+
+Mesuré sur Hala Laminor : **2 367 adhérents** (FCFE neutre, dette incluse) —
+1 903 sans dette (le service de dette « coûte » 464 adhérents d'équilibre),
+3 159 si loyer à 20 €/m² (chaque €/m² ≈ +83 adhérents). Réaliste : 7 093 →
+coussin +200%.
+
++ ligne point mort dans le Mémo d'IC · + terme « point mort » au lexique.
+
+Vérifié : valeurs déterministes, réactivité dette/loyer, 197/197 assertions.
+
+---
+
 ## [v6.75-bankability] — 2026-07-15
 
 ### 💰→🏦 Plan de Conquête : mode Fonds propres + point de bancabilité
