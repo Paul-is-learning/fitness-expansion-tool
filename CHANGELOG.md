@@ -1,6 +1,37 @@
 
 # Changelog
 
+## [v6.78-login-ux] — 2026-07-15
+
+### 🔑 Optimisation complète du login (demande Paul : « ça galère tout le temps »)
+
+Les 6 sources de friction traitées :
+
+1. **Session persistante** : nouvelle case « Rester connecté sur cet appareil »
+   (cochée par défaut) → la session desktop vit en localStorage comme sur
+   mobile. Fini le re-login à chaque ouverture d'onglet — on rentre
+   directement dans l'app. (Décochée = comportement historique, session fermée
+   avec l'onglet.)
+2. **Gestionnaires de mots de passe enfin fonctionnels** : le login est
+   maintenant un vrai `<form>` avec `autocomplete="username"` /
+   `"current-password"` → iCloud Keychain, Chrome et 1Password proposent
+   d'enregistrer puis pré-remplissent en 1 tap. Style autofill sombre inclus.
+3. **👁 Afficher le mot de passe** : les fautes de frappe deviennent visibles.
+4. **Trim automatique du mot de passe** : un espace parasite (copier-coller,
+   clavier mobile) ne fait plus échouer la connexion silencieusement.
+5. **Focus automatique intelligent** : email pré-rempli → curseur direct dans
+   le mot de passe.
+6. **Entrée valide depuis n'importe quel champ** (submit natif du formulaire).
+
+La signature de session (auth-guard) suit le même storage que la session
+(cohérence « Rester connecté »).
+
+Vérifié : login frais avec espace parasite ✓, session + signature en
+localStorage, reload → auto-login direct dans l'app (sig ok, 0 tamper),
+197/197 assertions.
+
+---
+
 ## [v6.77-auth-relax] — 2026-07-15
 
 ### 🔓 Auth simplifiée (demande Paul)

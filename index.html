@@ -443,18 +443,40 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         <div style="font-size:18px;font-weight:800;color:white;letter-spacing:-.3px">Expansion Intelligence</div>
         <div style="font-size:12px;color:#64748b;margin-top:4px">Romania — Master Franchise Analytics</div>
       </div>
+      <!-- v6.78 — vrai <form> + autocomplete standard : les gestionnaires de
+           mots de passe (iCloud, Chrome, 1Password…) proposent enfin
+           d'enregistrer et de pré-remplir. Entrée valide depuis tout champ. -->
+      <style>
+        #loginForm input:-webkit-autofill,
+        #loginForm input:-webkit-autofill:hover,
+        #loginForm input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 100px #0b101d inset !important;
+          -webkit-text-fill-color: #fff !important;
+          caret-color: #fff;
+          border: 1px solid rgba(212,160,23,.45) !important;
+        }
+      </style>
+      <form id="loginForm" method="post" action="#" onsubmit="doLogin();return false" autocomplete="on">
       <div style="margin-bottom:16px">
-        <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>
-        <input type="email" id="loginEmail" placeholder="votre@email.com" style="width:100%;padding:12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s">
+        <label for="loginEmail" style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>
+        <input type="email" id="loginEmail" name="email" placeholder="votre@email.com" autocomplete="username email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" inputmode="email" style="width:100%;padding:12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s">
       </div>
-      <div style="margin-bottom:24px">
-        <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">MOT DE PASSE</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" style="width:100%;padding:12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s" onkeydown="if(event.key==='Enter')doLogin()">
+      <div style="margin-bottom:14px">
+        <label for="loginPassword" style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">MOT DE PASSE</label>
+        <div style="position:relative">
+          <input type="password" id="loginPassword" name="password" placeholder="••••••••" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" style="width:100%;padding:12px 44px 12px 16px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);transition:all .3s">
+          <button type="button" onclick="const p=document.getElementById('loginPassword');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'👁':'🙈';p.focus()" title="Afficher / masquer le mot de passe" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;font-size:15px;cursor:pointer;padding:4px;line-height:1">👁</button>
+        </div>
       </div>
-      <button id="loginBtn" onclick="doLogin()" style="width:100%;padding:14px;border-radius:10px;font-size:14px;font-family:var(--font)">
+      <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#94a3b8;cursor:pointer;margin-bottom:16px;user-select:none">
+        <input type="checkbox" id="loginStayConnected" checked style="accent-color:#d4a017;width:15px;height:15px;cursor:pointer">
+        Rester connecté sur cet appareil
+      </label>
+      <button id="loginBtn" type="submit" style="width:100%;padding:14px;border-radius:10px;font-size:14px;font-family:var(--font)">
         CONNEXION
       </button>
       <div class="login-error" id="loginError">Email ou mot de passe incorrect</div>
+      </form>
       <div style="text-align:center;margin-top:14px">
         <a href="#" onclick="event.preventDefault();showPasswordResetModal()" style="font-size:11px;color:#94a3b8;text-decoration:none;border-bottom:1px dotted #475569;padding-bottom:1px">
           Mot de passe oublié&nbsp;?
@@ -8712,8 +8734,14 @@ function _authIsMobile() {
   return window.innerWidth <= 768
       || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
+// v6.78 — "Rester connecté" (coché par défaut) : la session vit en
+// localStorage même sur desktop → plus de re-login à chaque onglet.
+// Décoché → comportement historique (sessionStorage, fermé avec l'onglet).
+function _authStayConnected() {
+  try { return localStorage.getItem('fpStayConnected') !== '0'; } catch { return true; }
+}
 function _authStorage() {
-  return _authIsMobile() ? localStorage : sessionStorage;
+  return (_authIsMobile() || _authStayConnected()) ? localStorage : sessionStorage;
 }
 
 // Users with passwords stored in localStorage (always)
@@ -8769,7 +8797,9 @@ if(userList.length === 0) {
 // Login function
 function doLogin() {
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-  const pw = document.getElementById('loginPassword').value;
+  // v6.78 — trim: un espace parasite (copier-coller, clavier mobile) ne doit
+  // plus faire échouer silencieusement la connexion.
+  const pw = document.getElementById('loginPassword').value.trim();
   const errEl = document.getElementById('loginError');
 
   if(!email || !pw) { errEl.style.display='block'; errEl.textContent='Veuillez remplir tous les champs'; return; }
@@ -8778,11 +8808,17 @@ function doLogin() {
   if(!user) { errEl.style.display='block'; errEl.textContent='Email non reconnu — demandez une invitation'; return; }
   if(user.pwHash && user.pwHash !== simpleHash(pw)) { errEl.style.display='block'; errEl.textContent='Mot de passe incorrect'; return; }
 
+  // v6.78 — mémorise le choix "Rester connecté" AVANT de choisir le storage
+  try {
+    const stay = document.getElementById('loginStayConnected');
+    if (stay) localStorage.setItem('fpStayConnected', stay.checked ? '1' : '0');
+  } catch {}
+
   // Success
   currentUser = user;
   _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
   // Clear the other storage so we don't double-persist
-  if (_authIsMobile()) sessionStorage.removeItem('fpCurrentUser');
+  if (_authStorage() === localStorage) sessionStorage.removeItem('fpCurrentUser');
   else localStorage.removeItem('fpCurrentUser');
   localStorage.setItem('fpLastEmail', user.email);
   resetInactivityTimer();
@@ -8884,6 +8920,15 @@ function checkAuth() {
   if(lastEmail && document.getElementById('loginEmail')) {
     document.getElementById('loginEmail').value = lastEmail;
   }
+  // v6.78 — restaure l'état "Rester connecté" + focus direct sur le bon champ
+  try {
+    const stay = document.getElementById('loginStayConnected');
+    if (stay) stay.checked = _authStayConnected();
+    if (document.getElementById('loginPage')?.style.display !== 'none') {
+      const target = lastEmail ? document.getElementById('loginPassword') : document.getElementById('loginEmail');
+      setTimeout(() => target?.focus(), 80);
+    }
+  } catch {}
 }
 
 // Logout — clear both storages for safety

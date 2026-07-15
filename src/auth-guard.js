@@ -26,7 +26,12 @@
     return window.innerWidth <= 768
         || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
-  function _storage() { return _isMobile() ? localStorage : sessionStorage; }
+  // v6.78 — miroir de la règle "Rester connecté" d'index.html : la signature
+  // de session doit vivre dans le même storage que la session elle-même.
+  function _stayConnected() {
+    try { return localStorage.getItem('fpStayConnected') !== '0'; } catch { return true; }
+  }
+  function _storage() { return (_isMobile() || _stayConnected()) ? localStorage : sessionStorage; }
   function _readUser() {
     return localStorage.getItem('fpCurrentUser') || sessionStorage.getItem('fpCurrentUser') || '';
   }
