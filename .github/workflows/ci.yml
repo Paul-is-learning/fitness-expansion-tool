@@ -1,0 +1,27 @@
+# CI — les 197 assertions du moteur d'analyse à chaque push.
+# Rouge = le moteur a dérivé : ne pas laisser partir en production.
+# (Étape 2 — blocage réel du deploy Vercel : voir docs/SAAS_ROADMAP.md,
+#  nécessite le secret VERCEL_TOKEN.)
+name: tests-moteur
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  regression-197:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Installer Playwright (chromium)
+        run: |
+          npm init -y > /dev/null
+          npm install --no-save playwright > /dev/null
+          npx playwright install --with-deps chromium
+      - name: Suite de régression (197 assertions, hôtes externes bloqués)
+        run: node ci/run-tests.mjs
