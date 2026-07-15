@@ -1,6 +1,40 @@
 
 # Changelog
 
+## [v6.71-fcf-studio] — 2026-07-15
+
+### ⚖️ STUDIO FCF — comparateur de scénarios financiers (phase 1 de la refonte)
+
+Demande Paul : comparer deux FCF d'un même site (avec/sans dette, CAPEX
+différents…), cocher/décocher/modifier des hypothèses en direct, sauvegarder —
+en conservant TOUJOURS le modèle initial et les réglages outil comme référence.
+
+**Nouveau module `src/fcf-studio.js`** (bouton "⚖️ STUDIO FCF" dans le bloc
+Financement d'un site analysé) :
+
+- **4 colonnes** : Référence BP 🔒 (verrouillée) · Réglages outil (sliders
+  actuels) · Scénario A · Scénario B (bacs à sable).
+- **9 hypothèses cochables** groupées Financement / Investissement / Immobilier :
+  dette on/off, apport %, taux, durée, CAPEX, multiple de sortie, loyer,
+  charges, surface. Décocher = retour à la valeur de référence.
+- **13 indicateurs comparés** avec deltas B vs A colorés : CAPEX, equity, dette,
+  EBITDA A5, FCFF/FCFE 5 ans, IRR projet/equity, NPV, DSCR (A2+), MOIC,
+  paybacks, valeur terminale. Tooltip pédagogique sur chaque ligne.
+- **Graphe FCFE cumulé 60 mois** — 4 courbes superposées (référence en
+  pointillés), l'equity story en un regard.
+- **Sauvegarde** : scénarios nommés par site (localStorage, cap 20/site),
+  chips → charger dans A ou B, journalisés (fcf.scenario-save + KPIs).
+- **Défaut didactique** : à l'ouverture, A = "Sans dette (100% equity)" →
+  l'effet de levier (+37 pts d'IRR equity) est visible immédiatement.
+
+**Sandbox étanche** : computeWith() pose les overrides globaux, exécute
+buildPnL (pur), restaure tout en finally. Nouveaux hooks `_capexOverride` /
+`_exitMultipleOverride` (null par défaut → zéro changement de comportement).
+Vérifié : cocher/décocher/valeurs live, save/load, ZÉRO fuite de globals à la
+fermeture, référence bit-identique, 197/197 assertions.
+
+---
+
 ## [v6.70.1-actions-toggle] — 2026-07-15
 
 ### 🐛 2 bugs UI signalés par Paul

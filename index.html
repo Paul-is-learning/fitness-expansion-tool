@@ -44,6 +44,7 @@
 <script src="src/audit-log.js" defer></script>
 <script src="src/chains-intel.js" defer></script>
 <script src="src/reviews-history.js" defer></script>
+<script src="src/fcf-studio.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -4994,8 +4995,22 @@ function getSurfaceScale() {
   const current = window._surfaceOverride?.surface || refSurface;
   return current / refSurface;
 }
-function getScaledCapex()         { return Math.round(PNL_DEFAULTS.capex * getSurfaceScale()); }
+// v6.71 — sandbox Studio FCF : overrides scénario (null = comportement
+// identique, baseline 197 assertions intacte). Posés/restaurés par
+// FcfStudio.computeWith(), jamais persistés.
+window._capexOverride = null;         // {capex: EUR} — remplace capex AVANT scale surface
+window._exitMultipleOverride = null;  // {x: number} — remplace exitMultiple
+
+function getScaledCapex() {
+  const base = (window._capexOverride && typeof window._capexOverride.capex === 'number')
+    ? window._capexOverride.capex : PNL_DEFAULTS.capex;
+  return Math.round(base * getSurfaceScale());
+}
 function getScaledLeasingAnnual() { return Math.round(PNL_DEFAULTS.leasingAnnual * getSurfaceScale()); }
+function getEffectiveExitMultiple() {
+  return (window._exitMultipleOverride && typeof window._exitMultipleOverride.x === 'number')
+    ? window._exitMultipleOverride.x : PNL_DEFAULTS.exitMultiple;
+}
 
 /**
  * Build a 60-month P&L + IRR/NPV for a site given its member cohort trajectory.
@@ -5165,7 +5180,7 @@ function buildPnL(cohortData, avgQuartierPrice) {
   // --- Terminal Value (standard DCF — valeur de sortie Y5) ---
   // TV = EBITDA_Y5 × exit multiple, ajouté au dernier cashflow
   const ebitdaY5Annual = annualEBITDA[4] || 0;
-  const terminalValue = Math.round(ebitdaY5Annual * PNL_DEFAULTS.exitMultiple);
+  const terminalValue = Math.round(ebitdaY5Annual * getEffectiveExitMultiple());
 
   // IRR/NPV with terminal value (= investment horizon with exit)
   const cfWithTV = [...cashflows];
@@ -6955,6 +6970,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
         <div style="font-size:7px;color:var(--gray2);line-height:1.4">
           Référence BP: ${Math.round(PNL_DEFAULTS.financing.equityRatio*100)}% equity / ${Math.round(PNL_DEFAULTS.financing.loanRatio*100)}% dette @ ${(PNL_DEFAULTS.financing.loanRate*100).toFixed(1)}% sur ${PNL_DEFAULTS.financing.loanTermYears} ans (SG garantie BPI). FCFE = EBITDA − leasing − service dette (avant IS). Chaque réglage est journalisé avec son impact (📋 Journal).
         </div>
+        <button onclick="FcfStudio.open()" style="width:100%;margin-top:8px;padding:9px;border-radius:7px;background:linear-gradient(135deg,rgba(96,165,250,.2),rgba(52,211,153,.15));border:1px solid rgba(96,165,250,.4);color:var(--white);font-size:10px;font-weight:800;cursor:pointer;font-family:var(--font)" title="Comparer 2 scénarios de cash flow côte à côte (dette, CAPEX, loyer, sortie…) — la Référence BP reste inviolable">
+          ⚖️ STUDIO FCF — comparer des scénarios (dette, CAPEX, sortie…)
+        </button>
       </div>`;
       })()}
     </div>
