@@ -447,6 +447,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
         CONNEXION
       </button>
       <div class="login-error" id="loginError">Email ou mot de passe incorrect</div>
+      <div style="text-align:center;margin-top:14px">
+        <a href="#" onclick="event.preventDefault();showPasswordResetModal()" style="font-size:11px;color:#94a3b8;text-decoration:none;border-bottom:1px dotted #475569;padding-bottom:1px">
+          Mot de passe oublié&nbsp;?
+        </a>
+      </div>
       <div style="text-align:center;margin-top:16px;font-size:10px;color:#475569">
         Acces reserve aux membres du projet
       </div>
@@ -454,6 +459,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
     <!-- Footer -->
     <div style="text-align:center;margin-top:24px;font-size:9px;color:#334155">
       &copy; 2026 Isseo x Fitness Park — Expansion Intelligence Platform
+    </div>
+  </div>
+</div>
+
+<!-- ── Password reset modal (phrase de récupération, 100% client) ─── -->
+<div id="passwordResetModal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(6,8,15,.92);backdrop-filter:blur(8px);align-items:center;justify-content:center;overflow-y:auto;padding:24px 0">
+  <div style="background:linear-gradient(180deg,#0f172a,#0a0f1c);border:1px solid rgba(71,85,115,.4);border-radius:18px;padding:28px;max-width:420px;width:90%;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="font-size:18px;font-weight:800;color:white;margin-bottom:6px">Mot de passe oublié</div>
+    <div style="font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:18px">
+      Entrez votre email, votre phrase de récupération, et choisissez un nouveau mot de passe.
+    </div>
+    <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>
+    <input type="email" id="pwResetEmail" placeholder="votre@email.com" style="width:100%;padding:11px 14px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);margin-bottom:12px">
+    <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">PHRASE DE RÉCUPÉRATION</label>
+    <input type="text" id="pwResetPhrase" placeholder="Votre phrase secrète" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:11px 14px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);margin-bottom:12px">
+    <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">NOUVEAU MOT DE PASSE</label>
+    <input type="password" id="pwResetNew1" placeholder="Minimum 6 caractères" style="width:100%;padding:11px 14px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);margin-bottom:12px">
+    <label style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">CONFIRMATION</label>
+    <input type="password" id="pwResetNew2" placeholder="Retapez le mot de passe" style="width:100%;padding:11px 14px;background:rgba(0,0,0,.4);border:1px solid rgba(71,85,115,.4);border-radius:10px;color:white;font-size:13px;font-family:var(--font);margin-bottom:14px" onkeydown="if(event.key==='Enter')doPasswordReset()">
+    <div id="pwResetStatus" style="font-size:11px;min-height:16px;margin-bottom:12px;color:#94a3b8"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="hidePasswordResetModal()" style="flex:1;padding:12px;border-radius:10px;background:rgba(71,85,115,.2);color:#cbd5e1;border:1px solid rgba(71,85,115,.4);font-size:13px;cursor:pointer;font-family:var(--font)">Annuler</button>
+      <button id="pwResetBtn" onclick="doPasswordReset()" style="flex:1;padding:12px;border-radius:10px;background:#fbbf24;color:#0a0f1c;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">Valider</button>
     </div>
   </div>
 </div>
@@ -5595,6 +5623,10 @@ if(localStorage.getItem('fpModelVersion') !== MODEL_VERSION) {
   } catch(e) { console.warn('Custom sites cleanup:', e); }
   // 3. Clear sessionStorage caches
   sessionStorage.removeItem('opCache');
+  // 4. Clear users + their signature so CANONICAL_USERS changes (new fields like
+  //    recoveryHash) are re-seeded cleanly without triggering auth-guard's
+  //    "tampered" alert.
+  try { localStorage.removeItem('fpUsers'); localStorage.removeItem('fpUsersSig'); } catch {}
   localStorage.setItem('fpModelVersion', MODEL_VERSION);
   console.log('Model updated to ' + MODEL_VERSION + ' — ALL caches cleared');
   window._pendingAutoAnalyze = true;
@@ -8130,6 +8162,78 @@ function doLogin() {
   applyRole();
   // Broadcast login for onboarding tour + future listeners
   try { window.dispatchEvent(new CustomEvent('fp:login-success', { detail: { user, email: user.email } })); } catch {}
+}
+
+// ── Password reset via phrase de récupération (v6.66) ────────────────
+// 100% client. Compare simpleHash(phrase saisie) avec user.recoveryHash
+// (défini dans data/users.js). Si match, met à jour user.pwHash dans
+// localStorage. Aucun backend, aucun email — juste un secret partagé
+// que l'utilisateur garde dans son gestionnaire de mots de passe.
+function showPasswordResetModal() {
+  const m = document.getElementById('passwordResetModal');
+  if (!m) return;
+  const emailField = document.getElementById('pwResetEmail');
+  const loginEmail = document.getElementById('loginEmail');
+  if (emailField && loginEmail && loginEmail.value) emailField.value = loginEmail.value;
+  document.getElementById('pwResetPhrase').value = '';
+  document.getElementById('pwResetNew1').value = '';
+  document.getElementById('pwResetNew2').value = '';
+  document.getElementById('pwResetStatus').textContent = '';
+  const btn = document.getElementById('pwResetBtn');
+  btn.disabled = false;
+  btn.textContent = 'Valider';
+  m.style.display = 'flex';
+  setTimeout(() => (emailField?.value ? document.getElementById('pwResetPhrase') : emailField)?.focus(), 50);
+}
+function hidePasswordResetModal() {
+  const m = document.getElementById('passwordResetModal');
+  if (m) m.style.display = 'none';
+}
+function doPasswordReset() {
+  const email = (document.getElementById('pwResetEmail').value || '').trim().toLowerCase();
+  const phrase = document.getElementById('pwResetPhrase').value || '';
+  const pw1 = document.getElementById('pwResetNew1').value || '';
+  const pw2 = document.getElementById('pwResetNew2').value || '';
+  const status = document.getElementById('pwResetStatus');
+  const btn = document.getElementById('pwResetBtn');
+
+  const fail = (msg) => { status.style.color = '#f87171'; status.textContent = msg; };
+
+  if (!email || !email.includes('@')) return fail('Email invalide.');
+  if (!phrase) return fail('Phrase de récupération requise.');
+  if (pw1.length < 6) return fail('Mot de passe trop court (6 caractères min).');
+  if (pw1 !== pw2) return fail('Les deux mots de passe ne correspondent pas.');
+
+  const user = userList.find(u => u.email.toLowerCase() === email);
+  // Message volontairement identique en cas d'email inconnu OU phrase fausse
+  // (n'expose pas si l'email existe).
+  const errPhrase = 'Email ou phrase de récupération incorrect.';
+  if (!user) return fail(errPhrase);
+  if (!user.recoveryHash) return fail('Reset non disponible pour ce compte — contactez l\'admin.');
+  if (simpleHash(phrase) !== user.recoveryHash) return fail(errPhrase);
+
+  // Match. Update local pwHash.
+  const idx = userList.findIndex(u => u.email.toLowerCase() === email);
+  if (idx >= 0) {
+    userList[idx].pwHash = simpleHash(pw1);
+    try { localStorage.setItem('fpUsers', JSON.stringify(userList)); } catch {}
+    // Re-sign the list, sinon l'auth-guard verrait "tampered" au prochain boot
+    // et reseederait les users canoniques (= perte du nouveau mdp).
+    if (window._fpAuthGuard?.signUserList) window._fpAuthGuard.signUserList();
+    else { try { localStorage.removeItem('fpUsersSig'); } catch {} }
+  }
+  status.style.color = '#34d399';
+  status.textContent = 'Mot de passe mis à jour ✓';
+  btn.disabled = true;
+  btn.textContent = 'OK';
+
+  setTimeout(() => {
+    hidePasswordResetModal();
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPw = document.getElementById('loginPassword');
+    if (loginEmail) loginEmail.value = email;
+    if (loginPw) { loginPw.value = pw1; loginPw.focus(); }
+  }, 1000);
 }
 
 // Check if already logged in (session-based — must re-login each visit)

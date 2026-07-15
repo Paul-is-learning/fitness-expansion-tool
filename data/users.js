@@ -27,9 +27,12 @@
 // Depends on: src/utils.js (simpleHash)
 // ================================================================
 
+// recoveryHash (v6.66) : phrase secrète pour "Mot de passe oublié ?". Si présent,
+// l'utilisateur peut reset son mdp en tapant cette phrase. Sinon, fallback admin.
+// Pour changer la phrase : éditer ci-dessous, commit + push.
 const CANONICAL_USERS = [
-  {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
-  {email:'pbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!')},
+  {email:'paulbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!'),recoveryHash:simpleHash('FP2026-BECAUD')},
+  {email:'pbecaud@isseo-dev.com',role:'admin',name:'Paul Becaud',pwHash:simpleHash('FP2026!'),recoveryHash:simpleHash('FP2026-BECAUD')},
   {email:'ulysse.gaspard0@gmail.com',role:'user',name:'Ulysse Gaspard',pwHash:simpleHash('FP2026')},
   {email:'tomescumh@yahoo.com',role:'user',name:'Tomescu MH',pwHash:simpleHash('FP2026')},
 ];

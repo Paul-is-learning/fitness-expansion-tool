@@ -277,5 +277,5 @@
     console.groupEnd();
   };
 
-  window._fpAuthGuard = { isLockedOut, getFails, clearFails, checkUserListSig, checkSessionSig };
+  window._fpAuthGuard = { isLockedOut, getFails, clearFails, checkUserListSig, checkSessionSig, signUserList };
 })();

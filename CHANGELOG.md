@@ -1,6 +1,40 @@
 
 # Changelog
 
+## [v6.66-password-reset] — 2026-06-25
+
+### 🔑 Flow "mot de passe oublié" — phrase de récupération 100% client
+
+Avant : si tu oubliais ton mdp, il fallait éditer `data/users.js` (recompute `simpleHash`) et redéployer. Inaccessible pour un user non-dev.
+
+Maintenant : lien "Mot de passe oublié ?" sous le bouton Connexion → modal qui demande email + **phrase de récupération** + nouveau mdp → c'est fait, en 10 secondes, sans backend.
+
+### Comment ça marche
+
+- Chaque user a un `recoveryHash` baked dans `data/users.js` (simpleHash d'une phrase secrète qu'il garde dans son gestionnaire de mots de passe).
+- Reset = comparaison `simpleHash(phrase saisie)` vs `user.recoveryHash`. Si match, le `pwHash` local est mis à jour dans `localStorage.fpUsers`.
+- Aucun backend, aucun email, aucun env var, aucun KV. Marche offline.
+
+### Configurer la phrase
+
+Éditer `data/users.js`, ligne du user concerné :
+```js
+{email:'paulbecaud@isseo-dev.com', ..., recoveryHash:simpleHash('TA-NOUVELLE-PHRASE')}
+```
+Commit + push → Vercel redéploie. Phrase actuelle Paul : configurée (à garder dans gestionnaire de mdp).
+
+### Changements
+
+- **`data/users.js`** : nouveau champ `recoveryHash` (optionnel — si absent, fallback admin reset).
+- **`index.html`** : lien "Mot de passe oublié ?" sous le bouton Connexion + 1 modal unique (email + phrase + nouveau mdp + confirmation) + 3 fonctions JS (~60 lignes).
+- **Sécurité** : message d'erreur identique pour "email inconnu" ou "phrase fausse" (n'expose pas l'existence). Pas crypto-fort (simpleHash reste reversible) mais cohérent avec le modèle d'auth existant — voir `src/utils.js` pour le caveat.
+
+### Cross-device
+
+Le reset n'agit que sur le localStorage du device courant. Si tu reset sur ton tel et que tu te connectes ensuite sur le laptop, l'ancien mdp marchera encore là-bas (jusqu'à ce que tu reset là aussi, ou que tu clear localStorage et te reseed depuis `CANONICAL_USERS`).
+
+---
+
 ## [v6.65.3-sidebar-data-centric] — 2026-04-24
 
 ### 🖥️ Sidebar data-centric + mode "Analyse" qui réduit la carte
