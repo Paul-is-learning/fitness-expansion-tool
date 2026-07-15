@@ -42,6 +42,8 @@
 <script src="src/auth-guard.js" defer></script>
 <script src="src/cloud-sync.js" defer></script>
 <script src="src/audit-log.js" defer></script>
+<script src="src/chains-intel.js" defer></script>
+<script src="src/reviews-history.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -662,6 +664,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <button class="btn" onclick="loadAllCompetitors()" data-i18n="dactions.loadComp">Charger concurrents</button>
           <button class="btn btn-primary" onclick="analyzeAllSectors()" data-i18n="dactions.analyzeAll">Analyser tout</button>
           <button class="btn" onclick="showOverlapAnalysis()" data-i18n="dactions.overlap">Overlap sites</button>
+          <button class="btn" onclick="openChainsIntel()" title="CA officiels déposés (Ministerul Finanțelor) + membres déclarés par enseigne">🏢 Enseignes</button>
+          <button class="btn" onclick="window.ReviewsHistory?.openReport?.()" title="Vélocité des avis Google par club = proxy du flux de nouveaux membres">📈 Vélocité avis</button>
         </div>
       </div>
 
@@ -3226,11 +3230,15 @@ function showCompsOnMap(comps) {
     const mA=c.members||0;
     const mB=rv?rv.mB:0;
     const mAvg=mB>0?Math.round((mA+mB)/2):mA;
+    // v6.69 — vélocité des avis (série temporelle ReviewsHistory)
+    const vel = window.ReviewsHistory?.velocity?.(c.name) || null;
+    const velLine = vel ? `<div class="ps"><span>Vélocité avis</span><span class="pv" style="color:${vel.trendPct > 15 ? 'var(--red)' : vel.trendPct < -15 ? 'var(--green)' : 'var(--gray)'}">${vel.perMonth}/mois ${vel.trendPct != null ? (vel.trendPct > 15 ? '↗ accélère' : vel.trendPct < -15 ? '↘ ralentit' : '→ stable') : ''} <span style="font-size:8px;color:var(--gray2)">(${vel.days}j)</span></span></div>` : '';
     // Google enrichment data
     const gLine = c.gEnriched ? `
       <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(71,85,115,.2)">
         <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:3px">GOOGLE PLACES <span style="font-size:7px;background:rgba(212,160,23,.15);padding:1px 4px;border-radius:3px">LIVE</span></div>
         ${c.gRating?`<div class="ps"><span>Note Google</span><span class="pv" style="color:var(--accent)">★ ${c.gRating}/5 <span style="font-size:8px;color:var(--gray2)">(${fmt(c.gReviews)} avis)</span></span></div>`:''}
+        ${velLine}
         ${c.gOpen!==null?`<div class="ps"><span>Statut</span><span class="pv" style="color:${c.gOpen?'var(--green)':'var(--red)'}"> ${c.gOpen?'Ouvert maintenant':'Ferme'}</span></div>`:''}
         ${c.gWebsite?`<div class="ps"><span>Site</span><span class="pv"><a href="${c.gWebsite}" target="_blank" style="color:var(--blue);font-size:9px">Visiter ↗</a></span></div>`:''}
       </div>` : '';
@@ -3782,6 +3790,8 @@ async function loadAllCompetitors() {
   if (_googleHasKey()) {
     enrichWithGoogle(comps).then(() => {
       if (layers.competitors) showCompsOnMap(comps);
+      // v6.69 — snapshot des review counts pour la série temporelle vélocité
+      try { window.ReviewsHistory?.maybeSnapshot?.(comps); } catch {}
     });
   }
 }

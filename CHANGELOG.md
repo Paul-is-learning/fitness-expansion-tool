@@ -1,6 +1,24 @@
 
 # Changelog
 
+## [v6.69-market-intel] — 2026-06-25
+
+### 🏢 Intelligence enseignes (comptes publics RO) + 📈 Vélocité des avis Google
+
+Demande Paul : fiabiliser le KPI n°1 (abonnés/salle) avec des sources externes. Deux modules, 100% légaux et citables :
+
+**Enseignes — comptes publics (bouton "🏢 Enseignes")**
+- `src/chains-intel.js` : CA déposés au Ministerul Finanțelor (2024 ET 2025), résultat net, effectifs, CUI pour les 5 chaînes principales + membres déclarés presse + membres/club + ARPU réel implicite. Chaque chiffre sourcé (listafirme.eu, termene.ro, Forbes, ZF…), recoupé ≥ 2 sources.
+- **Validation clé** : les estimations membres/club de notre base collent aux comptes officiels (WC ~1 790 déclaré vs ~1 870 modèle, SF ~1 100 vs 1 100, 18GYM ~1 470 vs 1 200, Nr1 ~720 vs 600) → pas de recalibration nécessaire, baseline intacte.
+- Alertes remontées : Stay Fit CA ×2.6 en 2 ans, 18GYM ×2.3 en 1 an (levée 20 M€, objectif 150 salles) — les 2 challengers sont en hypercroissance. Downtown Vitan absent du site officiel (fermeture à vérifier). "ESX Intel World SRL" = n°3 national inconnu de la base (à identifier).
+
+**Vélocité des avis (bouton "📈 Vélocité avis")**
+- `src/reviews-history.js` + `api/reviews.js` (KV) : série temporelle des review counts Google par club. Seed t0 = REVIEWS_DB (mars 2026), snapshots auto après chaque enrichissement Places (max 1/7j), sync cross-device.
+- `velocity(club)` = Δavis/mois + tendance vs le rythme historique du club → affiché dans le popup concurrent (↗ accélère = menace / ↘ ralentit = opportunité) + rapport classé (top movers).
+- Zéro coût additionnel : réutilise la clé Places existante et le flux d'enrichissement déjà en place.
+
+---
+
 ## [v6.68-data-clubs-dedup] — 2026-06-25
 
 ### 🧹 Fiabilisation data — doublons clubs supprimés + re-géolocalisation (vérifiés sources officielles)
