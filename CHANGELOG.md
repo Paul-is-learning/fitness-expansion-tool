@@ -1,6 +1,34 @@
 
 # Changelog
 
+## [v6.80-saas-p2a] — 2026-07-15
+
+### 🏢 SaaS Phase 2a — Auth serveur (magic link) + rôles + liens de présentation publics
+
+**`api/auth.js`** — l'authentification serveur complète, prête à basculer :
+- Magic link email (token 15 min, usage unique) → session **cookie httpOnly
+  signé HMAC** 30 jours (clé = secret serveur existant, zéro nouvelle env var).
+- Annuaire utilisateurs en KV avec **rôles** (admin/editor/viewer) et
+  **workspace** ('fp-romania' — la clé multi-tenant est posée partout).
+- Actions : request / verify / me / logout / **invite** (admin ajoute un
+  utilisateur sans toucher au code !) / directory.
+- ⚙️ L'envoi d'email nécessite `RESEND_API_KEY` (résend.com, gratuit) — sans
+  elle, l'API répond proprement 503 avec la marche à suivre. Le login
+  actuel reste inchangé jusqu'à l'activation.
+
+**`api/share.js` + bouton 🔗 Partager** — visible dès maintenant :
+- Sur une fiche analysée : 🔗 Partager → snapshot du Mémo d'IC stocké côté
+  serveur → **URL publique lecture seule, expirable (30 j)**, copiée dans le
+  presse-papier. À envoyer à un bailleur, une banque, FP France — sans compte.
+- Bannière "document partagé en lecture seule" + noindex + page d'expiration
+  propre. Auth : whitelist actuelle OU session cookie (transition douce).
+- `ICMemo.buildHtml()` extrait (refactor sans changement de comportement).
+
+Transition documentée dans docs/SAAS_ROADMAP.md — étape suivante (P2b) :
+écrans de login magic link + bascule des endpoints data sur la session.
+
+---
+
 ## [v6.79-saas-p0p1] — 2026-07-15
 
 ### 🏗️ Programme SaaS — Phase 0 (CI) + Phase 1 (perf boot)

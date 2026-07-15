@@ -26,11 +26,13 @@
   ];
   const mitigantFor = risk => (MITIGANTS.find(x => x.rx.test(risk)) || { m: 'Suivi mensuel post-ouverture + plan d’action correctif.' }).m;
 
-  function open() {
+  // v6.80 — buildHtml() retourne le document complet (string) : utilisé par
+  // open() (fenêtre print) ET par le partage public (/api/share).
+  function buildHtml() {
     const d = window._lastCaptageData;
     const exec = window._lastExecData?.exec;
     const loc = window._lastCaptageLocation;
-    if (!d?.r?.pnl?.base || !exec) { alert('Analyse d’abord un site — le mémo se génère depuis la fiche ouverte.'); return; }
+    if (!d?.r?.pnl?.base || !exec) return null;
     const r = d.r;
     const pb = r.pnl.base;
     const siteName = loc?.siteName || 'Site';
@@ -58,9 +60,7 @@
     const modelVersion = (typeof MODEL_VERSION !== 'undefined') ? MODEL_VERSION : '';
     const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    const w = window.open('', '_blank');
-    if (!w) { alert('Autorise les popups pour générer le mémo.'); return; }
-    w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+    return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
 <title>Mémo IC — ${esc(siteName)}</title>
 <style>
   @page { size: A4; margin: 16mm 15mm; }
@@ -182,10 +182,21 @@ ${(exec.opportunities || []).length ? `<p style="font-size:8.5pt;color:#0f7b4d">
   comptes concurrents déposés Ministerul Finanțelor (recoupés presse) · relevés terrain Isseo · Google Places.
   FCFE avant IS. Généré le ${today} par Expansion Intelligence Platform (${esc(modelVersion)}) — document de travail interne, ne constitue pas un conseil en investissement.
 </div>
-</body></html>`);
-    w.document.close();
-    try { window.AuditLog?.log({ action: 'memo.export', target: siteName, siteKey: loc ? loc.lat.toFixed(3) + ',' + loc.lng.toFixed(3) : '' }); } catch {}
+</body></html>`;
   }
 
-  window.ICMemo = { open };
+  function open() {
+    const html = buildHtml();
+    if (!html) { alert('Analyse d’abord un site — le mémo se génère depuis la fiche ouverte.'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { alert('Autorise les popups pour générer le mémo.'); return; }
+    w.document.write(html);
+    w.document.close();
+    try {
+      const loc = window._lastCaptageLocation;
+      window.AuditLog?.log({ action: 'memo.export', target: loc?.siteName, siteKey: loc ? loc.lat.toFixed(3) + ',' + loc.lng.toFixed(3) : '' });
+    } catch {}
+  }
+
+  window.ICMemo = { open, buildHtml };
 })();
