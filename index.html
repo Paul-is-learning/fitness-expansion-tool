@@ -5031,23 +5031,32 @@ function getEffectiveExitMultiple() {
 // cohérent avec le P&L affiché.
 // yearIdx 0..4 (A1..A5) — le point mort varie avec l'année : paliers de
 // loyer, OPEX 20%→12%, staff +6%/an, leasing A1-A5, dette sur sa durée.
-function computeBreakEvenMembers(kind, yearIdx) {
+// forceFinancing (optionnel) : 'equity' = force 100% fonds propres,
+// 'ref' = force la structure BP (30/70), null/undefined = réglage courant.
+function computeBreakEvenMembers(kind, yearIdx, forceFinancing) {
   const arpu = getFP_MONTHLY_HT();
   if (!arpu || arpu <= 0) return null;
-  const evalM = (M) => {
-    const cohort = Array.from({ length: 60 }, (_, i) => ({ month: i + 1, monthlyCA: M * arpu, netMembers: M, arpu }));
-    const p = buildPnL(cohort, 0);
-    const months = p.monthly.slice(yearIdx * 12, yearIdx * 12 + 12);
-    return months.reduce((a, m) => a + (kind === 'fcfe' ? m.cashFlowEquity : m.ebitda), 0);
-  };
-  let lo = 0, hi = 10000;
-  if (evalM(hi) < 0) return null;      // jamais rentable même à 10 000 mbr
-  if (evalM(0) >= 0) return 0;
-  for (let it = 0; it < 20; it++) {
-    const mid = (lo + hi) / 2;
-    if (evalM(mid) >= 0) hi = mid; else lo = mid;
+  const savedFin = window._financingOverride;
+  try {
+    if (forceFinancing === 'equity') window._financingOverride = { enabled: false };
+    else if (forceFinancing === 'ref') window._financingOverride = null;
+    const evalM = (M) => {
+      const cohort = Array.from({ length: 60 }, (_, i) => ({ month: i + 1, monthlyCA: M * arpu, netMembers: M, arpu }));
+      const p = buildPnL(cohort, 0);
+      const months = p.monthly.slice(yearIdx * 12, yearIdx * 12 + 12);
+      return months.reduce((a, m) => a + (kind === 'fcfe' ? m.cashFlowEquity : m.ebitda), 0);
+    };
+    let lo = 0, hi = 10000;
+    if (evalM(hi) < 0) return null;      // jamais rentable même à 10 000 mbr
+    if (evalM(0) >= 0) return 0;
+    for (let it = 0; it < 20; it++) {
+      const mid = (lo + hi) / 2;
+      if (evalM(mid) >= 0) hi = mid; else lo = mid;
+    }
+    return Math.ceil(hi);
+  } finally {
+    window._financingOverride = savedFin;
   }
-  return Math.ceil(hi);
 }
 window.computeBreakEvenMembers = computeBreakEvenMembers;
 
@@ -5984,10 +5993,12 @@ function renderBreakEvenBlock() {
   const fin = getEffectiveFinancing();
   const debtOn = fin.enabled !== false && fin.loanRatio > 0;
 
-  // FCFE par année (A1..A5) + EBITDA croisière
+  // FCFE par année (A1..A5) + EBITDA croisière + variante 100% fonds propres
   const beFcfe = [0, 1, 2, 3, 4].map(y => computeBreakEvenMembers('fcfe', y));
   const beEbitda5 = computeBreakEvenMembers('ebitda', 4);
+  const beEquity5 = computeBreakEvenMembers('fcfe', 4, 'equity');
   const beCruise = beFcfe[4];
+  const debtCostMembers = (debtOn && beCruise != null && beEquity5 != null) ? beCruise - beEquity5 : null;
   const realiste = r.realiste || 0;
   const cushion = beCruise ? Math.round((realiste / beCruise - 1) * 100) : null;
   const cushionCol = cushion == null ? 'var(--gray2)' : cushion >= 50 ? 'var(--green)' : cushion >= 20 ? 'var(--yellow)' : 'var(--red)';
@@ -6011,6 +6022,10 @@ function renderBreakEvenBlock() {
         <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center">
           <div style="font-size:15px;font-weight:900;color:var(--gray)">${beFcfe[0] != null ? fmt(beFcfe[0]) : '—'}</div>
           <div style="font-size:6.5px;color:var(--gray2)">POINT MORT FCFE · ANNÉE 1${debtOn ? ' (dette + leasing)' : ' (leasing)'}</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center" title="Point mort FCFE en croisière si le club était financé 100% en fonds propres (aucun service de dette) — indépendant du toggle dette.${debtCostMembers != null ? ' La dette coûte ' + fmt(debtCostMembers) + ' adhérents d’équilibre.' : ''}">
+          <div style="font-size:15px;font-weight:900;color:var(--accent)">${beEquity5 != null ? fmt(beEquity5) : '—'}</div>
+          <div style="font-size:6.5px;color:var(--gray2)">💰 SI 100% FONDS PROPRES${debtCostMembers != null ? ' <span style="color:var(--orange)">(dette: +' + fmt(debtCostMembers) + ')</span>' : ''}</div>
         </div>
         <div style="flex:1;background:var(--bg);border-radius:5px;padding:6px 8px;text-align:center">
           <div style="font-size:15px;font-weight:900;color:var(--gray)">${beEbitda5 != null ? fmt(beEbitda5) : '—'}</div>

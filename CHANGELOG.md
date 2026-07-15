@@ -28,6 +28,10 @@ coussin +200%.
 
 + ligne point mort dans le Mémo d'IC · + terme « point mort » au lexique.
 
+**v6.76.1** — tuile supplémentaire « 💰 SI 100% FONDS PROPRES » : le point mort
+sans aucune dette, toujours affiché quel que soit le toggle, avec le coût de la
+dette en adhérents d'équilibre en badge orange (ex : 1 903 + « dette: +464 »).
+
 Vérifié : valeurs déterministes, réactivité dette/loyer, 197/197 assertions.
 
 ---
