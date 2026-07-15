@@ -102,7 +102,16 @@ module.exports = async (req, res) => {
   const action = String(q.action || 'snapshot');
   const s = sessionRole(req);
   const legacyUser = String(q.user || '').toLowerCase().trim();
-  const isAdmin = (s && s.role === 'admin') || ALLOWED_USERS.has(legacyUser);
+  let isAdmin = ALLOWED_USERS.has(legacyUser);
+  if (!isAdmin && s) {
+    // v6.87 — révocation immédiate : rôle relu dans l'annuaire VIVANT
+    try {
+      const raw = await kvGetRaw('fp:v2:directory');
+      const dir = raw ? JSON.parse(raw) : null;
+      const u = dir && dir[s.email];
+      isAdmin = !!(u && !u.disabled && u.role === 'admin');
+    } catch {}
+  }
 
   try {
     // ── snapshot : appelé par le cron (pas d'auth : lecture seule + écrit

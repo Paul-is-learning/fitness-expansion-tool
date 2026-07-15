@@ -1,6 +1,50 @@
 
 # Changelog
 
+## [v6.87-authpro] — 2026-07-15
+
+### 🔐 Login serveur + gestion des utilisateurs (exit le magic link)
+
+Un vrai login de SaaS : email + mot de passe, **vérifié côté serveur**
+(scrypt, cookie de session signé httpOnly — celui que /api/sync & co
+savent déjà lire). Plus aucune dépendance à une clé email (Resend).
+
+- **Connexion** : mêmes identifiants qu'avant (zéro migration). « Rester
+  connecté » = session 365 j, sinon 1 j. Refus serveur = pas de repli.
+- **Repli local automatique** si l'API est injoignable : offline, CI et
+  serveur statique gardent le comportement historique (197 tests OK).
+- **Panneau Utilisateurs (annuaire serveur)** : avatar → liste des
+  comptes (rôle, dernière connexion), ajout avec mot de passe initial,
+  changement de rôle en 1 clic, 🔑 reset mdp, 🗑 suppression. Garde-fous :
+  impossible de se supprimer/rétrograder soi-même ou le dernier admin.
+- **« Mot de passe oublié ? » passe par le serveur** : la phrase de
+  récupération met à jour le mdp pour TOUS les appareils.
+- **🔑 Mon mot de passe** : chaque utilisateur peut changer le sien
+  (mot de passe actuel requis).
+- **Sécurité** : auto-login ?invite= supprimé (token forgeable), rôle
+  lecteur serveur correctement propagé à l'UI, bloc magic link retiré
+  de l'écran de connexion (l'API reste dormante).
+
+- **Revue adversariale multi-agents (46 agents)** — 7 défauts confirmés,
+  tous corrigés avant déploiement, dont 3 critiques :
+  · **Révocation immédiate** : un utilisateur désactivé/supprimé perdait
+    ses droits… sauf son cookie (365 j). Désormais chaque action sensible
+    (gestion users **et** écritures data sync/scénarios/audit/share/backup)
+    revalide le rôle VIVANT dans l'annuaire — le vieux cookie devient inerte.
+  · Ajout local d'utilisateur sans re-signature → fausse alerte
+    « altération » + wipe au boot suivant. Corrigé (re-signature).
+  · Garde anti-tampering du login devenu aveugle avec le doLogin async
+    (tout login compté en échec, signatures plus jamais posées). Corrigé.
+  · Course logout/reload (reconnexion fantôme), divergence mdp
+    local/serveur après « 🔑 Mon mot de passe », faux succès du reset sur
+    erreur 500 : corrigés.
+
+Vérifié : 39/39 tests unitaires handler auth + 5/5 révocation /api/sync
+(KV mocké), 197/197 régression, parcours navigateur complets (login,
+mauvais mdp, logout, miroir mdp, re-signatures). E2E : +2 assertions.
+
+---
+
 ## [v6.86-portfolio] — 2026-07-15
 
 ### 📊 Dashboard Portefeuille + export Excel/CSV (chantier 18/20 #3 — le wow)

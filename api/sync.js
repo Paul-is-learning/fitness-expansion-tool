@@ -52,9 +52,22 @@ function readSession(req) {
     return { email: s.e, role: s.r, ws: s.w };
   } catch { return null; }
 }
-function isAuthorized(req, legacyUser, write) {
+// v6.87 — révocation immédiate : le rôle vient de l'annuaire VIVANT
+// (fp:v2:directory), pas du cookie (figé au login, jusqu'à 365 j).
+async function liveRole(email) {
+  try {
+    const dir = await kvGet('fp:v2:directory');
+    const u = dir && dir[email];
+    return (u && !u.disabled) ? u.role : null;
+  } catch { return null; }
+}
+async function isAuthorized(req, legacyUser, write) {
   const s = readSession(req);
-  if (s) return write ? ['admin', 'editor'].includes(s.role) : true;
+  if (s) {
+    const role = await liveRole(s.email);
+    if (role) return write ? ['admin', 'editor'].includes(role) : true;
+    // session révoquée → on retombe sur la whitelist legacy (transition)
+  }
   return ALLOWED_USERS.has(String(legacyUser || '').toLowerCase().trim());
 }
 
@@ -103,7 +116,7 @@ module.exports = async (req, res) => {
       const user = String(body.user || '').toLowerCase().trim();
       const sites = Array.isArray(body.sites) ? body.sites : null;
       const overrides = (body.overrides && typeof body.overrides === 'object') ? body.overrides : null;
-      if (!isAuthorized(req, user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
+      if (!(await isAuthorized(req, user, true))) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!sites) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
       if (sites.length > 1000) { res.status(413).json({ error: 'TOO_MANY_SITES' }); return; }
       const serialized = JSON.stringify({ sites, overrides });

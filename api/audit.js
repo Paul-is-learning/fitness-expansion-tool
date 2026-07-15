@@ -57,9 +57,14 @@ function readSession(req) {
     return { email: s.e, role: s.r, ws: s.w };
   } catch { return null; }
 }
-function isAuthorized(req, legacyUser, write) {
+async function isAuthorized(req, legacyUser, write) {
   const s = readSession(req);
-  if (s) return write ? ['admin', 'editor'].includes(s.role) : true;
+  if (s) {
+    // v6.87 — révocation immédiate : rôle relu dans l'annuaire VIVANT
+    const dir = await kvGet('fp:v2:directory').catch(() => null);
+    const u = dir && dir[s.email];
+    if (u && !u.disabled) return write ? ['admin', 'editor'].includes(u.role) : true;
+  }
   return ALLOWED_USERS.has(String(legacyUser || '').toLowerCase().trim());
 }
 
@@ -106,7 +111,7 @@ module.exports = async (req, res) => {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const user = String(body.user || '').toLowerCase().trim();
       const entry = body.entry && typeof body.entry === 'object' ? body.entry : null;
-      if (!isAuthorized(req, user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
+      if (!(await isAuthorized(req, user, true))) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!entry) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
 
       // Sanitize — cap sur taille de l'entrée pour éviter les abus.

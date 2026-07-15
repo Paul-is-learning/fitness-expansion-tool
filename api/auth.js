@@ -1,10 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────
-// /api/auth — Authentification serveur (Phase 2 SaaS, v6.80).
+// /api/auth — Authentification serveur (Phase 2 SaaS, v6.80 · v6.87).
 //
-// Magic link email (zéro mot de passe) + sessions signées + annuaire
-// utilisateurs avec RÔLES, sur l'infra existante (Upstash KV).
+// v6.87 : login mot de passe côté serveur (scrypt) + gestion des
+// utilisateurs (CRUD admin) + recover par phrase. Le magic link reste
+// disponible (dormant tant que RESEND_API_KEY n'est pas posée).
 //
-// Actions (POST JSON sauf mention) :
+// Actions v6.87 (POST JSON) :
+//   { action:'login', email, password, stay }
+//                                      → vérifie scrypt, pose le cookie
+//                                        (365 j si stay, sinon 1 j).
+//   { action:'recover', email, phrase, password }
+//                                      → phrase de récupération OK ⇒
+//                                        nouveau mot de passe.
+//   { action:'set-password', password, current?, email? }
+//                                      → soi-même (current requis) ou
+//                                        admin (email cible).
+//   GET ?action=users                  → ADMIN : liste sans empreintes.
+//   { action:'user-save', email, name, role, password?, disabled? }
+//                                      → ADMIN : créer/modifier.
+//   { action:'user-delete', email }    → ADMIN : supprimer (garde-fous
+//                                        self / dernier admin).
+//
+// Actions historiques (magic link, v6.80) :
 //   { action:'request', email }        → envoie le lien magique (Resend).
 //                                        Sans RESEND_API_KEY → 503 explicite.
 //   GET ?action=verify&token=...       → valide le token (TTL 15 min),
@@ -49,6 +66,38 @@ const BOOTSTRAP = {
   'tomescumh@yahoo.com':       { name: 'Tomescu MH',     role: 'editor', ws: 'fp-romania' },
 };
 
+// ─── v6.87 — Mots de passe côté serveur (scrypt) ─────────────────────
+// Format stocké : "s2$<salt b64url>$<scrypt-32o b64url>" (N=16384,r=8,p=1).
+// Empreintes seed = mots de passe ACTUELS des 4 comptes → zéro migration :
+// chacun se connecte avec son mdp habituel, l'admin peut changer ensuite.
+// Une entrée `pw` dans l'annuaire KV prime toujours sur le seed.
+const SEED_PW = {
+  'paulbecaud@isseo-dev.com':  's2$7kcEtNbh1dDtuTbCDvvL3A$WVmJ18CEQa4pBunxkFwdlzzIBW7ZfFDU9btGL6Yjemo',
+  'pbecaud@isseo-dev.com':     's2$jgCjZqfjE1i-rijmO1MF2g$vVvOjpTbDLWdHxL0dE1VuKMj7Cc0RJxk0vvt0Yj0lvM',
+  'ulysse.gaspard0@gmail.com': 's2$uFQAdqoTIGMLAPHqg4x1NQ$XvWT9JSTNjYAhkPQ3S_TIM3v5qrTsxMy2smCEqe6MM8',
+  'tomescumh@yahoo.com':       's2$UGZuBWMp0suHHKMOjsJB8w$JKL1MQkDU6_vC0J-GDHVAWB5IPPl6PfUmZUQHqhda8Q',
+};
+// Phrase de récupération ("Mot de passe oublié ?") — même mécanique.
+const SEED_REC = {
+  'paulbecaud@isseo-dev.com': 's2$VeSsTJ3lQoJNvuESvQ--Tw$PDza8vpSBbIUvbs77KAYllqocIXu1jujz5jW0igi76M',
+  'pbecaud@isseo-dev.com':    's2$zsV_JQrBC6HwSnIF-o1fhQ$OSFCNKQgrBSnFfjkJUDveAAkMjkqNBkTXaleYWX74RA',
+};
+
+function hashPw(pw) {
+  const salt = crypto.randomBytes(16).toString('base64url');
+  const hash = crypto.scryptSync(String(pw), salt, 32, { N: 16384, r: 8, p: 1 }).toString('base64url');
+  return `s2$${salt}$${hash}`;
+}
+function verifyPw(pw, stored) {
+  try {
+    const [v, salt, hash] = String(stored || '').split('$');
+    if (v !== 's2' || !salt || !hash) return false;
+    const got = crypto.scryptSync(String(pw), salt, 32, { N: 16384, r: 8, p: 1 });
+    const want = Buffer.from(hash, 'base64url');
+    return got.length === want.length && crypto.timingSafeEqual(got, want);
+  } catch { return false; }
+}
+
 // ─── KV helpers ──────────────────────────────────────────────────────
 async function kvGet(key) {
   const r = await fetch(`${KV_URL}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${KV_TOKEN}` } });
@@ -69,10 +118,11 @@ async function kvDel(key) {
 const b64u = b => Buffer.from(b).toString('base64url');
 const sign = payload => crypto.createHmac('sha256', KV_TOKEN).update(payload).digest('base64url');
 
-function makeSessionCookie(email, role, ws) {
-  const payload = b64u(JSON.stringify({ e: email, r: role, w: ws, x: Date.now() + SESSION_DAYS * 864e5 }));
+function makeSessionCookie(email, role, ws, days) {
+  const d = days || SESSION_DAYS;
+  const payload = b64u(JSON.stringify({ e: email, r: role, w: ws, x: Date.now() + d * 864e5 }));
   const value = payload + '.' + sign(payload);
-  return `fp_session=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`;
+  return `fp_session=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${d * 86400}`;
 }
 function readSession(req) {
   try {
@@ -91,6 +141,19 @@ async function getDirectory() {
   let dir = await kvGet(DIR_KEY);
   if (!dir || typeof dir !== 'object') { dir = { ...BOOTSTRAP }; await kvSet(DIR_KEY, dir); }
   return dir;
+}
+
+// v6.87 — révocation IMMÉDIATE : le rôle du cookie est figé au login
+// (jusqu'à 365 j), donc chaque action privilégiée revalide l'entrée
+// VIVANTE de l'annuaire (rôle actuel + non désactivé). Sans ça, un admin
+// supprimé/désactivé pouvait se ré-autopromouvoir avec son vieux cookie.
+async function liveSession(req) {
+  const s = readSession(req);
+  if (!s) return null;
+  const dir = await getDirectory();
+  const u = dir[s.email];
+  if (!u || u.disabled) return null;
+  return { email: s.email, role: u.role, ws: u.ws, dir };
 }
 
 // ─── Email magic link ────────────────────────────────────────────────
@@ -134,6 +197,122 @@ module.exports = async (req, res) => {
   const action = String(body.action || q.action || '');
 
   try {
+    // ═══ v6.87 — LOGIN mot de passe côté serveur ═════════════════
+    // Vérif scrypt (annuaire KV, seed fallback), cookie de session
+    // signé. Pas de rate-limit ni lockout (choix produit assumé :
+    // outil privé, Paul a explicitement demandé zéro friction).
+    if (action === 'login') {
+      const email = String(body.email || '').toLowerCase().trim();
+      const password = String(body.password || '');
+      if (!email.includes('@') || !password) { res.status(400).json({ error: 'BAD_CREDENTIALS' }); return; }
+      const dir = await getDirectory();
+      const u = dir[email];
+      // Message identique inconnu/mauvais mdp — pas de fuite d'existence.
+      if (!u || u.disabled) { res.status(401).json({ error: 'INVALID_LOGIN' }); return; }
+      const stored = u.pw || SEED_PW[email];
+      if (!stored) { res.status(403).json({ error: 'NO_PASSWORD', hint: 'Demandez à l’admin de définir votre mot de passe.' }); return; }
+      if (!verifyPw(password, stored)) { res.status(401).json({ error: 'INVALID_LOGIN' }); return; }
+      const days = body.stay === false ? 1 : 365; // "Rester connecté" coché par défaut
+      res.setHeader('Set-Cookie', makeSessionCookie(email, u.role, u.ws, days));
+      u.lastLogin = Date.now();
+      await kvSet(DIR_KEY, dir).catch(() => {}); // best-effort (lastLogin)
+      res.status(200).json({ ok: true, email, name: u.name, role: u.role, workspace: u.ws, days });
+      return;
+    }
+
+    // ── recover : phrase de récupération → nouveau mot de passe ──
+    if (action === 'recover') {
+      const email = String(body.email || '').toLowerCase().trim();
+      const phrase = String(body.phrase || '');
+      const password = String(body.password || '');
+      if (!email.includes('@') || !phrase || password.length < 6) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
+      const dir = await getDirectory();
+      const u = dir[email];
+      const rec = (u && u.rec) || SEED_REC[email];
+      if (!u || u.disabled || !rec || !verifyPw(phrase, rec)) { res.status(401).json({ error: 'INVALID_RECOVERY' }); return; }
+      u.pw = hashPw(password);
+      await kvSet(DIR_KEY, dir);
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    // ── set-password : soi-même (mdp actuel requis) ou admin ─────
+    if (action === 'set-password') {
+      const s = await liveSession(req);
+      if (!s) { res.status(401).json({ error: 'NO_SESSION' }); return; }
+      const password = String(body.password || '');
+      if (password.length < 6) { res.status(400).json({ error: 'PASSWORD_TOO_SHORT', hint: '6 caractères minimum.' }); return; }
+      const dir = s.dir;
+      const target = String(body.email || s.email).toLowerCase().trim();
+      if (target !== s.email && s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
+      const u = dir[target];
+      if (!u) { res.status(404).json({ error: 'UNKNOWN_USER' }); return; }
+      if (target === s.email && s.role !== 'admin') {
+        const stored = u.pw || SEED_PW[target];
+        if (!stored || !verifyPw(String(body.current || ''), stored)) { res.status(401).json({ error: 'BAD_CURRENT_PASSWORD' }); return; }
+      }
+      u.pw = hashPw(password);
+      await kvSet(DIR_KEY, dir);
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    // ── users (admin) : annuaire sans les empreintes ──────────────
+    if (action === 'users') {
+      const s = await liveSession(req);
+      if (!s || s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
+      const dir = s.dir;
+      const users = Object.entries(dir).map(([email, u]) => ({
+        email, name: u.name, role: u.role, ws: u.ws,
+        lastLogin: u.lastLogin || null,
+        hasPw: !!(u.pw || SEED_PW[email]),
+        disabled: !!u.disabled,
+      }));
+      res.status(200).json({ ok: true, users, me: s.email });
+      return;
+    }
+
+    // ── user-save (admin) : créer / modifier un utilisateur ──────
+    if (action === 'user-save') {
+      const s = await liveSession(req);
+      if (!s || s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
+      const email = String(body.email || '').toLowerCase().trim();
+      if (!email.includes('@')) { res.status(400).json({ error: 'BAD_EMAIL' }); return; }
+      const role = ['admin', 'editor', 'viewer'].includes(body.role) ? body.role : 'viewer';
+      const dir = s.dir;
+      const isNew = !dir[email];
+      if (email === s.email && role !== 'admin') { res.status(400).json({ error: 'CANT_DEMOTE_SELF', hint: 'Impossible de retirer son propre rôle admin.' }); return; }
+      if (isNew && !(typeof body.password === 'string' && body.password.length >= 6)) { res.status(400).json({ error: 'PASSWORD_REQUIRED', hint: 'Mot de passe initial requis (6 caractères min).' }); return; }
+      const u = dir[email] || { ws: s.ws || 'fp-romania' };
+      u.name = String(body.name || u.name || email.split('@')[0]).slice(0, 60);
+      u.role = role;
+      if (typeof body.password === 'string' && body.password.length >= 6) u.pw = hashPw(body.password);
+      if (typeof body.disabled === 'boolean') {
+        if (email === s.email && body.disabled) { res.status(400).json({ error: 'CANT_DISABLE_SELF' }); return; }
+        u.disabled = body.disabled;
+      }
+      dir[email] = u;
+      await kvSet(DIR_KEY, dir);
+      res.status(200).json({ ok: true, isNew, count: Object.keys(dir).length });
+      return;
+    }
+
+    // ── user-delete (admin) ───────────────────────────────────────
+    if (action === 'user-delete') {
+      const s = await liveSession(req);
+      if (!s || s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
+      const email = String(body.email || '').toLowerCase().trim();
+      if (email === s.email) { res.status(400).json({ error: 'CANT_DELETE_SELF' }); return; }
+      const dir = s.dir;
+      if (!dir[email]) { res.status(404).json({ error: 'UNKNOWN_USER' }); return; }
+      const admins = Object.entries(dir).filter(([e, u]) => u.role === 'admin' && !u.disabled && e !== email);
+      if (dir[email].role === 'admin' && admins.length === 0) { res.status(400).json({ error: 'LAST_ADMIN' }); return; }
+      delete dir[email];
+      await kvSet(DIR_KEY, dir);
+      res.status(200).json({ ok: true, count: Object.keys(dir).length });
+      return;
+    }
+
     // ── request : envoi du lien magique ──────────────────────────
     if (action === 'request') {
       const email = String(body.email || '').toLowerCase().trim();
@@ -171,7 +350,7 @@ module.exports = async (req, res) => {
       if (!s) { res.status(401).json({ error: 'NO_SESSION' }); return; }
       const dir = await getDirectory();
       const u = dir[s.email];
-      if (!u) { res.status(403).json({ error: 'REVOKED' }); return; }
+      if (!u || u.disabled) { res.status(403).json({ error: 'REVOKED' }); return; }
       res.status(200).json({ ok: true, email: s.email, name: u.name, role: u.role, workspace: u.ws });
       return;
     }
@@ -185,12 +364,12 @@ module.exports = async (req, res) => {
 
     // ── invite (admin) : ajoute/maj un utilisateur ────────────────
     if (action === 'invite') {
-      const s = readSession(req);
+      const s = await liveSession(req);
       if (!s || s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
       const email = String(body.email || '').toLowerCase().trim();
       const role = ['admin', 'editor', 'viewer'].includes(body.role) ? body.role : 'viewer';
       if (!email.includes('@')) { res.status(400).json({ error: 'BAD_EMAIL' }); return; }
-      const dir = await getDirectory();
+      const dir = s.dir;
       dir[email] = { name: String(body.name || email.split('@')[0]).slice(0, 60), role, ws: s.ws || 'fp-romania' };
       await kvSet(DIR_KEY, dir);
       res.status(200).json({ ok: true, count: Object.keys(dir).length });
@@ -199,9 +378,9 @@ module.exports = async (req, res) => {
 
     // ── directory (admin) ─────────────────────────────────────────
     if (action === 'directory') {
-      const s = readSession(req);
+      const s = await liveSession(req);
       if (!s || s.role !== 'admin') { res.status(403).json({ error: 'ADMIN_ONLY' }); return; }
-      res.status(200).json({ ok: true, directory: await getDirectory() });
+      res.status(200).json({ ok: true, directory: s.dir });
       return;
     }
 

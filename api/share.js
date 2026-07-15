@@ -95,7 +95,13 @@ module.exports = async (req, res) => {
       // Auth transition : session cookie (admin/editor) OU whitelist legacy
       const session = readSession(req);
       const legacyUser = String(body.user || '').toLowerCase().trim();
-      const allowed = (session && ['admin', 'editor'].includes(session.role)) || ALLOWED_USERS.has(legacyUser);
+      let allowed = ALLOWED_USERS.has(legacyUser);
+      if (!allowed && session) {
+        // v6.87 — révocation immédiate : rôle relu dans l'annuaire VIVANT
+        const dir = await kvGet('fp:v2:directory').catch(() => null);
+        const u = dir && dir[session.email];
+        allowed = !!(u && !u.disabled && ['admin', 'editor'].includes(u.role));
+      }
       if (!allowed) { res.status(403).json({ error: 'FORBIDDEN' }); return; }
 
       const html = String(body.html || '');

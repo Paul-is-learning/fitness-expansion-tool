@@ -141,7 +141,7 @@
     if (window.doLogin.__fpGuarded) return true;
     const original = window.doLogin;
 
-    window.doLogin = function guardedDoLogin() {
+    window.doLogin = async function guardedDoLogin() {
       // Lockout check
       if (isLockedOut()) {
         const errEl = document.getElementById('loginError');
@@ -157,7 +157,10 @@
       // Capture state before login
       const email = (document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
       const sessBefore = _readUser();
-      try { original.apply(this, arguments); } catch (e) { logEvent('login-error', e.message); throw e; }
+      // v6.87 — doLogin est async (vérif serveur) : il FAUT attendre la fin
+      // avant de relire le storage, sinon tout login serait compté en échec
+      // et signSession()/signUserList() ne tourneraient plus jamais.
+      try { await original.apply(this, arguments); } catch (e) { logEvent('login-error', e.message); throw e; }
       const sessAfter = _readUser();
 
       if (sessAfter && sessAfter !== sessBefore) {

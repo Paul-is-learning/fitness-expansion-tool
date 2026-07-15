@@ -61,6 +61,7 @@
 <script src="src/pwa.js" defer></script>
 <script src="src/userdata-sync.js" defer></script>
 <script src="src/portfolio.js" defer></script>
+<script src="src/admin-users.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -467,18 +468,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           border: 1px solid rgba(212,160,23,.45) !important;
         }
       </style>
-      <!-- v6.81 P2b — connexion par lien magique (s'active avec RESEND_API_KEY) -->
-      <div id="magicBlock" style="margin-bottom:16px">
-        <button type="button" onclick="requestMagicLink()" style="width:100%;padding:13px;border-radius:10px;font-size:13px;font-weight:800;font-family:var(--font);background:linear-gradient(135deg,rgba(212,160,23,.25),rgba(212,160,23,.1));border:1px solid rgba(212,160,23,.5);color:#fbbf24;cursor:pointer">
-          🪄 Recevoir mon lien de connexion par email
-        </button>
-        <div id="magicStatus" style="font-size:10px;min-height:14px;margin-top:6px;text-align:center;color:#94a3b8"></div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
-          <div style="flex:1;height:1px;background:rgba(71,85,115,.4)"></div>
-          <span style="font-size:9px;color:#64748b;letter-spacing:.5px">OU AVEC MOT DE PASSE</span>
-          <div style="flex:1;height:1px;background:rgba(71,85,115,.4)"></div>
-        </div>
-      </div>
+      <!-- v6.87 — login email + mot de passe, vérifié côté SERVEUR
+           (scrypt + session signée). Le bloc magic link v6.81 est retiré :
+           l'API reste dispo mais le mot de passe est le chemin principal. -->
       <form id="loginForm" method="post" action="#" onsubmit="doLogin();return false" autocomplete="on">
       <div style="margin-bottom:16px">
         <label for="loginEmail" style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>

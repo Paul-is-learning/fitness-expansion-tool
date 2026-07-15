@@ -7577,27 +7577,13 @@ if(userList.length === 0) {
   if(_migrated) localStorage.setItem('fpUsers', JSON.stringify(userList));
 }
 
-// Login function
-function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-  // v6.78 — trim: un espace parasite (copier-coller, clavier mobile) ne doit
-  // plus faire échouer silencieusement la connexion.
-  const pw = document.getElementById('loginPassword').value.trim();
-  const errEl = document.getElementById('loginError');
-
-  if(!email || !pw) { errEl.style.display='block'; errEl.textContent='Veuillez remplir tous les champs'; return; }
-
-  const user = userList.find(u => u.email.toLowerCase() === email);
-  if(!user) { errEl.style.display='block'; errEl.textContent='Email non reconnu — demandez une invitation'; return; }
-  if(user.pwHash && user.pwHash !== simpleHash(pw)) { errEl.style.display='block'; errEl.textContent='Mot de passe incorrect'; return; }
-
-  // v6.78 — mémorise le choix "Rester connecté" AVANT de choisir le storage
-  try {
-    const stay = document.getElementById('loginStayConnected');
-    if (stay) localStorage.setItem('fpStayConnected', stay.checked ? '1' : '0');
-  } catch {}
-
-  // Success
+// ═══ Login — v6.87 « Auth Pro » : SERVEUR d'abord, repli local ═══════
+// Le mot de passe est vérifié par /api/auth (scrypt + cookie de session
+// signé httpOnly — le même que lisent /api/sync & co). Si l'API est
+// injoignable (offline, serveur statique local, CI), on retombe sur la
+// vérification locale historique : l'app reste utilisable hors ligne et
+// les suites de tests n'ont pas besoin d'un backend.
+function finishLogin(user) {
   currentUser = user;
   _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
   // Clear the other storage so we don't double-persist
@@ -7612,6 +7598,69 @@ function doLogin() {
   applyRole();
   // Broadcast login for onboarding tour + future listeners
   try { window.dispatchEvent(new CustomEvent('fp:login-success', { detail: { user, email: user.email } })); } catch {}
+}
+
+function doLoginLocal(email, pw, errEl) {
+  const user = userList.find(u => u.email.toLowerCase() === email);
+  if(!user) { errEl.style.display='block'; errEl.textContent='Email non reconnu — demandez une invitation'; return; }
+  if(user.pwHash && user.pwHash !== simpleHash(pw)) { errEl.style.display='block'; errEl.textContent='Mot de passe incorrect'; return; }
+  finishLogin(user);
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  // v6.78 — trim: un espace parasite (copier-coller, clavier mobile) ne doit
+  // plus faire échouer silencieusement la connexion.
+  const pw = document.getElementById('loginPassword').value.trim();
+  const errEl = document.getElementById('loginError');
+
+  if(!email || !pw) { errEl.style.display='block'; errEl.textContent='Veuillez remplir tous les champs'; return; }
+
+  // v6.78 — mémorise le choix "Rester connecté" AVANT de choisir le storage
+  try {
+    const stay = document.getElementById('loginStayConnected');
+    if (stay) localStorage.setItem('fpStayConnected', stay.checked ? '1' : '0');
+  } catch {}
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('loginBtn');
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'CONNEXION…'; }
+  try {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 6000) : null;
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      signal: ctrl ? ctrl.signal : undefined,
+      body: JSON.stringify({ action: 'login', email, password: pw, stay: _authStayConnected() }),
+    });
+    if (timer) clearTimeout(timer);
+    if (r.ok) {
+      const j = await r.json();
+      window._serverSession = { ok: true, email: j.email, name: j.name, role: j.role, workspace: j.workspace };
+      const av = document.getElementById('userAvatar');
+      if (av) av.title = j.email + ' · rôle ' + j.role + ' · session serveur active';
+      finishLogin({ email: j.email, name: j.name, role: j.role === 'admin' ? 'admin' : (j.role === 'viewer' ? 'viewer' : 'user') });
+      return;
+    }
+    if (r.status === 401 || r.status === 403) {
+      // Le serveur a répondu et a REFUSÉ → pas de repli local (il ferait
+      // diverger les mots de passe). Message plat, pas de fuite d'existence.
+      const j = await r.json().catch(() => ({}));
+      errEl.style.display = 'block';
+      errEl.textContent = j.error === 'NO_PASSWORD' ? (j.hint || 'Compte sans mot de passe — contactez l’admin.') : 'Email ou mot de passe incorrect';
+      return;
+    }
+    // 404 / 501 / 5xx / 503 KV → pas d'API ici → vérification locale
+    doLoginLocal(email, pw, errEl);
+  } catch {
+    // Réseau coupé ou timeout → mode offline : vérification locale
+    doLoginLocal(email, pw, errEl);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+  }
 }
 
 // ── Password reset via phrase de récupération (v6.66) ────────────────
@@ -7639,7 +7688,7 @@ function hidePasswordResetModal() {
   const m = document.getElementById('passwordResetModal');
   if (m) m.style.display = 'none';
 }
-function doPasswordReset() {
+async function doPasswordReset() {
   const email = (document.getElementById('pwResetEmail').value || '').trim().toLowerCase();
   const phrase = document.getElementById('pwResetPhrase').value || '';
   const pw1 = document.getElementById('pwResetNew1').value || '';
@@ -7647,22 +7696,42 @@ function doPasswordReset() {
   const status = document.getElementById('pwResetStatus');
   const btn = document.getElementById('pwResetBtn');
 
-  const fail = (msg) => { status.style.color = '#f87171'; status.textContent = msg; };
+  const fail = (msg) => { btn.disabled = false; btn.textContent = 'Valider'; status.style.color = '#f87171'; status.textContent = msg; };
 
   if (!email || !email.includes('@')) return fail('Email invalide.');
   if (!phrase) return fail('Phrase de récupération requise.');
   if (pw1.length < 6) return fail('Mot de passe trop court (6 caractères min).');
   if (pw1 !== pw2) return fail('Les deux mots de passe ne correspondent pas.');
 
-  const user = userList.find(u => u.email.toLowerCase() === email);
   // Message volontairement identique en cas d'email inconnu OU phrase fausse
   // (n'expose pas si l'email existe).
   const errPhrase = 'Email ou phrase de récupération incorrect.';
-  if (!user) return fail(errPhrase);
-  if (!user.recoveryHash) return fail('Reset non disponible pour ce compte — contactez l\'admin.');
-  if (simpleHash(phrase) !== user.recoveryHash) return fail(errPhrase);
 
-  // Match. Update local pwHash.
+  // v6.87 — SERVEUR d'abord : si l'API répond, le nouveau mot de passe
+  // vaut pour tous les appareils. Repli 100% local si injoignable.
+  btn.disabled = true; btn.textContent = '…';
+  let server = null; // 'ok' | 'bad' | 'down' | null (API absente)
+  try {
+    const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: 'recover', email, phrase, password: pw1 }) });
+    if (r.ok) server = 'ok';
+    else if (r.status === 400 || r.status === 401) server = 'bad';
+    // 500/502/503 = l'API EXISTE mais a échoué (KV en panne…) : surtout pas
+    // de repli local, il créerait un mdp qui ne marche que sur cet appareil.
+    // (501 = serveur statique sans POST → repli local voulu, comme 404.)
+    else if (r.status >= 500 && r.status !== 501) server = 'down';
+  } catch {}
+  if (server === 'bad') return fail(errPhrase);
+  if (server === 'down') return fail('Erreur serveur — réessaie dans un instant.');
+
+  const user = userList.find(u => u.email.toLowerCase() === email);
+  if (server === null) {
+    // API injoignable → vérification locale historique (v6.66)
+    if (!user) return fail(errPhrase);
+    if (!user.recoveryHash) return fail('Reset non disponible pour ce compte — contactez l\'admin.');
+    if (simpleHash(phrase) !== user.recoveryHash) return fail(errPhrase);
+  }
+
+  // Maj locale (garde le repli offline aligné avec le serveur)
   const idx = userList.findIndex(u => u.email.toLowerCase() === email);
   if (idx >= 0) {
     userList[idx].pwHash = simpleHash(pw1);
@@ -7673,7 +7742,7 @@ function doPasswordReset() {
     else { try { localStorage.removeItem('fpUsersSig'); } catch {} }
   }
   status.style.color = '#34d399';
-  status.textContent = 'Mot de passe mis à jour ✓';
+  status.textContent = server === 'ok' ? 'Mot de passe mis à jour ✓ (tous appareils)' : 'Mot de passe mis à jour ✓ (cet appareil)';
   btn.disabled = true;
   btn.textContent = 'OK';
 
@@ -7685,6 +7754,21 @@ function doPasswordReset() {
     if (loginPw) { loginPw.value = pw1; loginPw.focus(); }
   }, 1000);
 }
+
+// v6.87 — miroir local d'un changement de mot de passe SERVEUR réussi
+// (🔑 Mon mot de passe / reset admin) : sans lui, le repli offline
+// (doLoginLocal) rejetterait le NOUVEAU mot de passe et accepterait
+// l'ancien. Même invariant que doPasswordReset applique déjà.
+window._fpMirrorLocalPw = function (email, pw) {
+  try {
+    const idx = userList.findIndex(u => (u.email || '').toLowerCase() === String(email || '').toLowerCase());
+    if (idx < 0) return;
+    userList[idx].pwHash = simpleHash(pw);
+    localStorage.setItem('fpUsers', JSON.stringify(userList));
+    if (window._fpAuthGuard?.signUserList) window._fpAuthGuard.signUserList();
+    else { try { localStorage.removeItem('fpUsersSig'); } catch {} }
+  } catch {}
+};
 
 // ═══ v6.81 P2b — connexion par lien magique + session serveur ═══════
 async function requestMagicLink() {
@@ -7711,6 +7795,14 @@ window.requestMagicLink = requestMagicLink;
 // Session serveur (posée par le lien magique) : si valide, entre direct
 // dans l'app — c'est elle qui fera foi après la bascule complète.
 async function checkServerSession() {
+  // v6.87 — un logout vient d'avoir lieu dans cet onglet : on saute UNE
+  // vérification (le Set-Cookie d'effacement peut encore être en vol).
+  try {
+    if (sessionStorage.getItem('fpJustLoggedOut')) {
+      sessionStorage.removeItem('fpJustLoggedOut');
+      return null;
+    }
+  } catch {}
   try {
     const r = await fetch('/api/auth?action=me', { credentials: 'include', cache: 'no-store' });
     if (!r.ok) return null;
@@ -7719,7 +7811,9 @@ async function checkServerSession() {
     window._serverSession = j; // {email, name, role, workspace}
     const av = document.getElementById('userAvatar');
     if (document.getElementById('loginPage').style.display !== 'none') {
-      currentUser = { email: j.email, name: j.name, role: j.role === 'admin' ? 'admin' : 'user' };
+      // v6.87 — préserve 'viewer' (avant: tout non-admin devenait 'user'
+      // et un lecteur voyait les contrôles d'édition)
+      currentUser = { email: j.email, name: j.name, role: j.role === 'admin' ? 'admin' : (j.role === 'viewer' ? 'viewer' : 'user') };
       _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('app').style.display = '';
@@ -7762,8 +7856,21 @@ function checkAuth() {
 }
 
 // Logout — clear both storages for safety
-function doLogout() {
+async function doLogout() {
   if(currentUser?.email) localStorage.setItem('fpLastEmail', currentUser.email);
+  // v6.87 — la session serveur est un cookie httpOnly STATELESS : seul le
+  // Set-Cookie Max-Age=0 de la RÉPONSE logout l'efface. On attend donc la
+  // réponse (bornée à 1500 ms) avant le reload, sinon checkServerSession
+  // pourrait re-connecter avec le cookie encore vivant. Le flag session
+  // couvre le cas où le timeout gagne la course.
+  window._serverSession = null;
+  try { sessionStorage.setItem('fpJustLoggedOut', '1'); } catch {}
+  try {
+    await Promise.race([
+      fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', keepalive: true, body: JSON.stringify({ action: 'logout' }) }),
+      new Promise(r => setTimeout(r, 1500)),
+    ]);
+  } catch {}
   currentUser = null;
   sessionStorage.removeItem('fpCurrentUser');
   localStorage.removeItem('fpCurrentUser');
@@ -7773,25 +7880,13 @@ function doLogout() {
   window.location.reload();
 }
 
-// Check URL for invite token (auto-login from invite link)
+// v6.87 — l'auto-login par lien ?invite= est SUPPRIMÉ : le token était un
+// simple base64 non signé, n'importe qui pouvait se forger un rôle admin.
+// Les comptes se créent depuis le panneau Utilisateurs (annuaire serveur).
+// On nettoie juste l'URL si un vieux lien traîne.
 (function checkInvite(){
   const params = new URLSearchParams(window.location.search);
-  const invite = params.get('invite');
-  if(invite) {
-    try {
-      const data = JSON.parse(atob(invite));
-      if(data.email && data.role) {
-        currentUser = {email:data.email, role:data.role, name:data.email.split('@')[0]};
-        _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
-        // Add to list if not exists
-        if(!userList.find(u=>u.email===data.email)) {
-          userList.push(currentUser);
-          localStorage.setItem('fpUsers', JSON.stringify(userList));
-        }
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    } catch(e) {}
-  }
+  if (params.get('invite')) window.history.replaceState({}, '', window.location.pathname);
 })();
 
 // Old default admin seeding removed — handled in AUTH section above
@@ -7861,9 +7956,12 @@ function showUserPanel() {
   panel.id = 'userPanel';
   panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,8,15,.92);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)';
 
-  const adminBtns = isAdmin() ? `
+  // v6.87 — session serveur admin → gestion des utilisateurs branchée sur
+  // l'annuaire SERVEUR (multi-appareils). Sinon, mode local historique.
+  const serverAdmin = window._serverSession?.role === 'admin' && window.AdminUsers;
+  const adminBtns = serverAdmin ? window.AdminUsers.blockHtml() : (isAdmin() ? `
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px">INVITER UN UTILISATEUR</div>
+      <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px">INVITER UN UTILISATEUR <span style="font-size:9px;padding:2px 8px;border-radius:20px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.35);color:#94a3b8;font-weight:700">MODE LOCAL — cet appareil</span></div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <input type="email" id="inviteEmail" placeholder="email@example.com" style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;font-family:var(--font)">
         <input type="text" id="invitePw" placeholder="Mot de passe" style="width:100px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;font-family:var(--font)">
@@ -7888,7 +7986,7 @@ function showUserPanel() {
         `).join('')}
       </div>
     </div>
-  ` : '';
+  ` : '');
 
   panel.innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:440px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
@@ -7905,6 +8003,7 @@ function showUserPanel() {
       </div>
       ${adminBtns}
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        ${window._serverSession && window.AdminUsers ? '<button class="btn" style="flex:1;min-width:130px" onclick="AdminUsers.changeMyPw()">🔑 Mon mot de passe</button>' : ''}
         <button class="btn" style="flex:1;min-width:130px;color:var(--accent)" onclick="replayOnboardingTour()" data-i18n="duser.replay">&#9835; Revoir la presentation</button>
         <button class="btn" style="flex:1;min-width:100px;color:var(--red)" onclick="doLogout()" data-i18n="duser.logout">Deconnexion</button>
         <button class="btn" style="flex:1;min-width:80px" onclick="document.getElementById('userPanel').remove()" data-i18n="duser.close">Fermer</button>
@@ -7912,6 +8011,7 @@ function showUserPanel() {
     </div>
   `;
   document.body.appendChild(panel);
+  if (serverAdmin) window.AdminUsers.load();
   try { window.applyI18n?.(panel); } catch {}
 }
 
@@ -8666,15 +8766,18 @@ function inviteUser() {
   if(!userList.find(u=>u.email===email)) {
     userList.push({email, role, name:email.split('@')[0], pwHash:simpleHash(pw)});
     localStorage.setItem('fpUsers', JSON.stringify(userList));
+    // v6.87 — re-signe la liste, sinon l'auth-guard verrait "tampered" au
+    // prochain boot et WIPERAIT fpUsers (fausse alerte + compte perdu).
+    if (window._fpAuthGuard?.signUserList) window._fpAuthGuard.signUserList();
+    else { try { localStorage.removeItem('fpUsersSig'); } catch {} }
   }
 
-  // Generate invite link
-  const token = btoa(JSON.stringify({email, role}));
-  const link = window.location.origin + window.location.pathname + '?invite=' + token;
-
+  // v6.87 — plus de lien d'invitation (le token base64 non signé était
+  // forgeable). En mode local le compte ne vaut que sur CET appareil ;
+  // en ligne, l'annuaire serveur prend le relais.
   const linkDiv = document.getElementById('inviteLink');
   linkDiv.style.display = 'block';
-  linkDiv.innerHTML = `<div style="font-size:9px;color:var(--gray);margin-bottom:4px">Lien d'invitation (${role}) :</div><div style="cursor:pointer" onclick="navigator.clipboard.writeText('${link}');this.style.color='var(--green)';this.textContent='Copie !'">${link}</div>`;
+  linkDiv.innerHTML = `<div style="font-size:10px;color:var(--green)">Compte local créé (${role}) — valable sur cet appareil. Connectez-vous en ligne pour créer un compte multi-appareils.</div>`;
 
   // Refresh panel
   document.getElementById('inviteEmail').value = '';
@@ -8683,6 +8786,9 @@ function inviteUser() {
 function removeUser(email) {
   userList = userList.filter(u=>u.email!==email);
   localStorage.setItem('fpUsers', JSON.stringify(userList));
+  // v6.87 — même impératif de re-signature que inviteUser
+  if (window._fpAuthGuard?.signUserList) window._fpAuthGuard.signUserList();
+  else { try { localStorage.removeItem('fpUsersSig'); } catch {} }
   document.getElementById('userPanel').remove();
   showUserPanel();
 }

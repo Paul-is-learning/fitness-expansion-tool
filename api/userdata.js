@@ -43,14 +43,19 @@ async function kvSet(key, value) {
   });
   if (!r.ok) throw new Error(`KV SET ${r.status}`);
 }
-function isAuthorized(req, legacyUser, write) {
+async function isAuthorized(req, legacyUser, write) {
   try {
     const c = (req.headers.cookie || '').split(/;\s*/).find(x => x.startsWith('fp_session='));
     if (c) {
       const [p, sig] = c.slice('fp_session='.length).split('.');
       if (crypto.createHmac('sha256', KV_TOKEN).update(p).digest('base64url') === sig) {
         const s = JSON.parse(Buffer.from(p, 'base64url').toString());
-        if (Date.now() <= s.x) return write ? ['admin', 'editor'].includes(s.r) : true;
+        if (Date.now() <= s.x) {
+          // v6.87 — révocation immédiate : rôle relu dans l'annuaire VIVANT
+          const dir = await kvGet('fp:v2:directory').catch(() => null);
+          const u = dir && dir[s.e];
+          if (u && !u.disabled) return write ? ['admin', 'editor'].includes(u.role) : true;
+        }
       }
     }
   } catch {}
@@ -94,7 +99,7 @@ module.exports = async (req, res) => {
 
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      if (!isAuthorized(req, body.user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
+      if (!(await isAuthorized(req, body.user, true))) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       const patch = body.patch || {};
 
       let scenarios = null, conquest = null;

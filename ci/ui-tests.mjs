@@ -143,8 +143,12 @@ try {
   check('Mémo IC: 4 sections clés présentes', memo.sections);
 
   // ── 8. modules exposés ──
-  const mods = await page.evaluate(() => ['FcfStudio', 'ConquestPlan', 'ICMemo', 'AiAnalyst', 'ShareLink', 'UserDataSync', 'ReviewsHistory'].every(m => typeof window[m] === 'object' && window[m]));
+  const mods = await page.evaluate(() => ['FcfStudio', 'ConquestPlan', 'ICMemo', 'AiAnalyst', 'ShareLink', 'UserDataSync', 'ReviewsHistory', 'Portfolio', 'AdminUsers'].every(m => typeof window[m] === 'object' && window[m]));
   check('tous les modules SaaS exposés', mods);
+
+  // ── 8b. v6.87 — login mot de passe seul (magic link retiré) ──
+  const authUi = await page.evaluate(() => ({ magicGone: !document.getElementById('magicBlock'), form: !!document.getElementById('loginForm') }));
+  check('écran login: bloc magic link retiré', authUi.magicGone && authUi.form);
 
   // ── 9. console sans erreur JS (hors réseau bloqué) ──
 } catch (e) {
