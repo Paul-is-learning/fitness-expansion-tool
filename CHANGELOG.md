@@ -1,6 +1,36 @@
 
 # Changelog
 
+## [v6.73-conquest] — 2026-07-15
+
+### 🗺️ PLAN DE CONQUÊTE — planificateur de déploiement multi-sites
+
+L'outil évaluait les sites un par un ; il répond maintenant à la question du
+master-franchisé : dans quel ordre ouvrir, à quel rythme, avec quel cash.
+
+`src/conquest-plan.js` (bouton 🗺️ dans Actions) :
+- **Séquencement sous contraintes** : enveloppe equity (réf. BP 3,2 M€),
+  ouvertures max/an, écart minimum, retard automatique si le cash manque,
+  réinvestissement des FCFE on/off (le flywheel).
+- **Cannibalisation inter-FP modélisée rigoureusement** : le site ouvert en
+  second à < 4 km subit une réduction de cohorte (50% × overlap, cap 60%)
+  appliquée AVANT le P&L — les coûts fixes restent, l'effet marge est réel.
+  L'ordre compte : le premier arrivé garde ses membres.
+- **Trésorerie consolidée holding 120 mois** (courbe avec zone rouge sous
+  zéro) → **PIC DE BESOIN DE FINANCEMENT** : le chiffre que la banque
+  demande — il capture les pertes de ramp-up, pas seulement les tickets
+  equity (mesuré : 2,14 M€ pour 1,76 M€ de tickets sur les 5 TARGETS).
+- 5 KPIs consolidés (clubs, pic, equity déployée, cash 10 ans, valeur
+  portefeuille), Gantt A1-A10, table par site avec pénalité de
+  cannibalisation, réordonnancement manuel ▲▼, config persistée.
+- Au-delà de M60 : FCFE = moyenne année 5 (conservateur). Sandbox
+  overrides identique au Studio FCF (référence intacte).
+
+Vérifié : calcul 5 sites en ~300 ms, réordonnancement/toggle/contraintes
+recalculent, 197/197 assertions.
+
+---
+
 ## [v6.72-didactic] — 2026-07-15
 
 ### 🎓 Refonte didactique (P2) + Mémo d'IC (P3) — phases 2-3 de la roadmap 17/20
