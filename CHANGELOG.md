@@ -1,6 +1,36 @@
 
 # Changelog
 
+## [v6.72-didactic] — 2026-07-15
+
+### 🎓 Refonte didactique (P2) + Mémo d'IC (P3) — phases 2-3 de la roadmap 17/20
+
+**P2a — Lexique au survol** (`src/lexicon.js`) : 27 termes métier (SAZ, captifs,
+natifs, IRR projet/equity, FCFE, DSCR, MOIC, NPV, WACC, EBITDA, churn, LTV/CAC,
+paybacks, valeur terminale, effet de levier…) définis en 2 phrases + repère
+chiffré, annotés automatiquement dans les fiches (pointillé doré + carte au
+survol). Anti-boucle MutationObserver, désactivé en mode présentation.
+
+**P2b — Verdict d'abord** : l'Executive Summary gagne 4 tuiles en langage
+décideur (membres vs cible BP, IRR equity, FCFE 5 ans vs apport, retour de
+l'apport) chacune avec sa phrase de lecture + une synthèse « EN CLAIR » qui
+raconte le site en une phrase (membres → EBITDA/marge → payback → rendement).
+
+**P3 — Mémo d'IC** (`src/ic-memo.js`, bouton 📜 sur la fiche) : export A4
+narratif style comité d'investissement — En bref, Le site, La demande, La
+concurrence, Plan financier A1-A5, Risques & mitigants (mappés
+automatiquement), Recommandation + conditions. Print Georgia/Helvetica,
+mention confidentiel, sources en pied de page.
+
+**P2c — Mode présentation** (`src/presentation-mode.js`, bouton 🎥 header) :
+typographie agrandie, curseurs/contrôles techniques masqués — pour partager
+son écran à un investisseur sans exposer la cuisine interne. Échap pour sortir.
+
+Vérifié : 23 termes annotés, tooltips, tuiles + EN CLAIR, mémo 7 sections
+avec données réelles, mode présentation on/off/Échap, 197/197 assertions.
+
+---
+
 ## [v6.71-fcf-studio] — 2026-07-15
 
 ### ⚖️ STUDIO FCF — comparateur de scénarios financiers (phase 1 de la refonte)
