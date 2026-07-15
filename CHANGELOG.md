@@ -1,6 +1,35 @@
 
 # Changelog
 
+## [v6.70-wc-downtown-field] — 2026-07-15
+
+### 📋 Donnée terrain : World Class Downtown (Radisson Blu) = 3 500 membres
+
+Source primaire : échange direct Paul ↔ manager du club (juil. 2026). Était estimé
+1 870 (ratio premium 0.85/m²) — le flagship Calea Victoriei sature bien au-delà
+du ratio réseau. Nouveau flag `fv: true` (field-verified) dans data/clubs.js.
+
+Cohérence vérifiée : réseau WC = 84 000 déclarés / 47 clubs (moyenne 1 790) —
+un flagship à 3 500 + petits clubs d'hôtel à 600-900 = distribution normale,
+ancrée par le CA officiel déposé (46,8 M€).
+
+### Impact baseline (protocole MODEL.md) — Unirea uniquement (Radisson à ~1,8 km)
+
+| Métrique | Avant | Après |
+|---|---:|---:|
+| Captifs | 2 119 | 2 148 |
+| Natifs | 1 941 | 1 862 |
+| Membres théoriques | 5 810 | 5 760 |
+| IRR Projet | 50.2% | 49.57% |
+| NPV | 3 420 k€ | 3 346 k€ |
+| Score / verdict | 70.3 GO COND. | 70.1 GO COND. |
+
+Lecture : plus de membres captables (+29) mais zone plus pénétrée → moins de
+demande native vierge (−79). Net marginal, verdict inchangé. Les 4 autres
+sites : intacts. Baseline régénérée, 197/197 assertions vertes.
+
+---
+
 ## [v6.69.2-top-clubs] — 2026-06-25
 
 ### 🏆 Bouton "Top clubs" — classement de Bucarest par membres actifs estimés

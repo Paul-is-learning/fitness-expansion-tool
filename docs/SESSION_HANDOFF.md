@@ -8,7 +8,7 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.68-data-clubs-dedup (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.70-wc-downtown-field (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
@@ -35,7 +35,7 @@ docs/ARCHITECTURE.md    Layout fichiers + load order
 ## 5 TARGETS (priorité expansion — IRR Projet post-v6.46 facturation 13 périodes)
 1. **Hala Laminor** (Sec 3) — GO COND, IRR projet **69.0%** — flagship
 2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **72.2%** — destination mall premium
-3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **50.2%**
+3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **49.6%** (v6.70 : WC Downtown field-verified 3500 mbr)
 4. **Militari Shopping** (Sec 6) — WATCH, IRR **13.9%** (NPV +122k€, enfin positif)
 5. **Grand Arena** (Sec 4) — WATCH, IRR **12.5%** (NPV +32k€ depuis v6.68 dédoublonnage clubs — Monaco Towers réellement à Berceni)
 

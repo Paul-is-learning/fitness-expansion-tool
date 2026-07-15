@@ -24,7 +24,11 @@ const VERIFIED_CLUBS = [
   // === WORLD CLASS (33 clubs) — Source: worldclass.ro, business-review.eu, fitnet.ro ===
   // WC avg = 84,000 members / 45 clubs = 1,867 mbr/club. Ratio = 0.93 mbr/m2 (premium with pool)
   {name:'World Class Charles de Gaulle',lat:44.464661,lng:26.083435,segment:'premium',size:1250,members:1063,tier:'W',sv:true},
-  {name:'World Class Downtown',lat:44.441133,lng:26.094974,segment:'premium',size:2200,members:1870,tier:'Platinum',sv:false},
+  // v6.70 — DONNÉE TERRAIN (Paul, échange direct avec le manager, juil. 2026):
+  // 3500 membres déclarés. Flagship Radisson Blu (Calea Victoriei 63, piscine
+  // 22m + spa). Était estimé 1870 via ratio premium 0.85/m² — le flagship
+  // sature bien au-delà du ratio réseau. fv = field-verified.
+  {name:'World Class Downtown',lat:44.441133,lng:26.094974,segment:'premium',size:2200,members:3500,tier:'Platinum',sv:false,fv:true},
   {name:'World Class At The Grand',lat:44.425619,lng:26.076877,segment:'premium',size:2300,members:1955,tier:'Platinum',sv:true},
   {name:'World Class Atlantis',lat:44.490200,lng:26.096500,segment:'premium',size:2200,members:1870,tier:'Platinum',sv:false},
   {name:'World Class Caro',lat:44.462500,lng:26.097800,segment:'premium',size:2000,members:1700,tier:'Gold',sv:false},
