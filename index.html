@@ -46,6 +46,7 @@
 <script src="src/reviews-history.js" defer></script>
 <script src="src/fcf-studio.js" defer></script>
 <script src="src/lexicon.js" defer></script>
+<script src="src/ic-memo.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -6628,7 +6629,8 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
 
   c.innerHTML = `
     <div style="background:linear-gradient(135deg,${exec.verdictColor}12,${exec.verdictColor}04);border:2px solid ${exec.verdictColor}50;border-radius:10px;padding:14px;margin-bottom:12px;position:relative">
-      <div style="position:absolute;top:8px;right:10px">
+      <div style="position:absolute;top:8px;right:10px;display:flex;gap:5px">
+        <button onclick="ICMemo.open()" title="Mémo d'investment committee — 1 page A4 narrative, prête à imprimer" style="font-size:8px;padding:3px 10px;background:transparent;border:1px solid var(--accent);border-radius:4px;color:var(--accent);cursor:pointer;font-weight:700;font-family:var(--font)">&#128220; Mémo d'IC</button>
         <button onclick="exportPDF()" style="font-size:8px;padding:3px 10px;background:var(--accent);border:none;border-radius:4px;color:#000;cursor:pointer;font-weight:700;font-family:var(--font)">&#128196; Export PDF</button>
       </div>
       <div style="font-size:8px;font-weight:700;color:var(--gray2);letter-spacing:1px;margin-bottom:8px">EXECUTIVE SUMMARY</div>
