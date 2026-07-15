@@ -33,6 +33,21 @@
   const MIN_VELOCITY_WINDOW_MS = 21 * 24 * 3600 * 1000; // fenêtre mini pour une vélocité fiable
   const LOCAL_CAP = 48;
 
+  // Clubs dont le compteur t0 (mars 2026) était VÉRIFIÉ (marqueurs ✓ de
+  // REVIEWS_DB, scraping citymaps.ro). Pour les autres, t0 était une
+  // estimation → la "vélocité" vs seed mesurerait l'erreur d'estimation,
+  // pas la croissance réelle. Leur vraie mesure démarre au 1er snapshot live.
+  const VERIFIED_T0 = new Set([
+    'World Class Downtown', 'World Class At The Grand', 'World Class Caro',
+    'World Class InCity', 'World Class Upground', 'World Class Asmita Gardens',
+    'World Class Militari Shopping', 'World Class Titan', 'World Class AFI Cotroceni',
+    'World Class AFI Tech', 'World Class Lujerului', 'World Class Sudului',
+    'World Class Titan Park', 'World Class Oregon Park',
+    'Stay Fit Romana', 'Stay Fit Teiul Doamnei', 'Stay Fit Vitan',
+    'Stay Fit Cocor', 'Stay Fit Liberty',
+    'Downtown Fitness Vitan', 'CrossFit Columna (Uzina)',
+  ]);
+
   function _storage() {
     return (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
   }
@@ -131,8 +146,10 @@
     try {
       const h = load();
       ensureSeed(h);
+      // Le seed ne compte que si le t0 du club était vérifié (✓ mars 2026).
       const points = h.snapshots
         .filter(s => s.clubs && s.clubs[name] && typeof s.clubs[name].r === 'number')
+        .filter(s => s.source !== 'seed' || VERIFIED_T0.has(name))
         .map(s => ({ ts: s.ts, r: s.clubs[name].r }));
       if (points.length < 2) return null;
       const first = points[0], last = points[points.length - 1];
@@ -141,6 +158,10 @@
       const months = spanMs / (30.44 * 24 * 3600 * 1000);
       const delta = last.r - first.r;
       const perMonth = Math.round((delta / months) * 10) / 10;
+      // Compteur qui BAISSE sensiblement = fiche Google changée / avis purgés
+      // (un total d'avis ne décroît quasi jamais organiquement) → à vérifier,
+      // pas un signal business.
+      const suspect = delta < 0 && Math.abs(delta) > Math.max(10, first.r * 0.1);
       // Tendance vs rythme historique du club (Méthode B : r total / âge)
       let trendPct = null;
       try {
@@ -149,7 +170,7 @@
           trendPct = Math.round((perMonth / (rv.reviewsPerYear / 12) - 1) * 100);
         }
       } catch {}
-      return { perMonth, delta, days: Math.round(spanMs / 86400000), trendPct, from: first.r, to: last.r };
+      return { perMonth, delta, days: Math.round(spanMs / 86400000), trendPct, from: first.r, to: last.r, suspect };
     } catch { return null; }
   }
 
@@ -205,18 +226,20 @@
                 </tr></thead>
                 <tbody>
                   ${rows.map(x => `
-                    <tr style="border-bottom:1px solid rgba(71,85,115,.15)">
-                      <td style="padding:5px 8px;color:var(--white);font-weight:600">${x.name.replace(/</g,'&lt;')}</td>
-                      <td style="padding:5px 8px;text-align:right;color:var(--gray)">${fmtN(x.v.from)} → ${fmtN(x.v.to)}</td>
+                    <tr style="border-bottom:1px solid rgba(71,85,115,.15)${x.v.suspect ? ';opacity:.55' : ''}">
+                      <td style="padding:5px 8px;color:var(--white);font-weight:600">${x.name.replace(/</g,'&lt;')}${x.v.suspect ? ' <span title="Compteur en baisse — fiche Google probablement changée ou avis purgés : signal à ignorer" style="color:var(--yellow);font-size:8px">⚠ fiche à vérifier</span>' : ''}</td>
+                      <td style="padding:5px 8px;text-align:right;color:var(--gray)">${fmtN(x.v.from)} → ${fmtN(x.v.to)} <span style="font-size:7.5px;color:var(--gray2)">(${x.v.days}j)</span></td>
                       <td style="padding:5px 8px;text-align:right;color:${x.v.delta >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700">${x.v.delta >= 0 ? '+' : ''}${fmtN(x.v.delta)}</td>
-                      <td style="padding:5px 8px;text-align:right;color:var(--cyan);font-weight:800">${x.v.perMonth}</td>
-                      <td style="padding:5px 8px;text-align:right">${trendBadge(x.v.trendPct)}</td>
+                      <td style="padding:5px 8px;text-align:right;color:var(--cyan);font-weight:800">${x.v.suspect ? '—' : x.v.perMonth}</td>
+                      <td style="padding:5px 8px;text-align:right">${x.v.suspect ? '<span style="color:var(--gray2)">—</span>' : trendBadge(x.v.trendPct)}</td>
                     </tr>`).join('')}
                 </tbody>
               </table>
               <div style="font-size:8px;color:var(--gray2);margin-top:10px;line-height:1.5">
                 Lecture : un club qui accélère (↗) recrute plus vite que son rythme historique — pression concurrentielle en hausse dans sa zone.
-                Un club qui décélère (↘) perd de la traction — opportunité de captage. Fenêtre de mesure : ${rows[0] ? rows[0].v.days : '—'} jours.
+                Un club qui décélère (↘) perd de la traction — opportunité de captage.<br>
+                Fiabilité : seuls les clubs au comptage t0 <b>vérifié</b> (mars 2026, ~21 clubs) ont une vélocité immédiate — pour les autres,
+                la mesure démarre au premier snapshot live (${new Date().toLocaleDateString('fr-FR')}) et sera disponible sous ~3-4 semaines.
               </div>`}
         </div>
       </div>`;
