@@ -1,6 +1,23 @@
 
 # Changelog
 
+## [v6.69.2-top-clubs] — 2026-06-25
+
+### 🏆 Bouton "Top clubs" — classement de Bucarest par membres actifs estimés
+
+Demande Paul : voir les meilleurs clubs de Bucarest en fréquentation.
+
+- Nouveau bouton sidebar "🏆 Top clubs" → modal top 25 (sur 90) triés par membres actifs estimés (dual model calibré comptes officiels).
+- Colonnes : rang (🥇🥈🥉), segment, membres, surface, **mbr/m² coloré** (>1.3 rouge = club saturé → membres plus captables), ★ Google live, dynamique (Δ avis/mois si mesurée).
+- Bouton 📍 par ligne : saute sur le club dans la carte (zoom 15 + anneau doré 3.5s). `animate:false` — un pan animé cross-ville prenait plusieurs secondes et semblait cassé.
+- Données enrichies automatiquement si les concurrents sont chargés avec la clé Google active.
+
+### Infra (session du jour, pour mémoire)
+- Clé Google : Paul a ajouté "Places API (New)" aux restrictions → enrichissement live + autocomplete + vélocité opérationnels.
+- KV Upstash : base supprimée pour inactivité (14j, vacances) → recréée + restauration en cours côté Paul. Cron quotidien `/api/sync` ajouté (vercel.json) pour empêcher toute future suppression.
+
+---
+
 ## [v6.69-market-intel] — 2026-06-25
 
 ### 🏢 Intelligence enseignes (comptes publics RO) + 📈 Vélocité des avis Google

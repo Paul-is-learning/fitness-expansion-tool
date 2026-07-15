@@ -181,3 +181,108 @@ function openChainsIntel() {
 }
 window.openChainsIntel = openChainsIntel;
 window.CHAINS_INTEL = CHAINS_INTEL;
+
+// ─── 🏆 Top clubs de Bucarest par membres actifs estimés ─────────────
+// Classement des concurrents par fréquentation (membres actifs, dual model
+// surface×ratio + avis, calibré comptes officiels — cf. openChainsIntel).
+function openTopClubs() {
+  // Source: allComps si chargés (avec data Google live), sinon la base vérifiée.
+  let clubs = [];
+  try {
+    if (typeof allComps !== 'undefined' && allComps.length) {
+      clubs = allComps.filter(c => c.source === 'verified');
+    }
+  } catch {}
+  if (!clubs.length && typeof VERIFIED_CLUBS !== 'undefined') clubs = VERIFIED_CLUBS;
+
+  const segColors = { premium: '#a855f7', 'mid-premium': '#60a5fa', mid: '#fbbf24', lowcost: '#94a3b8', independent: '#34d399', crossfit: '#f97316', boutique: '#ec4899' };
+  const fmtN = (typeof fmt === 'function') ? fmt : (x => String(x));
+
+  const rows = clubs
+    .map(c => {
+      const vel = window.ReviewsHistory?.velocity?.(c.name) || null;
+      return {
+        name: c.name, segment: c.segment, size: c.size || 0,
+        members: c.members || 0,
+        density: c.size > 0 ? Math.round((c.members || 0) / c.size * 100) / 100 : null,
+        gReviews: c.gReviews || null, gRating: c.gRating || null,
+        vel: (vel && !vel.suspect) ? vel : null,
+        lat: c.lat, lng: c.lng,
+      };
+    })
+    .sort((a, b) => b.members - a.members)
+    .slice(0, 25);
+
+  const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="color:var(--gray2)">${i + 1}</span>`;
+
+  const old = document.getElementById('fpTopClubsModal');
+  if (old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'fpTopClubsModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(6,8,15,.92);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:100%;max-width:880px;max-height:100%;display:flex;flex-direction:column;overflow:hidden">
+      <header style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--white)">🏆 Top clubs de Bucarest — membres actifs estimés</div>
+          <div style="font-size:9px;color:var(--gray2);margin-top:2px">Top 25 / ${clubs.length} clubs · Estimation dual model (surface × ratio segment + avis), calibrée sur les comptes officiels des enseignes (🏢)</div>
+        </div>
+        <button onclick="document.getElementById('fpTopClubsModal')?.remove()" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--gray);width:32px;height:32px;cursor:pointer;font-size:14px;font-weight:700">✕</button>
+      </header>
+      <div style="padding:12px 18px;overflow-y:auto;flex:1">
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="border-bottom:1px solid var(--border);color:var(--gray2);font-size:8px;letter-spacing:.5px">
+            <th style="text-align:center;padding:6px 4px;width:32px">#</th>
+            <th style="text-align:left;padding:6px 8px">CLUB</th>
+            <th style="text-align:left;padding:6px 8px">SEGMENT</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--accent)">MEMBRES</th>
+            <th style="text-align:right;padding:6px 8px">SURFACE</th>
+            <th style="text-align:right;padding:6px 8px" title="Densité membres/m² — proxy de saturation">MBR/M²</th>
+            <th style="text-align:right;padding:6px 8px">★ GOOGLE</th>
+            <th style="text-align:right;padding:6px 8px" title="Δ avis/mois (si mesurée)">DYNAMIQUE</th>
+            <th style="text-align:center;padding:6px 4px;width:40px"></th>
+          </tr></thead>
+          <tbody>
+            ${rows.map((c, i) => `
+              <tr style="border-bottom:1px solid rgba(71,85,115,.15)${i < 3 ? ';background:rgba(212,160,23,.05)' : ''}">
+                <td style="padding:5px 4px;text-align:center;font-size:12px">${medal(i)}</td>
+                <td style="padding:5px 8px;color:var(--white);font-weight:${i < 3 ? '800' : '600'}">${c.name.replace(/</g,'&lt;')}</td>
+                <td style="padding:5px 8px"><span style="color:${segColors[c.segment] || 'var(--gray)'};font-size:8.5px;font-weight:700">${c.segment}</span></td>
+                <td style="padding:5px 8px;text-align:right;color:var(--accent);font-weight:800;font-size:12px">${fmtN(c.members)}</td>
+                <td style="padding:5px 8px;text-align:right;color:var(--gray)">${c.size ? fmtN(c.size) + ' m²' : '—'}</td>
+                <td style="padding:5px 8px;text-align:right;color:${c.density > 1.3 ? 'var(--red)' : c.density > 0.9 ? 'var(--yellow)' : 'var(--green)'}">${c.density != null ? c.density.toFixed(2) : '—'}</td>
+                <td style="padding:5px 8px;text-align:right;color:var(--gray)">${c.gRating ? c.gRating + '★ <span style="font-size:8px;color:var(--gray2)">(' + fmtN(c.gReviews) + ')</span>' : '—'}</td>
+                <td style="padding:5px 8px;text-align:right">${c.vel ? `<span style="color:${c.vel.trendPct > 15 ? 'var(--red)' : c.vel.trendPct < -15 ? 'var(--green)' : 'var(--gray)'};font-weight:700">${c.vel.perMonth > 0 ? '+' : ''}${c.vel.perMonth} avis/m</span>` : '<span style="color:var(--gray2)">—</span>'}</td>
+                <td style="padding:5px 4px;text-align:center">
+                  <button onclick="window.focusClubOnMap(${c.lat},${c.lng});document.getElementById('fpTopClubsModal')?.remove()" title="Voir sur la carte" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--gray);padding:3px 7px;cursor:pointer;font-size:10px">📍</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="font-size:8px;color:var(--gray2);margin-top:10px;line-height:1.5">
+          <b>Lecture :</b> MBR/M² > 1.3 (rouge) = club saturé — ses membres sont plus captables (files d'attente, matériel occupé).
+          La colonne DYNAMIQUE (Δ avis Google/mois) indique qui recrute activement en ce moment.
+          Charge les concurrents avec la clé Google active pour enrichir ★ et DYNAMIQUE.
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+window.openTopClubs = openTopClubs;
+
+// Recentre la carte Leaflet sur un club (fallback silencieux si carte absente)
+window.focusClubOnMap = function (lat, lng) {
+  try {
+    if (typeof map !== 'undefined' && map && typeof map.setView === 'function') {
+      // animate:false — un pan animé à travers la ville prend plusieurs
+      // secondes et donne l'impression que le bouton ne marche pas.
+      map.setView([lat, lng], 15, { animate: false });
+      // Pulse temporaire pour repérer le club
+      if (typeof L !== 'undefined') {
+        const ring = L.circle([lat, lng], { radius: 120, color: '#d4a017', weight: 3, fillOpacity: 0.15 }).addTo(map);
+        setTimeout(() => { try { map.removeLayer(ring); } catch {} }, 3500);
+      }
+    }
+  } catch {}
+};
