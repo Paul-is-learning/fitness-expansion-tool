@@ -1,11 +1,29 @@
 {
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/(index.html|config.js|structure-couts.html|test.html)?",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
         { "key": "Pragma", "value": "no-cache" },
         { "key": "Expires", "value": "0" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/(src|data|docs)/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=300, stale-while-revalidate=604800" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(css|png|ico|svg|webmanifest)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=604800" }
       ]
     }
   ],

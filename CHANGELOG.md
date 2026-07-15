@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.79-saas-p0p1] — 2026-07-15
+
+### 🏗️ Programme SaaS — Phase 0 (CI) + Phase 1 (perf boot)
+
+Décisions d'architecture actées avec Paul (12 questions) → `docs/SAAS_ROADMAP.md` :
+multi-tenant master-franchisés, 4 rôles, magic link, serveur source de vérité,
+free-tier-first, offline lecture, refactor progressif, CI bloquante.
+
+**Phase 0 — CI GitHub Actions** (`.github/workflows/ci.yml` + `ci/run-tests.mjs`) :
+- Les **197 assertions tournent en headless (Playwright/chromium) à chaque push**.
+- Déterminisme : Overpass/Google/Resend/Anthropic bloqués dans le navigateur CI
+  (les fallbacks du code sont conçus pour) — pas de flakiness réseau.
+- Étape 2 (blocage réel du deploy sur Vercel Hobby) : déployer depuis l'Action
+  si vert — nécessite le secret `VERCEL_TOKEN` (action Paul, cf. roadmap).
+
+**Phase 1 — Perf boot** :
+- AVANT : `no-store` sur TOUT → ~1,3 MB re-téléchargés à chaque visite.
+- APRÈS (`vercel.json`) : `no-store` conservé sur index.html/config.js/api ;
+  `src/`, `data/` → `max-age=300, stale-while-revalidate=604800` ;
+  CSS/images → 1 h + SWR. Repeat loads quasi instantanés, fraîcheur ≤ 5 min
+  après deploy, zéro build step.
+- `preconnect` unpkg/jsdelivr/cartocdn + `dns-prefetch` tuiles → TLS négocié
+  pendant le parse (gain 4G).
+
+---
+
 ## [v6.78-login-ux] — 2026-07-15
 
 ### 🔑 Optimisation complète du login (demande Paul : « ça galère tout le temps »)
