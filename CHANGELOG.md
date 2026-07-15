@@ -1,6 +1,41 @@
 
 # Changelog
 
+## [v6.75-bankability] — 2026-07-15
+
+### 💰→🏦 Plan de Conquête : mode Fonds propres + point de bancabilité
+
+Demande Paul : « pouvoir y aller avec mes fonds propres exclusivement, voir la
+temporalité réaliste des ouvertures, et surtout : à partir de quel moment les
+banques locales seraient théoriquement OK pour financer. »
+
+**3 modes de financement** (radio dans les contraintes) :
+- 🏦 Dette dès le départ (réf. BP 30/70) — comportement v6.73
+- 💰 **Fonds propres uniquement** : chaque club coûte son CAPEX complet
+  (1 176 k€), les ouvertures attendent le cash → la vraie temporalité de
+  l'auto-financement (mesuré : 5 clubs en 3,3 ans au lieu de 2 ans, pic 3,75 M€)
+- 💰→🏦 **Hybride** : FP jusqu'à la bancabilité, puis dette 70% — mesuré :
+  2 clubs en FP puis bascule, pic 3,15 M€ (passe sous l'enveloppe de 3,2 M€
+  là où le 100% FP ne passe pas)
+
+**Bancabilité — modèle transparent et réglable** (pas une boîte noire, les
+3 critères sont des conventions bancaires standard ajustables dans l'UI) :
+① le 1er club a ≥ N mois d'exploitation (déf. 12) · ② il a enchaîné ≥ K mois
+consécutifs d'EBITDA positif (déf. 6) · ③ l'(EBITDA−leasing) consolidé des
+12 derniers mois couvre ≥ X fois (déf. 1.2×) le service annuel d'un prêt club
+standard (70% CAPEX @ taux réf). Le mois de bancabilité s'affiche en tuile KPI
+(ex : 🏦 A2 M5), en losange bleu sur la courbe de trésorerie, et chaque club
+du Gantt porte son badge 💰/🏦.
+
+Propriété émergente réaliste : ouvrir un club (ramp-up EBITDA négatif) dégrade
+temporairement le DSCR consolidé → peut repousser la bancabilité. Le modèle le
+capture naturellement.
+
+Vérifié : 3 modes recalculent, badges corrects (ref 0💰/5🏦 · equity 5💰/0🏦 ·
+hybride 2💰/3🏦), cash-gating étire la timeline en mode FP, 197/197 assertions.
+
+---
+
 ## [v6.74-ai-analyst] — 2026-07-15
 
 ### 💬 ANALYSTE IA — pose tes questions au site, en français
