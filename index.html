@@ -49,6 +49,7 @@
 <script src="src/ic-memo.js" defer></script>
 <script src="src/presentation-mode.js" defer></script>
 <script src="src/conquest-plan.js" defer></script>
+<script src="src/ai-analyst.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -6633,6 +6634,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   c.innerHTML = `
     <div style="background:linear-gradient(135deg,${exec.verdictColor}12,${exec.verdictColor}04);border:2px solid ${exec.verdictColor}50;border-radius:10px;padding:14px;margin-bottom:12px;position:relative">
       <div style="position:absolute;top:8px;right:10px;display:flex;gap:5px">
+        <button onclick="AiAnalyst.open()" title="Pose tes questions au site en français — l'IA répond uniquement sur les chiffres du modèle" style="font-size:8px;padding:3px 10px;background:transparent;border:1px solid var(--cyan);border-radius:4px;color:var(--cyan);cursor:pointer;font-weight:700;font-family:var(--font)">&#128172; Analyste IA</button>
         <button onclick="ICMemo.open()" title="Mémo d'investment committee — 1 page A4 narrative, prête à imprimer" style="font-size:8px;padding:3px 10px;background:transparent;border:1px solid var(--accent);border-radius:4px;color:var(--accent);cursor:pointer;font-weight:700;font-family:var(--font)">&#128220; Mémo d'IC</button>
         <button onclick="exportPDF()" style="font-size:8px;padding:3px 10px;background:var(--accent);border:none;border-radius:4px;color:#000;cursor:pointer;font-weight:700;font-family:var(--font)">&#128196; Export PDF</button>
       </div>

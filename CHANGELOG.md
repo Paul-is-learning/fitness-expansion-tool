@@ -1,6 +1,33 @@
 
 # Changelog
 
+## [v6.74-ai-analyst] — 2026-07-15
+
+### 💬 ANALYSTE IA — pose tes questions au site, en français
+
+Bouton "💬 Analyste IA" sur chaque fiche analysée → panneau chat latéral.
+
+- **Contexte complet automatique** : l'IA reçoit le JSON compact de l'analyse
+  (verdict, demande, sources de membres, top 5 concurrents, P&L A1-A5, FCFE,
+  DSCR, MOIC, financement, réglages) + le classement des autres sites
+  analysés → les comparaisons inter-sites marchent nativement.
+- **Garde-fous** : system prompt qui interdit d'inventer des chiffres hors
+  contexte ("le modèle ne fournit pas X"), réponses 150-250 mots, pédagogie
+  intégrée (chaque terme technique glissé est expliqué), et une ligne
+  "→ À creuser" à chaque réponse.
+- **6 questions suggérées** : pourquoi ce verdict, expliquer l'IRR equity,
+  argumentaire négo bailleur, comparaison inter-sites, risques + mitigants,
+  thèse d'investissement pour le mémo.
+- **Backend** : `api/analyst.js` (Anthropic API, claude-sonnet-5, max 900
+  tokens, whitelist users, caps taille). Continuité conversationnelle (2
+  derniers échanges). Journalisé (analyst.ask).
+
+⚙️ **Activation (Paul, 2 min)** : créer une clé sur console.anthropic.com →
+Vercel → Settings → Environment Variables → `ANTHROPIC_API_KEY` → Redeploy.
+Sans clé, le panneau explique la marche à suivre.
+
+---
+
 ## [v6.73-conquest] — 2026-07-15
 
 ### 🗺️ PLAN DE CONQUÊTE — planificateur de déploiement multi-sites
