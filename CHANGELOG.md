@@ -1,6 +1,31 @@
 
 # Changelog
 
+## [v6.82-core-extract] — 2026-07-15
+
+### ⚡ Extraction du monofichier — index.html 888 KB → 176 KB (SaaS P3b)
+
+Le corps applicatif (~712 KB de JS qui était inline dans index.html) est
+extrait dans `src/app-core.js` — script CLASSIQUE non-defer chargé à la
+position d'origine (après config/utils/data, avant les modules defer). Le
+scope lexical global (let/const/function top-level) reste partagé : les
+modules src/*.js voient les mêmes globals, sémantique **identique**.
+Extraction verbatim, zéro ligne de logique modifiée.
+
+**Impact perf** :
+- `index.html` : 888 KB → **176 KB** (revalidé à chaque visite, désormais léger).
+- `app-core.js` : cacheable (max-age 300 + stale-while-revalidate 7j + service
+  worker) → re-téléchargé seulement au changement réel, sinon lecture cache
+  quasi instantanée. Sur les visites répétées (le cas courant), le boot ne
+  paie plus les 712 KB à chaque fois.
+- Bénéfice cumulé avec v6.79 (cache HTTP) et v6.81 (service worker).
+
+Vérifié : 197/197 assertions (scope global préservé), login + analyse +
+point mort (2 367) + Studio FCF (13 lignes) + tous les globals connectés,
+console sans erreur (hors Overpass sandbox).
+
+---
+
 ## [v6.81-saas-p2b-pwa] — 2026-07-15
 
 ### 🪄 Connexion magic link (UI) + dual-auth data + 📡 PWA lecture offline
