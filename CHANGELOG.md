@@ -1,6 +1,34 @@
 
 # Changelog
 
+## [v6.70.1-actions-toggle] — 2026-07-15
+
+### 🐛 2 bugs UI signalés par Paul
+
+**1. "Impossible de décocher les Actions"**
+- Cause racine : `showOverlapAnalysis()` dessinait cercles pointillés + lignes
+  directement sur la carte (addTo(map)) sans layer group → indélébiles sans reload.
+- Fix : layer group `overlapLayer` dédié + le bouton devient un vrai toggle.
+- "Charger concurrents" devient aussi un toggle (2e clic = masquer les clusters) ;
+  quitter le Mode Démo nettoie désormais la carte (avant : clubs démo bloqués).
+- État visuel : les boutons togglables passent en doré plein (.btn.active,
+  !important requis car le gradient de desktop-polish l'écrasait).
+- `genHeatmap` (chargement en coulisse) resynchronise l'état du bouton.
+
+**2. Logos FP en double sur la carte**
+- Cause : customs et TARGETS partagent le même pin logo FP → un site custom créé
+  au même endroit qu'un TARGET (ex: ajout "Hala Laminor" via autocomplete) ou des
+  doublons multi-device pré-sync affichaient 2+ logos superposés.
+- Fix dans `refreshCustomMarkers` : un custom à <150m d'un TARGET n'est pas rendu
+  (le pin TARGET représente le lieu), deux customs à <50m → seul le 1er est rendu.
+  La numérotation reste alignée sur la liste "Mes sites". Les données ne sont PAS
+  supprimées — dédoublonnage purement visuel.
+
+Vérifié navigateur : cycles ON/OFF overlap + concurrents + démo, dédoublonnage
+(3 sites test → 1 pin), computed styles actif/inactif, 197/197 assertions.
+
+---
+
 ## [v6.70-wc-downtown-field] — 2026-07-15
 
 ### 📋 Donnée terrain : World Class Downtown (Radisson Blu) = 3 500 membres

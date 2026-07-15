@@ -253,6 +253,17 @@
     transform: translateY(0) scale(.98);
     box-shadow: 0 2px 6px rgba(212, 160, 23, .2);
   }
+  /* v6.70.1 — état "coché" des boutons Actions togglables (Charger
+     concurrents / Overlap / Démo). Sans !important le gradient .btn
+     ci-dessus l'écrasait et l'état actif était invisible. */
+  .btn.active {
+    background: linear-gradient(135deg,
+                rgba(212, 160, 23, .9) 0%,
+                rgba(212, 160, 23, .7) 100%) !important;
+    border-color: var(--accent) !important;
+    color: #10131c !important;
+    font-weight: 800;
+  }
 
   /* ═════ METRIC ROWS — hover row effect ═════ */
   .metric-row, .detail-row {

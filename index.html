@@ -660,10 +660,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
       <div class="card">
         <div class="card-header"><div class="card-title"><span class="icon">&#9889;</span> <span data-i18n="dactions.title">Actions</span></div></div>
         <div class="btn-group">
-          <button class="btn" onclick="toggleDemoMode()" data-i18n="dactions.demo">Mode Demo</button>
-          <button class="btn" onclick="loadAllCompetitors()" data-i18n="dactions.loadComp">Charger concurrents</button>
+          <button class="btn" id="btnDemo" onclick="toggleDemoMode()" data-i18n="dactions.demo">Mode Demo</button>
+          <button class="btn" id="btnLoadComp" onclick="toggleCompetitorsAction()" data-i18n="dactions.loadComp">Charger concurrents</button>
           <button class="btn btn-primary" onclick="analyzeAllSectors()" data-i18n="dactions.analyzeAll">Analyser tout</button>
-          <button class="btn" onclick="showOverlapAnalysis()" data-i18n="dactions.overlap">Overlap sites</button>
+          <button class="btn" id="btnOverlap" onclick="toggleOverlapAnalysis()" data-i18n="dactions.overlap">Overlap sites</button>
           <button class="btn" onclick="openChainsIntel()" title="CA officiels déposés (Ministerul Finanțelor) + membres déclarés par enseigne">🏢 Enseignes</button>
           <button class="btn" onclick="window.ReviewsHistory?.openReport?.()" title="Vélocité des avis Google par club = proxy du flux de nouveaux membres">📈 Vélocité avis</button>
           <button class="btn" onclick="openTopClubs()" title="Classement des clubs de Bucarest par membres actifs estimés (dual model calibré comptes officiels)">🏆 Top clubs</button>
@@ -2026,9 +2026,22 @@ function refreshCustomMarkers() {
   customMarkersLayer.clearLayers();
   // Numérotation continue après TARGETS: pin 1-5 = TARGETS, pin 6+ = custom (v6.32).
   // v6.38: filtre les tombstones (deletedAt) — ne render que les sites vivants.
+  // v6.70.1 — anti-doublons visuels (bug "logos FP en double", Paul):
+  //   - custom à <150m d'un TARGET (ex: "Hala Laminor" ajouté via autocomplete)
+  //     → le pin TARGET représente déjà le lieu, on ne rend pas un 2e logo
+  //   - deux customs à <50m (ajouts multi-device avant sync) → 1er seulement
+  //   La numérotation reste alignée sur la liste "Mes sites" (index conservé).
   const startNum = (typeof TARGETS !== 'undefined' ? TARGETS.length : 0) + 1;
   const live = customSites.filter(s => !s.deletedAt);
-  live.forEach((s, i) => addCustomSiteMarker(s, startNum + i));
+  const rendered = [];
+  live.forEach((s, i) => {
+    const nearTarget = (typeof TARGETS !== 'undefined')
+      && TARGETS.some(t => haversine(t.lat, t.lng, s.lat, s.lng) < 150);
+    const nearRendered = rendered.some(r => haversine(r.lat, r.lng, s.lat, s.lng) < 50);
+    if (nearTarget || nearRendered) return;
+    rendered.push(s);
+    addCustomSiteMarker(s, startNum + i);
+  });
 }
 window.refreshCustomMarkers = refreshCustomMarkers;
 
@@ -3782,6 +3795,7 @@ async function loadAllCompetitors() {
   showCompsOnMap(comps);
   buildBrandFilters(comps);
   if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
+  document.getElementById('btnLoadComp')?.classList.add('active');
   setStatus('ok',`${comps.length} concurrents charges`);
 
   // Enrich with Google Places data (async, non-blocking).
@@ -3808,6 +3822,7 @@ async function genHeatmap() {
       layers.competitors = false;
       const tgl = el('tglCompetitors');
       if(tgl) tgl.classList.remove('on');
+      document.getElementById('btnLoadComp')?.classList.remove('active'); // v6.70.1 état bouton Actions
     }
   }
   if(heatLayer) map.removeLayer(heatLayer);
@@ -3994,6 +4009,27 @@ function setPresetWeights(f,d,j) {
 // ================================================================
 // OVERLAP ANALYSIS — BP sites catchment overlap
 // ================================================================
+// v6.70.1 — les graphiques overlap vivent dans un layer group dédié (avant:
+// addTo(map) direct → cercles/lignes indélébiles sans reload, bug "impossible
+// de décocher" signalé par Paul).
+let overlapLayer = L.layerGroup();
+
+function toggleOverlapAnalysis() {
+  const btn = document.getElementById('btnOverlap');
+  if (overlapLayer.getLayers().length) {
+    overlapLayer.clearLayers();
+    if (map.hasLayer(overlapLayer)) map.removeLayer(overlapLayer);
+    btn?.classList.remove('active');
+    setStatus('ok', 'Overlap masqué');
+    return;
+  }
+  showOverlapAnalysis();
+  if (overlapLayer.getLayers().length) {
+    if (!map.hasLayer(overlapLayer)) map.addLayer(overlapLayer);
+    btn?.classList.add('active');
+  }
+}
+
 function showOverlapAnalysis() {
   const allSites = [...TARGETS, ...customSites.filter(s=>!s.deletedAt).map(s=>({name:s.name,lat:s.lat,lng:s.lng}))];
   if(allSites.length < 2) return;
@@ -4002,7 +4038,7 @@ function showOverlapAnalysis() {
   allSites.forEach(s=>{
     L.circle([s.lat, s.lng], {
       radius: 2000, color: '#d4a01780', weight: 1, fillColor: '#d4a017', fillOpacity: 0.05, dashArray: '4,4'
-    }).addTo(map);
+    }).addTo(overlapLayer);
   });
 
   // Find overlaps
@@ -4017,7 +4053,7 @@ function showOverlapAnalysis() {
         L.polyline([[allSites[i].lat,allSites[i].lng],[allSites[j].lat,allSites[j].lng]],{
           color:d<2000?'#ef4444':d<3000?'#f97316':'#eab308',weight:2,dashArray:'6,4',opacity:.7
         }).bindTooltip(`${allSites[i].name} ↔ ${allSites[j].name}<br>${(d/1000).toFixed(1)}km | Overlap: ${Math.max(0,Math.round((1-d/4000)*100))}%`,
-          {className:'custom-tooltip'}).addTo(map);
+          {className:'custom-tooltip'}).addTo(overlapLayer);
       }
     }
   }
@@ -7847,6 +7883,7 @@ function flyTarget(lat,lng) {
 function toggleDemoMode() {
   demo=!demo;
   el('demoBanner').classList.toggle('on',demo);
+  document.getElementById('btnDemo')?.classList.toggle('active', demo);
   setStatus(demo?'warn':'ok',demo?'Mode demo actif':'APIs connectees'+(_googleHasKey()?' + Google':''));
   if(demo) {
     allComps=DEMO_COMPS.map(c=>({...c,id:Math.random(),source:'demo',est:false,color:segColor(c.segment),threat:segThreat(c.segment),brand:'local'}));
@@ -7854,6 +7891,32 @@ function toggleDemoMode() {
     showCompsOnMap(allComps);
     buildBrandFilters(allComps);
     if(!layers.competitors){layers.competitors=true;el('tglCompetitors').classList.add('on')}
+  } else {
+    // v6.70.1 — sortir du mode démo NETTOIE la carte (avant: les clubs démo
+    // restaient affichés sans moyen de les retirer)
+    compCluster.clearLayers();
+    allComps=[]; lastDisplayedComps=[];
+    layers.competitors=false;
+    el('tglCompetitors')?.classList.remove('on');
+    document.getElementById('btnLoadComp')?.classList.remove('active');
+  }
+}
+
+// v6.70.1 — le bouton Actions "Charger concurrents" est un TOGGLE:
+// 1er clic charge + affiche, 2e clic masque les clusters. (Les appels
+// programmatiques — tests, heatmap — continuent d'utiliser
+// loadAllCompetitors directement, comportement inchangé.)
+function toggleCompetitorsAction() {
+  const btn = document.getElementById('btnLoadComp');
+  if (layers.competitors && allComps.length) {
+    compCluster.clearLayers();
+    layers.competitors = false;
+    el('tglCompetitors')?.classList.remove('on');
+    btn?.classList.remove('active');
+    setStatus('ok', 'Concurrents masqués');
+  } else {
+    btn?.classList.add('active');
+    loadAllCompetitors();
   }
 }
 
