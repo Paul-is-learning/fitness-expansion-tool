@@ -37,6 +37,28 @@ const ALLOWED_USERS = new Set([
   'tomescumh@yahoo.com',
 ]);
 
+// ─── v6.81 (SaaS P2b) — dual-auth : cookie session (magic link) OU
+// whitelist legacy (transition). Session éditeur/admin requise pour écrire.
+const _crypto = require('crypto');
+function readSession(req) {
+  try {
+    const c = (req.headers.cookie || '').split(/;\s*/).find(x => x.startsWith('fp_session='));
+    if (!c) return null;
+    const [payload, sig] = c.slice('fp_session='.length).split('.');
+    const expect = _crypto.createHmac('sha256', KV_TOKEN).update(payload).digest('base64url');
+    if (sig !== expect) return null;
+    const s = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (Date.now() > s.x) return null;
+    return { email: s.e, role: s.r, ws: s.w };
+  } catch { return null; }
+}
+function isAuthorized(req, legacyUser, write) {
+  const s = readSession(req);
+  if (s) return write ? ['admin', 'editor'].includes(s.role) : true;
+  return ALLOWED_USERS.has(String(legacyUser || '').toLowerCase().trim());
+}
+
+
 async function kvGet(key) {
   const r = await fetch(`${KV_URL}/get/${encodeURIComponent(key)}`, {
     headers: { Authorization: `Bearer ${KV_TOKEN}` },
@@ -83,7 +105,7 @@ module.exports = async (req, res) => {
       // v6.49 — overrides per-site (rent / charge / surface) synchronisés aussi.
       // Maps keyed by "lat.toFixed(3),lng.toFixed(3)". LWW simple via ts global.
       const overrides = (body.overrides && typeof body.overrides === 'object') ? body.overrides : null;
-      if (!ALLOWED_USERS.has(user)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
+      if (!isAuthorized(req, user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!sites) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
       if (sites.length > 1000) { res.status(413).json({ error: 'TOO_MANY_SITES' }); return; }
       const serialized = JSON.stringify({ sites, overrides });

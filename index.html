@@ -58,6 +58,7 @@
 <script src="src/conquest-plan.js" defer></script>
 <script src="src/ai-analyst.js" defer></script>
 <script src="src/share-link.js" defer></script>
+<script src="src/pwa.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -464,6 +465,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           border: 1px solid rgba(212,160,23,.45) !important;
         }
       </style>
+      <!-- v6.81 P2b — connexion par lien magique (s'active avec RESEND_API_KEY) -->
+      <div id="magicBlock" style="margin-bottom:16px">
+        <button type="button" onclick="requestMagicLink()" style="width:100%;padding:13px;border-radius:10px;font-size:13px;font-weight:800;font-family:var(--font);background:linear-gradient(135deg,rgba(212,160,23,.25),rgba(212,160,23,.1));border:1px solid rgba(212,160,23,.5);color:#fbbf24;cursor:pointer">
+          🪄 Recevoir mon lien de connexion par email
+        </button>
+        <div id="magicStatus" style="font-size:10px;min-height:14px;margin-top:6px;text-align:center;color:#94a3b8"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+          <div style="flex:1;height:1px;background:rgba(71,85,115,.4)"></div>
+          <span style="font-size:9px;color:#64748b;letter-spacing:.5px">OU AVEC MOT DE PASSE</span>
+          <div style="flex:1;height:1px;background:rgba(71,85,115,.4)"></div>
+        </div>
+      </div>
       <form id="loginForm" method="post" action="#" onsubmit="doLogin();return false" autocomplete="on">
       <div style="margin-bottom:16px">
         <label for="loginEmail" style="font-size:10px;font-weight:600;color:#8899b0;letter-spacing:.5px;display:block;margin-bottom:6px">EMAIL</label>
@@ -8912,6 +8925,53 @@ function doPasswordReset() {
   }, 1000);
 }
 
+// ═══ v6.81 P2b — connexion par lien magique + session serveur ═══════
+async function requestMagicLink() {
+  const email = (document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
+  const st = document.getElementById('magicStatus');
+  if (!email || !email.includes('@')) {
+    st.style.color = '#fbbf24';
+    st.textContent = 'Entre d’abord ton email dans le champ ci-dessous, puis re-clique.';
+    document.getElementById('loginEmail')?.focus();
+    return;
+  }
+  st.style.color = '#94a3b8';
+  st.textContent = 'Envoi du lien…';
+  try {
+    const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: 'request', email }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { st.style.color = '#34d399'; st.textContent = '📬 Email envoyé ! Clique le lien reçu (valable 15 min) — session de 30 jours.'; }
+    else if (j.error === 'NO_RESEND_KEY') { st.style.color = '#fbbf24'; st.textContent = 'Bientôt actif — la clé email (Resend) n’est pas encore posée. Utilise le mot de passe.'; }
+    else { st.style.color = '#f87171'; st.textContent = 'Erreur — utilise le mot de passe ci-dessous.'; }
+  } catch { st.style.color = '#f87171'; st.textContent = 'Service indisponible ici — utilise le mot de passe.'; }
+}
+window.requestMagicLink = requestMagicLink;
+
+// Session serveur (posée par le lien magique) : si valide, entre direct
+// dans l'app — c'est elle qui fera foi après la bascule complète.
+async function checkServerSession() {
+  try {
+    const r = await fetch('/api/auth?action=me', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!j.ok) return null;
+    window._serverSession = j; // {email, name, role, workspace}
+    const av = document.getElementById('userAvatar');
+    if (document.getElementById('loginPage').style.display !== 'none') {
+      currentUser = { email: j.email, name: j.name, role: j.role === 'admin' ? 'admin' : 'user' };
+      _authStorage().setItem('fpCurrentUser', JSON.stringify(currentUser));
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('app').style.display = '';
+      if (av) av.textContent = (j.name || j.email)[0].toUpperCase();
+      init(); applyRole();
+      try { window.dispatchEvent(new CustomEvent('fp:login-success', { detail: { user: currentUser, email: j.email } })); } catch {}
+    }
+    if (av) av.title = j.email + ' · rôle ' + j.role + ' · session serveur active (30 j)';
+    return j;
+  } catch { return null; }
+}
+window.checkServerSession = checkServerSession;
+
 // Check if already logged in (session-based — must re-login each visit)
 function checkAuth() {
   if(currentUser && userList.find(u=>u.email===currentUser.email)) {
@@ -9833,6 +9893,7 @@ function applyRole() {
 // BOOT — Check auth first
 // ================================================================
 checkAuth();
+checkServerSession(); // v6.81 — la session magic link (si présente) prend le relais
 </script>
 </body>
 </html>

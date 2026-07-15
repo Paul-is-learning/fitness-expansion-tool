@@ -34,6 +34,28 @@ const ALLOWED_USERS = new Set([
   'tomescumh@yahoo.com',
 ]);
 
+// ─── v6.81 (SaaS P2b) — dual-auth : cookie session (magic link) OU
+// whitelist legacy (transition). Session éditeur/admin requise pour écrire.
+const _crypto = require('crypto');
+function readSession(req) {
+  try {
+    const c = (req.headers.cookie || '').split(/;\s*/).find(x => x.startsWith('fp_session='));
+    if (!c) return null;
+    const [payload, sig] = c.slice('fp_session='.length).split('.');
+    const expect = _crypto.createHmac('sha256', KV_TOKEN).update(payload).digest('base64url');
+    if (sig !== expect) return null;
+    const s = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (Date.now() > s.x) return null;
+    return { email: s.e, role: s.r, ws: s.w };
+  } catch { return null; }
+}
+function isAuthorized(req, legacyUser, write) {
+  const s = readSession(req);
+  if (s) return write ? ['admin', 'editor'].includes(s.role) : true;
+  return ALLOWED_USERS.has(String(legacyUser || '').toLowerCase().trim());
+}
+
+
 async function kvGet(key) {
   const r = await fetch(`${KV_URL}/get/${encodeURIComponent(key)}`, {
     headers: { Authorization: `Bearer ${KV_TOKEN}` },
@@ -78,7 +100,7 @@ module.exports = async (req, res) => {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const user = String(body.user || '').toLowerCase().trim();
       const snap = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : null;
-      if (!ALLOWED_USERS.has(user)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
+      if (!isAuthorized(req, user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!snap || !snap.clubs || typeof snap.clubs !== 'object') {
         res.status(400).json({ error: 'BAD_PAYLOAD' }); return;
       }

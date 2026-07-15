@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.81-saas-p2b-pwa] — 2026-07-15
+
+### 🪄 Connexion magic link (UI) + dual-auth data + 📡 PWA lecture offline
+
+**Écran de connexion** : nouveau bouton principal « 🪄 Recevoir mon lien de
+connexion par email » (au-dessus du mot de passe). Tant que la clé Resend
+n'est pas posée, il l'explique proprement ; dès qu'elle l'est, le flux
+complet fonctionne sans redéploiement. Au boot, `checkServerSession()` :
+une session magic link valide fait entrer directement dans l'app (l'avatar
+affiche le rôle serveur au survol).
+
+**Dual-auth sur les endpoints data** (`/api/sync`, `/api/audit`,
+`/api/reviews`) : le cookie session (magic link) est accepté partout —
+écritures réservées aux rôles admin/éditeur ; la whitelist legacy reste
+valide pendant la transition.
+
+**PWA lecture offline (P3 partiel)** : `sw.js` + `src/pwa.js` —
+service worker conservateur (API = réseau seul ; navigations = réseau
+d'abord, cache en secours ; assets = stale-while-revalidate y compris CDN)
+et bannière « 📡 HORS LIGNE — lecture seule » sur perte de réseau. Les
+fiches et écrans déjà consultés restent lisibles sans connexion (terrain,
+avion). Deuxième effet : les visites répétées deviennent quasi instantanées
+(cache SW par-dessus la stratégie HTTP de v6.79).
+
+---
+
 ## [v6.80-saas-p2a] — 2026-07-15
 
 ### 🏢 SaaS Phase 2a — Auth serveur (magic link) + rôles + liens de présentation publics
