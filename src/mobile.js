@@ -1480,30 +1480,72 @@
   }
 
   // ─── FINANCING CARD: equity/debt split + IRR project vs equity ──
+  // v6.67 — toggle dette + sliders (global) + FCFE/DSCR/MOIC/payback equity.
   function financingCard(pnlBase) {
     if (!pnlBase) return '';
     const fin = pnlBase.financing || {};
+    const debtOn = fin.enabled !== false && (fin.loanRatio || 0) > 0;
     const equity = pnlBase.equity || 0;
     const loan = pnlBase.loanPrincipal || 0;
     const monthlyPmt = pnlBase.loanMonthlyPayment || 0;
     const totalInt = pnlBase.totalInterest || 0;
     const irrProj = pnlBase.irr;
     const irrEq = pnlBase.irrEquity;
+    const eqPct = Math.round((fin.equityRatio || 0.3) * 100);
+    const ratePct = ((fin.loanRate || 0) * 100);
 
     return `
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
-        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${_t('fin.structure')}</div>
-        <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">
-          <div style="flex:${(fin.equityRatio || 0.3) * 100};background:linear-gradient(90deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:800">${_t('fin.equityShort')} ${Math.round((fin.equityRatio || 0.3) * 100)}%</div>
-          <div style="flex:${(fin.loanRatio || 0.7) * 100};background:linear-gradient(90deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">${_t('fin.loanShort')} ${Math.round((fin.loanRatio || 0.7) * 100)}%</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('fin.structure')}</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${debtOn ? '#60a5fa' : 'var(--gray2)'}">
+            <input type="checkbox" ${debtOn ? 'checked' : ''} onchange="window.onFinancingToggle?.(this.checked);setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="accent-color:#60a5fa;width:18px;height:18px">
+            ${debtOn ? _t('fin.debtToggle') : _t('fin.allEquity')}
+          </label>
         </div>
+        <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">
+          <div style="flex:${debtOn ? eqPct : 100};background:linear-gradient(90deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:800">${_t('fin.equityShort')} ${debtOn ? eqPct : 100}%</div>
+          ${debtOn ? `<div style="flex:${100 - eqPct};background:linear-gradient(90deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">${_t('fin.loanShort')} ${100 - eqPct}%</div>` : ''}
+        </div>
+        ${debtOn ? `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray2);margin-bottom:2px"><span>${_t('fin.equity')} %</span><span style="color:#60a5fa;font-weight:700">${eqPct}%</span></div>
+          <input type="range" min="10" max="100" step="5" value="${eqPct}" oninput="window.onFinEquitySlider?.(this.value)" onchange="setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="width:100%;accent-color:#60a5fa;height:5px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray2);margin:6px 0 2px"><span>${_t('fin.rate')}</span><span style="color:#60a5fa;font-weight:700">${ratePct.toFixed(2)}%</span></div>
+          <input type="range" min="0.5" max="12" step="0.25" value="${ratePct.toFixed(2)}" oninput="window.onFinRateSlider?.(this.value)" onchange="setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="width:100%;accent-color:#60a5fa;height:5px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray2);margin:6px 0 2px"><span>${_t('fin.term')}</span><span style="color:#60a5fa;font-weight:700">${fin.loanTermYears || 7} ${_t('fin.years')}</span></div>
+          <input type="range" min="3" max="15" step="1" value="${fin.loanTermYears || 7}" oninput="window.onFinTermSlider?.(this.value)" onchange="setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="width:100%;accent-color:#60a5fa;height:5px">
+        </div>` : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px">
           <div><div style="color:var(--gray2)">${_t('fin.equity')}</div><div style="color:#34d399;font-weight:800;font-size:14px">${fmtM(equity)}</div></div>
-          <div><div style="color:var(--gray2)">${_t('fin.loan')}</div><div style="color:#60a5fa;font-weight:800;font-size:14px">${fmtM(loan)}</div></div>
-          <div><div style="color:var(--gray2)">${_t('fin.rate')}</div><div style="color:var(--white);font-weight:700">${((fin.loanRate || 0.065) * 100).toFixed(1)}%</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.loan')}</div><div style="color:#60a5fa;font-weight:800;font-size:14px">${debtOn ? fmtM(loan) : '—'}</div></div>
+          ${debtOn ? `
+          <div><div style="color:var(--gray2)">${_t('fin.rate')}</div><div style="color:var(--white);font-weight:700">${ratePct.toFixed(1)}%</div></div>
           <div><div style="color:var(--gray2)">${_t('fin.term')}</div><div style="color:var(--white);font-weight:700">${fin.loanTermYears || 7} ${_t('fin.years')}</div></div>
           <div><div style="color:var(--gray2)">${_t('fin.monthlyPmt')}</div><div style="color:var(--white);font-weight:700">${fmtNum(monthlyPmt)} €</div></div>
-          <div><div style="color:var(--gray2)">${_t('fin.totalInterest')}</div><div style="color:#f87171;font-weight:700">${fmtM(totalInt)}</div></div>
+          <div><div style="color:var(--gray2)">${_t('fin.totalInterest')}</div><div style="color:#f87171;font-weight:700">${fmtM(totalInt)}</div></div>` : ''}
+        </div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Cash & couverture — investisseur</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="padding:10px;background:rgba(30,41,59,.45);border-radius:8px">
+            <div style="font-size:9px;color:var(--gray2)" title="${_t('fin.fcfeHint')}">${_t('fin.fcfe5y')}</div>
+            <div style="font-size:17px;font-weight:900;color:${(pnlBase.fcfe5y || 0) > 0 ? '#34d399' : '#f87171'};margin-top:2px">${fmtM(pnlBase.fcfe5y || 0)}</div>
+          </div>
+          <div style="padding:10px;background:rgba(30,41,59,.45);border-radius:8px">
+            <div style="font-size:9px;color:var(--gray2)" title="${_t('fin.dscrHint')}">${_t('fin.dscrMin')}</div>
+            <div style="font-size:17px;font-weight:900;color:${pnlBase.dscrMinCruise == null ? 'var(--gray2)' : pnlBase.dscrMinCruise >= 1.2 ? '#34d399' : pnlBase.dscrMinCruise >= 1.0 ? '#fbbf24' : '#f87171'};margin-top:2px">${pnlBase.dscrMinCruise != null ? pnlBase.dscrMinCruise.toFixed(2) + '×' : 'n/a'}</div>
+          </div>
+          <div style="padding:10px;background:rgba(30,41,59,.45);border-radius:8px">
+            <div style="font-size:9px;color:var(--gray2)" title="${_t('fin.moicHint')}">${_t('fin.moic')}</div>
+            <div style="font-size:17px;font-weight:900;color:${(pnlBase.moic || 0) >= 2 ? '#34d399' : '#fbbf24'};margin-top:2px">${pnlBase.moic != null ? pnlBase.moic.toFixed(1) + '×' : 'n/a'}</div>
+          </div>
+          <div style="padding:10px;background:rgba(30,41,59,.45);border-radius:8px">
+            <div style="font-size:9px;color:var(--gray2)" title="${_t('fin.paybackEquityHint')}">${_t('fin.paybackEquity')}</div>
+            <div style="font-size:17px;font-weight:900;color:${pnlBase.paybackEquityMonth ? '#34d399' : '#f87171'};margin-top:2px">${pnlBase.paybackEquityMonth ? 'M' + pnlBase.paybackEquityMonth : '>60M'}</div>
+          </div>
         </div>
       </div>
 
@@ -1693,6 +1735,13 @@
       </div>
     `;
   }
+
+  // v6.67 — hook exposé pour la carte financement : re-run l'analyse du site
+  // actif (mêmes effets qu'un relâchement de slider loyer) pour rafraîchir
+  // hero + P&L + carte financement après un changement dette/equity/taux/durée.
+  window._fpMobileFinRefresh = function() {
+    try { recomputeCurrentAnalysis(parseFloat(qs('#fpRentSlider')?.value || 10.5)); } catch {}
+  };
 
   // ─── Live hint (Total all-in Y1) — reads current slider values ─
   function updateRentAllInHint() {

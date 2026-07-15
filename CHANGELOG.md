@@ -1,6 +1,35 @@
 
 # Changelog
 
+## [v6.67-debt-fcfe-history] — 2026-06-25
+
+### 💰 Toggle dette bancaire + FCFE/DSCR/MOIC · 📜 Historique des hypothèses avec impact KPI
+
+Deux demandes Paul (retour de vacances) :
+1. « Intégrer ou non de la dette bancaire et voir les impacts sur le Net Free Cash Flow to Equity et autres indicateurs investisseur. »
+2. « Jouer avec le P&L en suivant les changements — un historique avec l'impact EBITDA de chaque modification. »
+
+### Financement (Moteur A, `buildPnL`)
+
+- **`getEffectiveFinancing()`** : défauts BP (30% equity / 70% dette @ 4% / 7 ans, SG-BPI) ou override user `window._financingOverride` (localStorage `fpFinancing`, GLOBAL tous sites, sync cloud LWW par `.at`). `enabled:false` = 100% equity, zéro dette.
+- **Nouveaux outputs buildPnL** (additifs, baseline intacte) : `annualFCFE[5]`, `fcfe5y`, `annualDebtService[5]`, `dscrByYear`, `dscrMin`, `dscrAvg`, `moic` (avec sortie 8× EBITDA A5), `paybackEquityMonth`. FCFE = EBITDA − leasing − service dette (avant IS — le modèle ne cashflow-ise pas le CIT, inchangé).
+- **Taux 0% + dette** : amortissement linéaire (plus de division par zéro).
+- **UI desktop** : bloc "💰 FINANCEMENT" sous les sliders loyer (toggle dette + 3 sliders apport/taux/durée + 10 KPIs live). **UI mobile** : financingCard upgradée (toggle + sliders + carte "Cash & couverture").
+- **Export PDF** : lignes FCFE 5 ans / DSCR min / MOIC ajoutées au tableau 3 scénarios.
+
+### Historique des hypothèses (journal + impact)
+
+- **`computeKpiImpact(field, before, after)`** : re-run buildPnL (pur) avec la valeur avant puis après → delta EBITDA A5, IRR projet, IRR equity, FCFE 5 ans. Attaché en `meta.kpi` à chaque entrée du journal (loyer, charges, surface, financement).
+- **Journal d'activité** (📋) : nouvelle colonne **IMPACT KPI** — badges colorés ΔEBITDA/ΔIRR/ΔFCFE par modification. L'historique cloud (KV, 500 entrées, cross-device) devient un vrai monitoring des hypothèses dans le temps.
+- **Ligne "vs Référence BP"** sous le P&L 3 scénarios : écart des réglages courants (loyer/charges/surface/financement) vs le BP verrouillé (OnAir calibré) — ΔEBITDA A5, ΔIRR projet, ΔIRR equity, ou "✓ Réglages = Référence BP".
+
+### Garde-fous
+
+- Sans override, `getEffectiveFinancing()` retourne exactement les défauts → les 197 assertions baseline passent sans modification.
+- Le P&L de référence reste le BP verrouillé : les écarts sont AFFICHÉS, jamais silencieusement absorbés.
+
+---
+
 ## [v6.66-password-reset] — 2026-06-25
 
 ### 🔑 Flow "mot de passe oublié" — phrase de récupération 100% client

@@ -118,6 +118,17 @@
       'fin.irrLabelLevered': '(levered)',
       'fin.equityShort': 'Equity',
       'fin.loanShort': 'Emprunt',
+      // v6.67 — toggle dette + indicateurs investisseur
+      'fin.debtToggle': 'Dette bancaire',
+      'fin.allEquity': '100% equity',
+      'fin.fcfe5y': 'FCFE cumulé 5 ans',
+      'fin.fcfeHint': 'Net Free Cash Flow to Equity (avant IS, hors valeur de sortie)',
+      'fin.dscrMin': 'DSCR min',
+      'fin.dscrHint': 'Couverture du service de la dette — la banque exige ≥ 1.2',
+      'fin.moic': 'MOIC 5 ans',
+      'fin.moicHint': 'Multiple sur equity investie, avec valeur de sortie 8× EBITDA A5',
+      'fin.paybackEquity': 'Payback equity',
+      'fin.paybackEquityHint': 'Mois de récupération de l’apport via les FCFE',
 
       // ─── BP Template card ────────────────────────────────────────
       'bp.revenues': 'Revenus',
@@ -591,6 +602,17 @@
       'fin.irrLabelLevered': '(levered)',
       'fin.equityShort': 'Equity',
       'fin.loanShort': 'Loan',
+      // v6.67 — debt toggle + investor indicators
+      'fin.debtToggle': 'Bank debt',
+      'fin.allEquity': '100% equity',
+      'fin.fcfe5y': '5-yr cumulative FCFE',
+      'fin.fcfeHint': 'Net Free Cash Flow to Equity (pre-tax, excl. exit value)',
+      'fin.dscrMin': 'Min DSCR',
+      'fin.dscrHint': 'Debt service coverage — banks require ≥ 1.2',
+      'fin.moic': '5-yr MOIC',
+      'fin.moicHint': 'Multiple on invested equity, incl. exit at 8× Y5 EBITDA',
+      'fin.paybackEquity': 'Equity payback',
+      'fin.paybackEquityHint': 'Month when cumulative FCFE recovers the equity',
 
       // ─── BP Template card ────────────────────────────────────────
       'bp.revenues': 'Revenue',

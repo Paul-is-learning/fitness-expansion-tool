@@ -4827,6 +4827,11 @@ window._surfaceOverrides = (typeof safeStorage !== 'undefined') ? (safeStorage.g
 // v6.65.1 — rayon de captage par site (m) + taux de capture par segment (global).
 window._radiusOverrides  = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpRadiusOverrides', {})  || {}) : {};
 window._captureRatesOverride = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpCaptureRates', null) || null) : null;
+// v6.67 — structure de financement (GLOBALE, pas par site — décision corporate).
+// null = défauts BP (30% equity / 70% dette @ 4% / 7 ans).
+// Shape: {enabled:bool, equityRatio:0-1, loanRate:0-0.12, loanTermYears:3-15, at:epochMs}
+// `at` sert au LWW cross-device (cloud-sync).
+window._financingOverride = (typeof safeStorage !== 'undefined') ? (safeStorage.get('fpFinancing', null) || null) : null;
 // Si override présent au boot (cross-device ou session précédente), applique-les.
 if (typeof window.applyCaptureRatesOverride === 'function') window.applyCaptureRatesOverride();
 
@@ -4842,6 +4847,7 @@ window.persistOverrides = function persistOverrides() {
     safeStorage.set('fpSurfaceOverrides', window._surfaceOverrides || {});
     safeStorage.set('fpRadiusOverrides',  window._radiusOverrides  || {});
     if (window._captureRatesOverride) safeStorage.set('fpCaptureRates', window._captureRatesOverride);
+    if (window._financingOverride)    safeStorage.set('fpFinancing',   window._financingOverride);
   }
   // Debounce cloud push — les sliders peuvent fire 10+ events en quelques ms.
   if (_overridesPushTimer) clearTimeout(_overridesPushTimer);
@@ -4968,20 +4974,45 @@ function getScaledLeasingAnnual() { return Math.round(PNL_DEFAULTS.leasingAnnual
  *   financing: object              // ref to PNL_DEFAULTS.financing
  * }}
  */
+/**
+ * v6.67 — structure de financement effective : défauts BP (30/70 @ 4% / 7 ans)
+ * ou override user (window._financingOverride). enabled:false = 100% equity
+ * (aucune dette bancaire). Sans override, retourne des valeurs STRICTEMENT
+ * identiques aux défauts → la baseline de tests (197 assertions) est intacte.
+ */
+function getEffectiveFinancing() {
+  const base = PNL_DEFAULTS.financing || { equityRatio: 1, loanRatio: 0, loanRate: 0, loanTermYears: 7 };
+  const o = window._financingOverride;
+  if (!o) return { equityRatio: base.equityRatio, loanRatio: base.loanRatio, loanRate: base.loanRate, loanTermYears: base.loanTermYears, enabled: true };
+  if (o.enabled === false) return { equityRatio: 1, loanRatio: 0, loanRate: 0, loanTermYears: 0, enabled: false };
+  const eq = (typeof o.equityRatio === 'number') ? Math.min(1, Math.max(0.05, o.equityRatio)) : base.equityRatio;
+  return {
+    equityRatio: eq,
+    loanRatio: Math.max(0, 1 - eq),
+    loanRate: (typeof o.loanRate === 'number') ? Math.min(0.15, Math.max(0, o.loanRate)) : base.loanRate,
+    loanTermYears: (typeof o.loanTermYears === 'number') ? Math.min(15, Math.max(1, Math.round(o.loanTermYears))) : base.loanTermYears,
+    enabled: true,
+  };
+}
+window.getEffectiveFinancing = getEffectiveFinancing;
+
 function buildPnL(cohortData, avgQuartierPrice) {
   const capex = getScaledCapex();
   const leasingMonthly = getScaledLeasingAnnual() / 12;
   const arpu = getFP_MONTHLY_HT();
 
   // ─── Financing structure: equity + bank loan on CAPEX ────────
-  const fin = PNL_DEFAULTS.financing || { equityRatio: 1, loanRatio: 0, loanRate: 0, loanTermYears: 7 };
+  const fin = getEffectiveFinancing();
   const equity = Math.round(capex * fin.equityRatio);
   const loanPrincipal = capex * fin.loanRatio;
   const monthlyRate = fin.loanRate / 12;
   const loanMonths = fin.loanTermYears * 12;
   // Standard amortization payment: M = PV × r / (1 - (1+r)^-n)
-  const loanMonthlyPayment = loanMonths > 0 && monthlyRate > 0
-    ? loanPrincipal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -loanMonths))
+  // Taux 0% avec dette → amortissement linéaire (évite division par zéro).
+  const loanMonthlyPayment = loanMonths > 0 && loanPrincipal > 0
+    ? (monthlyRate > 0
+        ? loanPrincipal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -loanMonths))
+        : loanPrincipal / loanMonths)
     : 0;
   let loanOutstanding = loanPrincipal;
 
@@ -4990,8 +5021,14 @@ function buildPnL(cohortData, avgQuartierPrice) {
   const monthly = [];
   const annualCA = [0,0,0,0,0];
   const annualEBITDA = [0,0,0,0,0];
+  // v6.67 — séries investisseur : FCFE (net free cash flow to equity, avant IS
+  // — aligné sur le modèle qui ne modélise pas le CIT dans les cashflows) et
+  // service de la dette (intérêts + principal) pour le DSCR.
+  const annualFCFE = [0,0,0,0,0];
+  const annualDebtService = [0,0,0,0,0];
   let breakevenMonth = null;
   let paybackMonth = null;
+  let paybackEquityMonth = null;               // 1er mois où cumul FCFE > 0
   const cashflows = [-capex];                  // unlevered IRR inputs
   const cashflowsEquity = [-equity];           // levered IRR inputs
 
@@ -5054,10 +5091,13 @@ function buildPnL(cohortData, avgQuartierPrice) {
     if(yearIdx < 5) {
       annualCA[yearIdx] += totalCA;
       annualEBITDA[yearIdx] += ebitda;
+      annualFCFE[yearIdx] += cashFlowEquity;
+      annualDebtService[yearIdx] += interestExp + principalPay;
     }
 
     if(breakevenMonth === null && ebitda > 0) breakevenMonth = i + 1;
     if(paybackMonth === null && cumulCashFlow > 0) paybackMonth = i + 1;
+    if(paybackEquityMonth === null && cumulCashFlowEquity > 0) paybackEquityMonth = i + 1;
 
     cashflows.push(cashFlow);
     cashflowsEquity.push(cashFlowEquity);
@@ -5135,6 +5175,28 @@ function buildPnL(cohortData, avgQuartierPrice) {
   // Total interest paid over loan term (sum monthly interest)
   const totalInterest = monthly.reduce((a, m) => a + (m.interestExp || 0), 0);
 
+  // ─── v6.67 — Indicateurs investisseur (dette / equity) ────────────
+  // DSCR annuel = (EBITDA − leasing) / service de la dette. null si pas de
+  // service de dette cette année-là (dette OFF ou prêt déjà remboursé).
+  const annualLeasing = annualEBITDA.map((_, y) =>
+    (y + 1) <= PNL_DEFAULTS.leasingYears ? getScaledLeasingAnnual() : 0);
+  const dscrByYear = annualDebtService.map((ds, y) =>
+    ds > 0 ? Math.round(((annualEBITDA[y] - annualLeasing[y]) / ds) * 100) / 100 : null);
+  const dscrValues = dscrByYear.filter(v => v !== null);
+  const dscrMin = dscrValues.length ? Math.min(...dscrValues) : null;
+  const dscrAvg = dscrValues.length
+    ? Math.round(dscrValues.reduce((a, b) => a + b, 0) / dscrValues.length * 100) / 100 : null;
+  // DSCR "cruising" (A2+) — l'A1 en ramp-up a souvent un EBITDA négatif,
+  // structurellement non couvrant (financé par l'equity/BFR) : c'est le DSCR
+  // des années de croisière que la banque regarde pour dimensionner la dette.
+  const dscrCruise = dscrByYear.slice(1).filter(v => v !== null);
+  const dscrMinCruise = dscrCruise.length ? Math.min(...dscrCruise) : null;
+  // FCFE cumulé 5 ans (hors equity initiale, hors TV) + MOIC 5 ans avec exit.
+  // MOIC = (Σ FCFE + valeur terminale) / equity investie.
+  const fcfe5y = Math.round(annualFCFE.reduce((a, b) => a + b, 0));
+  const moic = equity > 0
+    ? Math.round(((fcfe5y + terminalValue) / equity) * 100) / 100 : null;
+
   return {
     monthly, annualCA: annualCA.map(Math.round), annualEBITDA: annualEBITDA.map(Math.round),
     capex, rent: rentY1, fixedOpex: fixedOpexDisplay,
@@ -5144,7 +5206,11 @@ function buildPnL(cohortData, avgQuartierPrice) {
     // Financing
     equity, loanPrincipal, loanMonthlyPayment: Math.round(loanMonthlyPayment),
     irrEquity, npvEquity, totalInterest,
-    financing: PNL_DEFAULTS.financing,
+    financing: fin,
+    // v6.67 — investisseur : FCFE, DSCR, MOIC, payback equity
+    annualFCFE: annualFCFE.map(Math.round), fcfe5y,
+    annualDebtService: annualDebtService.map(Math.round),
+    dscrByYear, dscrMin, dscrAvg, dscrMinCruise, moic, paybackEquityMonth,
     totalCA5y: Math.round(annualCA.reduce((a,b)=>a+b,0)),
     avgMargin: monthly.length > 0 ? Math.round(monthly.slice(-12).reduce((a,m)=>a+m.ebitda,0) / 12) : 0,
     rentSteps: PNL_DEFAULTS.rentSteps, leasingMonthly
@@ -5407,9 +5473,78 @@ function computeExecSummary(r) {
 }
 
 // --- RENT SLIDER: REAL-TIME P&L RECALC ---
-// v6.65 — helper pour logger les 3 sliders (loyer/charges/surface) au
-// relâchement user. Garde le "before" (1re valeur vue) et le "after"
-// (dernière valeur vue) entre les onInput rapides, log au debounce 800ms.
+
+// ═══════════════════════════════════════════════════════════════════
+// v6.67 — IMPACT KPI PAR CHANGEMENT D'HYPOTHÈSE
+// Chaque modification loggée (loyer, charges, surface, financement)
+// embarque le delta des KPIs investisseur (EBITDA Y5, IRR projet/equity,
+// NPV, FCFE 5 ans, DSCR min) calculé en re-runnant buildPnL (pur, ~1ms)
+// avec la valeur avant puis après. → Journal = historique monitorable
+// des hypothèses avec impact chiffré.
+// ═══════════════════════════════════════════════════════════════════
+
+// Applique temporairement une valeur d'hypothèse (pour le calcul before/after).
+// Retourne une fonction de restauration.
+function _applyHypothesisValue(field, value) {
+  const saves = {
+    rentOv: window._rentOverride, chargeOv: window._chargeOverride,
+    surfOv: window._surfaceOverride, finOv: window._financingOverride,
+  };
+  switch (field) {
+    case 'loyer':    window._rentOverride    = (value == null) ? null : { y1: Number(value) }; break;
+    case 'charges':  window._chargeOverride  = (value == null) ? null : { chargeTotal: Number(value) }; break;
+    case 'surface':  window._surfaceOverride = (value == null) ? null : { surface: Number(value) }; break;
+    case 'fin.dette':   window._financingOverride = Object.assign({}, window._financingOverride, { enabled: !!value }); break;
+    case 'fin.equity':  window._financingOverride = Object.assign({ enabled: true }, window._financingOverride, { equityRatio: Number(value) / 100 }); break;
+    case 'fin.taux':    window._financingOverride = Object.assign({ enabled: true }, window._financingOverride, { loanRate: Number(value) / 100 }); break;
+    case 'fin.duree':   window._financingOverride = Object.assign({ enabled: true }, window._financingOverride, { loanTermYears: Number(value) }); break;
+    default: return () => {};
+  }
+  return () => {
+    window._rentOverride = saves.rentOv; window._chargeOverride = saves.chargeOv;
+    window._surfaceOverride = saves.surfOv; window._financingOverride = saves.finOv;
+  };
+}
+
+// KPIs compacts du scénario BASE avec la valeur donnée pour `field`.
+// null si aucune analyse ouverte (pas de cohort → pas de P&L).
+function _kpisWithValue(field, value) {
+  try {
+    if (!window._lastCaptageData?.r?.scenarios?.base?.cohort) return null;
+    const { r, avgPrice } = window._lastCaptageData;
+    const restore = _applyHypothesisValue(field, value);
+    let p;
+    try { p = buildPnL(r.scenarios.base.cohort, avgPrice); }
+    finally { restore(); }
+    return {
+      ebitdaY5: Math.round((p.annualEBITDA?.[4] || 0) / 1000),   // k€
+      irr: p.irr, irrEquity: p.irrEquity,
+      npv: Math.round((p.npv || 0) / 1000),                      // k€
+      fcfe5y: Math.round((p.fcfe5y || 0) / 1000),                // k€
+      dscrMin: p.dscrMinCruise,
+    };
+  } catch { return null; }
+}
+
+// Delta complet before/after pour le journal. null si pas calculable.
+function computeKpiImpact(field, before, after) {
+  const kb = _kpisWithValue(field, before);
+  const ka = _kpisWithValue(field, after);
+  if (!kb || !ka) return null;
+  return {
+    before: kb, after: ka,
+    dEbitdaY5: Math.round((ka.ebitdaY5 - kb.ebitdaY5) * 10) / 10,        // k€
+    dIrr: Math.round((ka.irr - kb.irr) * 10) / 10,                        // pts
+    dIrrEquity: Math.round((ka.irrEquity - kb.irrEquity) * 10) / 10,      // pts
+    dFcfe5y: Math.round((ka.fcfe5y - kb.fcfe5y) * 10) / 10,               // k€
+  };
+}
+window.computeKpiImpact = computeKpiImpact;
+
+// v6.65 — helper pour logger les sliders d'hypothèses au relâchement user.
+// Garde le "before" (1re valeur vue) et le "after" (dernière valeur vue)
+// entre les onInput rapides, log au debounce 800ms.
+// v6.67 — enrichi du delta KPI (meta.kpi) calculé au flush.
 window._sliderLogTimers = window._sliderLogTimers || {};
 window._sliderLogBefore = window._sliderLogBefore || {};
 function logSliderChangeDebounced(field, before, after, siteKey, siteName) {
@@ -5421,10 +5556,12 @@ function logSliderChangeDebounced(field, before, after, siteKey, siteName) {
     const b = window._sliderLogBefore[k];
     if (b !== after) {
       try {
+        const kpi = computeKpiImpact(field, b, after);
         window.AuditLog.log({
-          action: 'slider.' + field,
+          action: field.startsWith('fin.') ? 'financement.' + field.slice(4) : 'slider.' + field,
           target: siteName || '(site inconnu)',
           siteKey, field, before: b, after,
+          meta: kpi ? { kpi } : undefined,
         });
       } catch {}
     }
@@ -5509,6 +5646,89 @@ function onSurfaceSliderChange(val) {
   clearTimeout(window._surfaceRecalcTimer);
   window._surfaceRecalcTimer = setTimeout(recalcPnLWithRent, 150);
 }
+
+// ═══ v6.67 — FINANCEMENT: toggle dette + sliders (GLOBAL, tous sites) ═══
+function _finGet() {
+  // État courant effectif pour l'UI (défauts BP si pas d'override)
+  const f = getEffectiveFinancing();
+  return { enabled: f.enabled !== false && f.loanRatio > 0, equityPct: Math.round(f.equityRatio * 100),
+           ratePct: Math.round(f.loanRate * 1000) / 10, term: f.loanTermYears };
+}
+function _finSet(patch) {
+  const cur = window._financingOverride || {};
+  const def = PNL_DEFAULTS.financing;
+  window._financingOverride = Object.assign({
+    enabled: cur.enabled !== false,
+    equityRatio: cur.equityRatio ?? def.equityRatio,
+    loanRate: cur.loanRate ?? def.loanRate,
+    loanTermYears: cur.loanTermYears ?? def.loanTermYears,
+  }, cur, patch, { at: Date.now() });
+  window.persistOverrides?.();
+  clearTimeout(window._finRecalcTimer);
+  window._finRecalcTimer = setTimeout(recalcPnLWithRent, 150);
+}
+function _finSiteCtx() {
+  const loc = window._lastCaptageLocation;
+  return { siteKey: 'global', siteName: (loc?.siteName ? loc.siteName + ' (réglage global)' : 'Financement global') };
+}
+function onFinancingToggle(checked) {
+  const before = _finGet().enabled;
+  const { siteKey, siteName } = _finSiteCtx();
+  logSliderChangeDebounced('fin.dette', before, !!checked, siteKey, siteName);
+  _finSet({ enabled: !!checked });
+  // Griser/dégriser les sliders
+  ['finEquitySlider','finRateSlider','finTermSlider'].forEach(id => {
+    const s = document.getElementById(id); if (s) s.disabled = !checked;
+  });
+  const wrap = document.getElementById('fin-sliders-wrap');
+  if (wrap) wrap.style.opacity = checked ? '1' : '.35';
+}
+function onFinEquitySlider(val) {
+  const v = parseInt(val, 10);
+  const before = _finGet().equityPct;
+  const { siteKey, siteName } = _finSiteCtx();
+  logSliderChangeDebounced('fin.equity', before, v, siteKey, siteName);
+  _finSet({ equityRatio: v / 100 });
+  const lbl = document.getElementById('fin-equity-label');
+  if (lbl) lbl.textContent = v + '% / ' + (100 - v) + '%';
+}
+function onFinRateSlider(val) {
+  const v = parseFloat(val);
+  const before = _finGet().ratePct;
+  const { siteKey, siteName } = _finSiteCtx();
+  logSliderChangeDebounced('fin.taux', before, v, siteKey, siteName);
+  _finSet({ loanRate: v / 100 });
+  const lbl = document.getElementById('fin-rate-label');
+  if (lbl) lbl.textContent = v.toFixed(2) + '%';
+}
+function onFinTermSlider(val) {
+  const v = parseInt(val, 10);
+  const before = _finGet().term;
+  const { siteKey, siteName } = _finSiteCtx();
+  logSliderChangeDebounced('fin.duree', before, v, siteKey, siteName);
+  _finSet({ loanTermYears: v });
+  const lbl = document.getElementById('fin-term-label');
+  if (lbl) lbl.textContent = v + ' ans';
+}
+
+// P&L de RÉFÉRENCE (BP verrouillé, zéro override) pour la ligne "vs Référence".
+// Pur et sans effet de bord : sauvegarde/restaure les 4 overrides.
+function computeReferencePnL() {
+  try {
+    if (!window._lastCaptageData?.r?.scenarios?.base?.cohort) return null;
+    const { r, avgPrice } = window._lastCaptageData;
+    const saves = [window._rentOverride, window._chargeOverride, window._surfaceOverride, window._financingOverride];
+    window._rentOverride = null; window._chargeOverride = null;
+    window._surfaceOverride = null; window._financingOverride = null;
+    let p;
+    try { p = buildPnL(r.scenarios.base.cohort, avgPrice); }
+    finally {
+      [window._rentOverride, window._chargeOverride, window._surfaceOverride, window._financingOverride] = saves;
+    }
+    return p;
+  } catch { return null; }
+}
+window.computeReferencePnL = computeReferencePnL;
 
 function recalcPnLWithRent() {
   if(!window._lastCaptageData) return;
@@ -5600,7 +5820,57 @@ function updatePnLDisplay(pnl, exec) {
       window._pnlChart.update('none');
     } catch(err) { console.warn('Chart update failed:', err); }
   }
+
+  // ═══ v6.67 — bloc FINANCEMENT (scénario base) + ligne "vs Référence BP" ═══
+  updateFinancingDisplay(pnl.base);
 }
+
+function updateFinancingDisplay(p) {
+  if (!p) return;
+  const e = id => document.getElementById(id);
+  const kEUR = v => fmt(Math.round((v || 0) / 1000)) + 'k';
+  // Structure
+  if (e('fin-kpi-equity'))   e('fin-kpi-equity').textContent   = kEUR(p.equity);
+  if (e('fin-kpi-loan'))     e('fin-kpi-loan').textContent     = p.loanPrincipal > 0 ? kEUR(p.loanPrincipal) : '—';
+  if (e('fin-kpi-pmt'))      e('fin-kpi-pmt').textContent      = p.loanMonthlyPayment > 0 ? fmt(p.loanMonthlyPayment) + '/mois' : '—';
+  if (e('fin-kpi-interest')) e('fin-kpi-interest').textContent = p.totalInterest > 0 ? kEUR(p.totalInterest) : '—';
+  // Indicateurs investisseur
+  if (e('fin-kpi-irrproj')) { e('fin-kpi-irrproj').textContent = p.irr + '%'; e('fin-kpi-irrproj').style.color = p.irr > 15 ? 'var(--green)' : p.irr > 8 ? 'var(--yellow)' : 'var(--red)'; }
+  if (e('fin-kpi-irreq'))   { e('fin-kpi-irreq').textContent   = p.irrEquity + '%'; e('fin-kpi-irreq').style.color = p.irrEquity > 15 ? 'var(--green)' : p.irrEquity > 8 ? 'var(--yellow)' : 'var(--red)'; }
+  if (e('fin-kpi-fcfe'))    { e('fin-kpi-fcfe').textContent    = kEUR(p.fcfe5y); e('fin-kpi-fcfe').style.color = p.fcfe5y > 0 ? 'var(--green)' : 'var(--red)'; }
+  if (e('fin-kpi-dscr'))    {
+    const d = p.dscrMinCruise;
+    e('fin-kpi-dscr').textContent = d != null ? d.toFixed(2) + '×' : 'n/a';
+    // Seuil bancaire standard: DSCR ≥ 1.2 confortable, < 1.0 en tension
+    e('fin-kpi-dscr').style.color = d == null ? 'var(--gray2)' : d >= 1.2 ? 'var(--green)' : d >= 1.0 ? 'var(--yellow)' : 'var(--red)';
+    e('fin-kpi-dscr').title = p.dscrByYear ? 'DSCR par année: ' + p.dscrByYear.map((v,i)=>'A'+(i+1)+' '+(v!=null?v.toFixed(2)+'×':'—')).join(' · ') + ' (A1 = ramp-up)' : '';
+  }
+  if (e('fin-kpi-moic'))    { e('fin-kpi-moic').textContent    = p.moic != null ? p.moic.toFixed(1) + '×' : 'n/a'; e('fin-kpi-moic').style.color = (p.moic || 0) >= 2 ? 'var(--green)' : 'var(--yellow)'; }
+  if (e('fin-kpi-pbeq'))    { e('fin-kpi-pbeq').textContent    = p.paybackEquityMonth ? 'M' + p.paybackEquityMonth : '>60M'; e('fin-kpi-pbeq').style.color = p.paybackEquityMonth ? 'var(--green)' : 'var(--red)'; }
+  // Ligne "vs Référence BP" — écart des réglages courants vs BP verrouillé
+  const refEl = e('pnl-ref-delta');
+  if (refEl) {
+    const ref = computeReferencePnL();
+    if (!ref) { refEl.style.display = 'none'; }
+    else {
+      const dEb = Math.round(((p.annualEBITDA?.[4] || 0) - (ref.annualEBITDA?.[4] || 0)) / 1000);
+      const dIrr = Math.round((p.irr - ref.irr) * 10) / 10;
+      const dIrrEq = Math.round((p.irrEquity - ref.irrEquity) * 10) / 10;
+      const isRef = dEb === 0 && dIrr === 0 && dIrrEq === 0;
+      refEl.style.display = '';
+      const sgn = v => (v > 0 ? '+' : '') + v;
+      const col = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--gray2)';
+      refEl.innerHTML = isRef
+        ? `<span style="color:var(--green)">✓ Réglages = Référence BP</span> <span style="color:var(--gray2)">(OnAir calibré v6.x — EBITDA A5 ${fmt(Math.round((ref.annualEBITDA?.[4]||0)/1000))}k, IRR ${ref.irr}%, IRR Eq ${ref.irrEquity}%)</span>`
+        : `<span style="color:var(--accent);font-weight:700">Écart vs Référence BP :</span> `
+          + `EBITDA A5 <span style="color:${col(dEb)};font-weight:700">${sgn(dEb)}k€</span> · `
+          + `IRR Projet <span style="color:${col(dIrr)};font-weight:700">${sgn(dIrr)} pts</span> · `
+          + `IRR Equity <span style="color:${col(dIrrEq)};font-weight:700">${sgn(dIrrEq)} pts</span> `
+          + `<span style="color:var(--gray2)">(réf: EBITDA ${fmt(Math.round((ref.annualEBITDA?.[4]||0)/1000))}k · IRR ${ref.irr}% · Eq ${ref.irrEquity}%)</span>`;
+    }
+  }
+}
+window.updateFinancingDisplay = updateFinancingDisplay;
 
 // --- MULTI-SITE RANKING ---
 // Store all analyzed sites for comparison
@@ -5759,6 +6029,7 @@ async function renderActivityLog() {
   };
   const actionIcon = (a) => {
     if (a?.startsWith('slider')) return '🎛️';
+    if (a?.startsWith('financement')) return '💰';
     if (a === 'site.add') return '➕';
     if (a === 'site.remove') return '🗑️';
     if (a === 'site.qualify') return '🏷️';
@@ -5768,11 +6039,29 @@ async function renderActivityLog() {
   };
   const fmtVal = (v) => {
     if (v == null) return '—';
+    if (typeof v === 'boolean') return v ? 'ON' : 'OFF';
     if (typeof v === 'number') {
       if (Math.abs(v) >= 1000) return v.toLocaleString('fr-FR');
       return String(v);
     }
     return String(v);
+  };
+  // v6.67 — badge d'impact KPI (delta EBITDA A5 / IRR / IRR Equity / FCFE)
+  const impactBadge = (e) => {
+    const k = e.meta?.kpi;
+    if (!k) return '<span style="color:var(--gray2)">—</span>';
+    const part = (label, v, unit) => {
+      if (v == null || v === 0) return '';
+      const col = v > 0 ? 'var(--green)' : 'var(--red)';
+      return `<span style="white-space:nowrap;color:${col};font-weight:700">${label} ${v > 0 ? '+' : ''}${v}${unit}</span>`;
+    };
+    const parts = [
+      part('EBITDA A5', k.dEbitdaY5, 'k€'),
+      part('IRR', k.dIrr, 'pts'),
+      part('IRR Eq', k.dIrrEquity, 'pts'),
+      part('FCFE', k.dFcfe5y, 'k€'),
+    ].filter(Boolean);
+    return parts.length ? parts.join(' · ') : '<span style="color:var(--gray2)">neutre</span>';
   };
   body.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:10px">
@@ -5784,6 +6073,7 @@ async function renderActivityLog() {
           <th style="text-align:left;padding:6px 8px">SITE</th>
           <th style="text-align:left;padding:6px 8px">CHAMP</th>
           <th style="text-align:right;padding:6px 8px">AVANT → APRÈS</th>
+          <th style="text-align:right;padding:6px 8px" title="Impact sur le scénario Base au moment du changement">IMPACT KPI</th>
         </tr>
       </thead>
       <tbody>
@@ -5795,11 +6085,12 @@ async function renderActivityLog() {
             <td style="padding:6px 8px;color:var(--white)">${(e.target || '—').replace(/</g,'&lt;')}</td>
             <td style="padding:6px 8px;color:var(--gray)">${e.field || '—'}</td>
             <td style="padding:6px 8px;text-align:right;color:var(--gray)">${(e.before != null || e.after != null) ? `<span style="color:var(--red)">${fmtVal(e.before)}</span> → <span style="color:var(--green)">${fmtVal(e.after)}</span>` : '—'}</td>
+            <td style="padding:6px 8px;text-align:right;font-size:9px">${impactBadge(e)}</td>
           </tr>
         `).join('')}
       </tbody>
     </table>
-    <div style="font-size:8px;color:var(--gray2);margin-top:12px;text-align:center">${entries.length} entrées · dernière maj ${new Date(resp.ts).toLocaleString('fr-FR')}</div>
+    <div style="font-size:8px;color:var(--gray2);margin-top:12px;text-align:center">${entries.length} entrées · dernière maj ${new Date(resp.ts).toLocaleString('fr-FR')} · Les entrées 🎛️/💰 portent l'impact KPI (scénario Base) calculé au moment du changement</div>
   `;
 }
 
@@ -5981,6 +6272,9 @@ function exportPDF() {
         <tr style="border-top:2px solid #d4a017"><td style="font-weight:700">IRR Projet (unlevered)</td><td style="color:${r.pnl.conservateur.irr>15?'#10b981':'#ef4444'}">${r.pnl.conservateur.irr.toFixed(1)}%</td><td style="font-weight:700;color:${r.pnl.base.irr>15?'#10b981':'#ef4444'}">${r.pnl.base.irr.toFixed(1)}%</td><td style="color:${r.pnl.optimiste.irr>15?'#10b981':'#ef4444'}">${r.pnl.optimiste.irr.toFixed(1)}%</td></tr>
         <tr><td style="font-weight:700">IRR Equity (levered) ⭐</td><td style="color:${r.pnl.conservateur.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.conservateur.irrEquity ?? 0).toFixed(1)}%</td><td style="font-weight:700;color:${r.pnl.base.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.base.irrEquity ?? 0).toFixed(1)}%</td><td style="color:${r.pnl.optimiste.irrEquity>15?'#10b981':'#ef4444'}">${(r.pnl.optimiste.irrEquity ?? 0).toFixed(1)}%</td></tr>
         <tr><td style="font-weight:700">NPV</td><td>${fmt(Math.round(r.pnl.conservateur.npv/1000))}k€</td><td style="font-weight:700">${fmt(Math.round(r.pnl.base.npv/1000))}k€</td><td>${fmt(Math.round(r.pnl.optimiste.npv/1000))}k€</td></tr>
+        <tr><td style="font-weight:700">FCFE cumulé 5 ans (avant IS)</td><td>${fmt(Math.round((r.pnl.conservateur.fcfe5y||0)/1000))}k€</td><td style="font-weight:700">${fmt(Math.round((r.pnl.base.fcfe5y||0)/1000))}k€</td><td>${fmt(Math.round((r.pnl.optimiste.fcfe5y||0)/1000))}k€</td></tr>
+        <tr><td style="font-weight:700">DSCR min (A2+, hors ramp-up A1)</td><td>${r.pnl.conservateur.dscrMinCruise != null ? r.pnl.conservateur.dscrMinCruise.toFixed(2)+'×' : 'n/a'}</td><td style="font-weight:700;color:${(r.pnl.base.dscrMinCruise||0)>=1.2?'#10b981':'#ef4444'}">${r.pnl.base.dscrMinCruise != null ? r.pnl.base.dscrMinCruise.toFixed(2)+'×' : 'n/a'}</td><td>${r.pnl.optimiste.dscrMinCruise != null ? r.pnl.optimiste.dscrMinCruise.toFixed(2)+'×' : 'n/a'}</td></tr>
+        <tr><td style="font-weight:700">MOIC 5 ans (avec sortie 8× EBITDA)</td><td>${r.pnl.conservateur.moic != null ? r.pnl.conservateur.moic.toFixed(1)+'×' : 'n/a'}</td><td style="font-weight:700">${r.pnl.base.moic != null ? r.pnl.base.moic.toFixed(1)+'×' : 'n/a'}</td><td>${r.pnl.optimiste.moic != null ? r.pnl.optimiste.moic.toFixed(1)+'×' : 'n/a'}</td></tr>
       </table>
     </div>
 
@@ -6468,6 +6762,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div style="font-size:7px;color:var(--gray2);line-height:1.4">
         CAPEX ${fmt(Math.round(PNL_DEFAULTS.capex/1000))}k + Leasing ${fmt(Math.round(PNL_DEFAULTS.leasingAnnual/1000))}k/an (5 ans) | Staff 3 ETP plug ${fmt(Math.round(PNL_DEFAULTS.staffFloorAnnual/1000))}k A1 (+${Math.round((PNL_DEFAULTS.staff?.inflationRate||0.06)*100)}%/an) | OPEX Ops ${Math.round(PNL_DEFAULTS.opexOpsRateByYear[0]*100)}%→${Math.round(PNL_DEFAULTS.opexOpsRateByYear[4]*100)}% CA | Redev ${Math.round(PNL_DEFAULTS.redevanceRate*100)}%+${Math.round(PNL_DEFAULTS.fondsPubRate*100)}% | CIT ${Math.round(PNL_DEFAULTS.citRate*100)}% | WACC ${Math.round(PNL_DEFAULTS.discountRate*100)}%
       </div>
+      <div id="pnl-ref-delta" style="font-size:8px;margin-top:6px;padding:6px 8px;background:var(--bg2);border-radius:5px;line-height:1.5"></div>
       <div id="rent-block" style="background:#fbbf2410;border:1px solid #fbbf2430;border-radius:6px;padding:8px;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div style="font-size:8px;font-weight:700;color:var(--accent)">LOYER — Ajustable en direct (${PNL_DEFAULTS.rentSteps.surface} m²)</div>
@@ -6521,6 +6816,100 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           <span style="font-size:7px;color:var(--gray2)">2500</span>
         </div>
       </div>
+
+      <!-- v6.67: FINANCEMENT — toggle dette bancaire + structure + KPIs investisseur -->
+      ${(() => {
+        const f = getEffectiveFinancing();
+        const on = f.enabled !== false && f.loanRatio > 0;
+        const pb = r.pnl.base;
+        const kEUR = v => fmt(Math.round((v||0)/1000)) + 'k';
+        return `
+      <div id="financing-block" style="background:#3b82f610;border:1px solid #3b82f630;border-radius:6px;padding:8px;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:8px;font-weight:700;color:#60a5fa">💰 FINANCEMENT — Dette bancaire (global, tous sites)</div>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:8px;color:var(--gray)">
+            <input id="finDebtToggle" type="checkbox" ${on ? 'checked' : ''} onchange="onFinancingToggle(this.checked)" style="accent-color:#60a5fa;cursor:pointer">
+            <span style="font-weight:700;color:${on ? '#60a5fa' : 'var(--gray2)'}">${on ? 'DETTE ON' : '100% EQUITY'}</span>
+          </label>
+        </div>
+        <div id="fin-sliders-wrap" style="opacity:${on ? '1' : '.35'}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:8px;color:var(--gray)">Apport / Dette</div>
+            <div id="fin-equity-label" style="font-size:9px;font-weight:800;color:#60a5fa">${Math.round(f.equityRatio*100)}% / ${Math.round(f.loanRatio*100)}%</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:7px;color:var(--gray2)">10%</span>
+            <input id="finEquitySlider" type="range" min="10" max="100" step="5" value="${Math.round(f.equityRatio*100)}" ${on ? '' : 'disabled'} style="flex:1;accent-color:#60a5fa;height:5px;cursor:pointer" oninput="onFinEquitySlider(this.value)">
+            <span style="font-size:7px;color:var(--gray2)">100%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:8px;color:var(--gray)">Taux d'intérêt annuel</div>
+            <div id="fin-rate-label" style="font-size:9px;font-weight:800;color:#60a5fa">${(f.loanRate*100).toFixed(2)}%</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:7px;color:var(--gray2)">0.5%</span>
+            <input id="finRateSlider" type="range" min="0.5" max="12" step="0.25" value="${(f.loanRate*100).toFixed(2)}" ${on ? '' : 'disabled'} style="flex:1;accent-color:#60a5fa;height:5px;cursor:pointer" oninput="onFinRateSlider(this.value)">
+            <span style="font-size:7px;color:var(--gray2)">12%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:8px;color:var(--gray)">Durée d'amortissement</div>
+            <div id="fin-term-label" style="font-size:9px;font-weight:800;color:#60a5fa">${f.loanTermYears} ans</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:7px;color:var(--gray2)">3</span>
+            <input id="finTermSlider" type="range" min="3" max="15" step="1" value="${f.loanTermYears}" ${on ? '' : 'disabled'} style="flex:1;accent-color:#60a5fa;height:5px;cursor:pointer" oninput="onFinTermSlider(this.value)">
+            <span style="font-size:7px;color:var(--gray2)">15</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:6px">
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)">EQUITY</div>
+            <div id="fin-kpi-equity" style="font-size:10px;font-weight:800;color:#34d399">${kEUR(pb.equity)}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)">DETTE</div>
+            <div id="fin-kpi-loan" style="font-size:10px;font-weight:800;color:#60a5fa">${pb.loanPrincipal > 0 ? kEUR(pb.loanPrincipal) : '—'}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)">MENSUALITÉ</div>
+            <div id="fin-kpi-pmt" style="font-size:10px;font-weight:800;color:var(--white)">${pb.loanMonthlyPayment > 0 ? fmt(pb.loanMonthlyPayment)+'/mois' : '—'}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)">INTÉRÊTS TOT.</div>
+            <div id="fin-kpi-interest" style="font-size:10px;font-weight:800;color:#f87171">${pb.totalInterest > 0 ? kEUR(pb.totalInterest) : '—'}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px">
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)">IRR PROJET</div>
+            <div id="fin-kpi-irrproj" style="font-size:11px;font-weight:800">${pb.irr}%</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center;border:1px solid rgba(212,160,23,.3)">
+            <div style="font-size:6.5px;color:var(--accent);font-weight:700">IRR EQUITY ⭐</div>
+            <div id="fin-kpi-irreq" style="font-size:11px;font-weight:800">${pb.irrEquity}%</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)" title="Net Free Cash Flow to Equity cumulé 5 ans (avant IS, hors TV)">FCFE 5 ANS</div>
+            <div id="fin-kpi-fcfe" style="font-size:11px;font-weight:800">${kEUR(pb.fcfe5y)}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)" title="Debt Service Coverage Ratio minimum en années de croisière (A2+) — banque exige ≥ 1.2. A1 ramp-up exclu (EBITDA négatif structurel).">DSCR (A2+)</div>
+            <div id="fin-kpi-dscr" style="font-size:11px;font-weight:800">${pb.dscrMinCruise != null ? pb.dscrMinCruise.toFixed(2)+'×' : 'n/a'}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)" title="Multiple sur equity investie à 5 ans avec valeur de sortie (8× EBITDA A5)">MOIC 5A</div>
+            <div id="fin-kpi-moic" style="font-size:11px;font-weight:800">${pb.moic != null ? pb.moic.toFixed(1)+'×' : 'n/a'}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:5px;text-align:center">
+            <div style="font-size:6.5px;color:var(--gray2)" title="Mois où le cumul FCFE devient positif (récupération de l'apport)">PAYBACK EQUITY</div>
+            <div id="fin-kpi-pbeq" style="font-size:11px;font-weight:800">${pb.paybackEquityMonth ? 'M'+pb.paybackEquityMonth : '>60M'}</div>
+          </div>
+        </div>
+        <div style="font-size:7px;color:var(--gray2);line-height:1.4">
+          Référence BP: ${Math.round(PNL_DEFAULTS.financing.equityRatio*100)}% equity / ${Math.round(PNL_DEFAULTS.financing.loanRatio*100)}% dette @ ${(PNL_DEFAULTS.financing.loanRate*100).toFixed(1)}% sur ${PNL_DEFAULTS.financing.loanTermYears} ans (SG garantie BPI). FCFE = EBITDA − leasing − service dette (avant IS). Chaque réglage est journalisé avec son impact (📋 Journal).
+        </div>
+      </div>`;
+      })()}
     </div>
 
     <div style="background:linear-gradient(135deg,rgba(212,160,23,.07),rgba(16,185,129,.04));border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:12px;margin-bottom:10px">
@@ -6717,6 +7106,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   `;
 
   // === CHART.JS RENDERING ===
+  // v6.67 — remplit la ligne "vs Référence BP" + KPIs financement au 1er rendu
+  // (updatePnLDisplay ne tourne qu'aux mouvements de slider).
+  setTimeout(() => { try { updateFinancingDisplay(r.pnl?.base); } catch {} }, 0);
   setTimeout(() => {
     const bassCanvas = document.getElementById('bassChart');
     if(bassCanvas && typeof Chart !== 'undefined') {

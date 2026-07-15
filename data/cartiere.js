@@ -10,7 +10,9 @@
 //   lat,lng Centroid
 //   sector  Bucharest administrative sector (1-6)
 //   pop     Population (INS + field adjustments)
-//   price   Avg rental price EUR/m2
+//   price   Avg property SALE price EUR/m2 (700-3200 range) — NOT a rent.
+//           Consumed by calcJeunesseScore (index.html) as a gentrification
+//           proxy with thresholds 1000/1400/2000/2500.
 //   young   % of 15-45 yo
 //   desc    Short description
 //

@@ -175,6 +175,15 @@
         }
       }
     }
+    // v6.67 — financement (global). LWW par timestamp `at`.
+    if (remote.financing && typeof remote.financing === 'object') {
+      const localAt = (window._financingOverride && window._financingOverride.at) || 0;
+      const remoteAt = remote.financing.at || 0;
+      if (remoteAt > localAt) {
+        window._financingOverride = remote.financing;
+        changes++;
+      }
+    }
     // v6.65.1 — capture rates (global, pas par site). LWW simple.
     if (remote.captureRates && typeof remote.captureRates === 'object') {
       const before = window._captureRatesOverride || {};
@@ -286,6 +295,7 @@
         surface: window._surfaceOverrides || {},
         radius:  window._radiusOverrides  || {},   // v6.65.1 rayon par site
         captureRates: window._captureRatesOverride || null, // v6.65.1 taux global
+        financing: window._financingOverride || null, // v6.67 structure dette (global, LWW par .at)
         meta:    (function(){
           try {
             const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
@@ -373,6 +383,7 @@
         surface: window._surfaceOverrides || {},
         radius:  window._radiusOverrides  || {},   // v6.65.1 rayon par site
         captureRates: window._captureRatesOverride || null, // v6.65.1 taux global
+        financing: window._financingOverride || null, // v6.67 structure dette (global, LWW par .at)
         meta:    (function(){
           try {
             const s = (typeof window.safeStorage !== 'undefined') ? window.safeStorage : null;
