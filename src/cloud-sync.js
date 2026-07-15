@@ -244,6 +244,7 @@
       if (!r.ok) { setStatus('error', `pull ${r.status}`); return { ok: false, reason: 'HTTP_' + r.status }; }
       kvAvailable = true;
       const data = await r.json();
+      window._fpLastServerTs = data.ts || window._fpLastServerTs || 0; // v6.85 baseline anti-conflit
       const remoteSites = Array.isArray(data.sites) ? data.sites : [];
       const changes = mergeCRDT(remoteSites);
       const ovChanges = mergeOverrides(data.overrides);
@@ -306,12 +307,23 @@
       const r2 = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, sites: window.customSites, overrides }),
+        // v6.85 — baseTs = dernier ts serveur connu → le serveur détecte si
+        // un autre user a modifié entre-temps (merge champ par champ + conflits).
+        body: JSON.stringify({ user, sites: window.customSites, overrides, baseTs: window._fpLastServerTs || 0 }),
       });
       if (r2.status === 503) { kvAvailable = false; setStatus('offline', 'KV not configured'); return; }
       if (!r2.ok) { setStatus('error', `push ${r2.status}`); return; }
       kvAvailable = true;
       const data = await r2.json();
+      window._fpLastServerTs = data.ts || Date.now();
+      // v6.85 — le serveur a fusionné : ré-adopter les overrides mergés
+      // (évite qu'un push suivant ré-écrase avec un état périmé).
+      if (data.overrides) { try { mergeOverrides(data.overrides); } catch {} }
+      // Conflits réels (même site+champ édité par un autre, plus récemment) :
+      // notifier sans rien perdre — la version distante a été conservée.
+      if (Array.isArray(data.conflicts) && data.conflicts.length) {
+        try { window.notifyOverrideConflicts?.(data.conflicts); } catch {}
+      }
       const liveCount = window.customSites.filter(s => !s.deletedAt).length;
       setStatus('ok', `${liveCount} sites synchros`);
     } catch (e) {

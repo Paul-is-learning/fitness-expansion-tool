@@ -7793,6 +7793,42 @@ function doLogout() {
 
 function isAdmin() { return !currentUser || currentUser.role === 'admin'; }
 
+// v6.85 — notification non-destructive de conflit d'édition simultanée.
+// Le serveur a conservé la version du collègue (plus récente) ; on le
+// signale au lieu d'écraser en silence. L'utilisateur voit la valeur
+// retenue et peut re-modifier s'il n'est pas d'accord.
+function notifyOverrideConflicts(conflicts) {
+  if (!Array.isArray(conflicts) || !conflicts.length) return;
+  const label = { rent: 'loyer', charge: 'charges', surface: 'surface', radius: 'rayon' };
+  const shortName = e => { try { return String(e || '').split('@')[0]; } catch { return e; } };
+  const siteName = sk => {
+    try {
+      const [la, ln] = sk.split(',').map(Number);
+      const t = (typeof TARGETS !== 'undefined') ? TARGETS.find(x => Math.abs(x.lat - la) < 0.01 && Math.abs(x.lng - ln) < 0.01) : null;
+      if (t) return t.name;
+      const c = (window.customSites || []).find(x => Math.abs(x.lat - la) < 0.01 && Math.abs(x.lng - ln) < 0.01);
+      return c ? c.name : sk;
+    } catch { return sk; }
+  };
+  const old = document.getElementById('fpConflictToast');
+  if (old) old.remove();
+  const box = document.createElement('div');
+  box.id = 'fpConflictToast';
+  box.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100006;max-width:92vw;' +
+    'background:linear-gradient(180deg,#1f2937,#111827);border:1px solid rgba(251,191,36,.5);border-radius:12px;' +
+    'box-shadow:0 14px 40px rgba(0,0,0,.5);padding:12px 16px;font-family:var(--font,sans-serif);color:#e5e7eb';
+  box.innerHTML =
+    '<div style="font-size:12px;font-weight:800;color:#fbbf24;margin-bottom:6px">⚠ Modification simultanée détectée</div>' +
+    conflicts.slice(0, 4).map(c =>
+      `<div style="font-size:11px;line-height:1.5"><b>${shortName(c.by)}</b> a changé le <b>${label[c.kind] || c.kind}</b> de <b>${siteName(c.siteKey).replace(/</g, '&lt;')}</b> — sa valeur (<b style="color:#34d399">${c.theirValue}</b>) a été gardée, la tienne (${c.yourValue}) écartée.</div>`
+    ).join('') +
+    '<div style="font-size:9.5px;color:#94a3b8;margin-top:6px">Rien n\'a été perdu en silence. Ré-applique ta valeur si tu n\'es pas d\'accord.</div>' +
+    '<div style="text-align:right;margin-top:8px"><button onclick="document.getElementById(\'fpConflictToast\')?.remove()" style="background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:6px;padding:5px 12px;font-size:10px;font-weight:700;cursor:pointer">Compris</button></div>';
+  document.body.appendChild(box);
+  try { window.AuditLog?.log({ action: 'sync.conflict', target: conflicts.map(c => siteName(c.siteKey)).join(', '), meta: { conflicts } }); } catch {}
+}
+window.notifyOverrideConflicts = notifyOverrideConflicts;
+
 // v6.83 — télécharge l'export complet du cloud (coffre hors-ligne).
 async function downloadBackup() {
   const email = (currentUser?.email || '').toLowerCase();

@@ -102,8 +102,6 @@ module.exports = async (req, res) => {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const user = String(body.user || '').toLowerCase().trim();
       const sites = Array.isArray(body.sites) ? body.sites : null;
-      // v6.49 — overrides per-site (rent / charge / surface) synchronisés aussi.
-      // Maps keyed by "lat.toFixed(3),lng.toFixed(3)". LWW simple via ts global.
       const overrides = (body.overrides && typeof body.overrides === 'object') ? body.overrides : null;
       if (!isAuthorized(req, user, true)) { res.status(403).json({ error: 'FORBIDDEN_USER' }); return; }
       if (!sites) { res.status(400).json({ error: 'BAD_PAYLOAD' }); return; }
@@ -111,14 +109,65 @@ module.exports = async (req, res) => {
       const serialized = JSON.stringify({ sites, overrides });
       if (serialized.length > 1 * 1024 * 1024) { res.status(413).json({ error: 'PAYLOAD_TOO_LARGE' }); return; }
       const ts = Date.now();
-      // Stamp createdBy on sites that don't have one (new sites from this user)
-      for (const s of sites) {
-        if (!s.createdBy) s.createdBy = user;
+      for (const s of sites) { if (!s.createdBy) s.createdBy = user; }
+
+      // ═══ v6.85 — MERGE serveur champ par champ (anti-conflit) ═══
+      // Avant : le push écrasait tout l'objet overrides → une modif d'un
+      // autre user sur un AUTRE site/champ était perdue. Maintenant on
+      // fusionne clé par clé (rent/charge/surface/radius par siteKey) en
+      // gardant la plus récente selon les timestamps de `meta`. Les
+      // conflits RÉELS (même site+champ édité par 2 personnes) sont
+      // signalés dans la réponse (`conflicts`) sans rien perdre en silence.
+      const prev = (await kvGet(SHARED_KEY)) || {};
+      const prevOv = (prev.overrides && typeof prev.overrides === 'object') ? prev.overrides : {};
+      const conflicts = [];
+      let mergedOv = overrides;
+      if (overrides) {
+        const at = (meta, sk, kind) => (meta && meta[sk] && meta[sk][kind] && meta[sk][kind].at) || 0;
+        const byOf = (meta, sk, kind) => (meta && meta[sk] && meta[sk][kind] && meta[sk][kind].by) || null;
+        const inMeta = overrides.meta || {}, prMeta = prevOv.meta || {};
+        mergedOv = { meta: {} };
+        for (const [mapKey, kind] of [['rent', 'rent'], ['charge', 'charge'], ['surface', 'surface'], ['radius', 'radius']]) {
+          const inMap = overrides[mapKey] || {}, prMap = prevOv[mapKey] || {};
+          const out = { ...prMap };
+          const keys = new Set([...Object.keys(inMap), ...Object.keys(prMap)]);
+          for (const sk of keys) {
+            const inHas = sk in inMap, prHas = sk in prMap;
+            if (inHas && !prHas) { out[sk] = inMap[sk]; continue; }
+            if (!inHas && prHas) { continue; }
+            // les deux ont une valeur : le plus récent gagne (par meta.at)
+            const inAt = at(inMeta, sk, kind), prAt = at(prMeta, sk, kind);
+            if (inMap[sk] !== prMap[sk]) {
+              // conflit réel seulement si l'autre modif est plus récente que
+              // la base que ce client connaissait (baseTs qu'il renvoie)
+              const baseTs = Number(body.baseTs) || 0;
+              if (prAt > baseTs && prAt >= inAt && byOf(prMeta, sk, kind) && byOf(prMeta, sk, kind) !== user) {
+                conflicts.push({ siteKey: sk, kind, by: byOf(prMeta, sk, kind), theirValue: prMap[sk], yourValue: inMap[sk], at: prAt });
+                out[sk] = prMap[sk]; // on garde la version distante (l'autre a été plus récent) — pas d'écrasement silencieux
+                continue;
+              }
+              out[sk] = inAt >= prAt ? inMap[sk] : prMap[sk];
+            } else out[sk] = inMap[sk];
+          }
+          mergedOv[mapKey] = out;
+        }
+        // captureRates : global, LWW simple
+        mergedOv.captureRates = overrides.captureRates || prevOv.captureRates || null;
+        // meta : union en gardant les entrées les plus récentes
+        const outMeta = JSON.parse(JSON.stringify(prMeta));
+        for (const sk in inMeta) {
+          outMeta[sk] = outMeta[sk] || {};
+          for (const kind in inMeta[sk]) {
+            if (!outMeta[sk][kind] || (inMeta[sk][kind].at || 0) >= (outMeta[sk][kind].at || 0)) outMeta[sk][kind] = inMeta[sk][kind];
+          }
+        }
+        mergedOv.meta = outMeta;
       }
+
       const payload = { sites, ts };
-      if (overrides) payload.overrides = overrides;
+      if (mergedOv) payload.overrides = mergedOv;
       await kvSet(SHARED_KEY, payload);
-      res.status(200).json({ ok: true, ts, count: sites.length, hasOverrides: !!overrides });
+      res.status(200).json({ ok: true, ts, count: sites.length, hasOverrides: !!mergedOv, conflicts, overrides: mergedOv });
       return;
     }
 

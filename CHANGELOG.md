@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.85-anticonflit] — 2026-07-15
+
+### 🔒 Anti-conflit d'édition simultanée (chantier 18/20 #2)
+
+Ferme le risque n°1 de l'audit : deux personnes modifiaient des réglages
+en même temps → le dernier push écrasait TOUT en silence.
+
+- **Merge serveur champ par champ** (`api/sync.js`) : les overrides
+  (loyer/charges/surface/rayon par site) sont fusionnés clé par clé selon
+  les timestamps `meta`, plus remplacés en bloc. Deux modifs sur des
+  sites/champs DIFFÉRENTS → aucune perte (testé).
+- **Détection de conflit réel** : si un collègue a modifié le même
+  site+champ plus récemment que la base connue du client (`baseTs`), sa
+  version est **conservée** et le conflit est renvoyé — jamais d'écrasement
+  silencieux.
+- **Notification client** : toast « ⚠ Ulysse a changé le loyer de Hala
+  Laminor — sa valeur (16) gardée, la tienne (18) écartée ». Journalisé.
+- Le client ré-adopte l'état mergé du serveur après push (évite de
+  re-pousser un état périmé).
+
+Vérifié : merge unitaire 3 scénarios (sites différents=0 perte, conflit
+réel=version distante+signalé, même user=pas de faux positif), notif
+rendue, 197/197 assertions.
+
+---
+
 ## [v6.84-backup-scensync] — 2026-07-15
 
 ### 💾 Sauvegarde auto du cloud + 🔄 synchro des scénarios FCF & Plan de Conquête
