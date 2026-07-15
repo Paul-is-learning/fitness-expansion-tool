@@ -121,6 +121,8 @@
   }
   function persistSaved(all) {
     try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch {}
+    // v6.84 — pousse les scénarios au cloud (partage équipe + retrouvés partout)
+    try { window.UserDataSync?.pushScenarios(); } catch {}
   }
   function saveScenario(which) {
     const sc = S[which];

@@ -244,7 +244,11 @@
     try { return { ...defaultCfg(), ...(JSON.parse(localStorage.getItem(LS_KEY) || '{}')) }; }
     catch { return defaultCfg(); }
   }
-  function persistCfg() { try { localStorage.setItem(LS_KEY, JSON.stringify(S.cfg)); } catch {} }
+  function persistCfg() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(S.cfg)); } catch {}
+    // v6.84 — synchro cloud de la config du plan (LWW par ts)
+    try { S.cfg.ts = Date.now(); localStorage.setItem(LS_KEY, JSON.stringify(S.cfg)); window.UserDataSync?.pushConquest(); } catch {}
+  }
 
   // ─── UI ───────────────────────────────────────────────────────────
   function open() {

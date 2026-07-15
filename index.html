@@ -59,6 +59,7 @@
 <script src="src/ai-analyst.js" defer></script>
 <script src="src/share-link.js" defer></script>
 <script src="src/pwa.js" defer></script>
+<script src="src/userdata-sync.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -717,6 +718,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
           <button class="btn" onclick="window.ReviewsHistory?.openReport?.()" title="Vélocité des avis Google par club = proxy du flux de nouveaux membres">📈 Vélocité avis</button>
           <button class="btn" onclick="openTopClubs()" title="Classement des clubs de Bucarest par membres actifs estimés (dual model calibré comptes officiels)">🏆 Top clubs</button>
           <button class="btn" onclick="ConquestPlan.open()" title="Séquencement d'ouvertures multi-sites : ordre, rythme, cannibalisation, pic de financement, trésorerie consolidée 10 ans" style="border-color:rgba(212,160,23,.5)">🗺️ Plan de Conquête</button>
+          <button class="btn" onclick="downloadBackup()" title="Télécharge un export JSON complet (sites, réglages, journal, vélocité, scénarios) — ton coffre hors-ligne. Sauvegarde cloud auto chaque dimanche.">💾 Sauvegarde</button>
         </div>
       </div>
 

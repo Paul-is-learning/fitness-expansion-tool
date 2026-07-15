@@ -1,6 +1,36 @@
 
 # Changelog
 
+## [v6.84-backup-scensync] — 2026-07-15
+
+### 💾 Sauvegarde auto du cloud + 🔄 synchro des scénarios FCF & Plan de Conquête
+
+Ferme les 2 trous restants du SaaS identifiés à l'audit.
+
+**Sauvegarde (`api/backup.js`)** — ferme le risque "perte de données" :
+- **Cron hebdo (dimanche 4h UTC)** : instantané daté de TOUTES les clés
+  métier (sites, réglages, journal, vélocité, annuaire, scénarios) dans
+  `fp:v2:backup:<semaine>`, rotation sur 8 (≈ 2 mois).
+- **Bouton 💾 Sauvegarde** (Actions) : télécharge un export JSON complet
+  horodaté — ton coffre hors-ligne à poser sur ton disque de temps en temps.
+- Actions list / get / download, réservées admin (session ou whitelist).
+
+**Synchro scénarios (`api/userdata.js` + `src/userdata-sync.js`)** — ferme
+le "pas tout synchronisé" :
+- Les **scénarios FCF nommés** (Studio) et la **config du Plan de Conquête**
+  quittent le localStorage isolé → partagés avec l'équipe, retrouvés sur
+  tous les appareils.
+- Merge : scénarios = union immuable par (nom+ts), cap 40/site (aucun perdu) ;
+  conquest = last-write-wins par timestamp.
+- Pull au boot (après login) + push débouncé après chaque sauvegarde de
+  scénario / changement de config. Dégrade proprement hors ligne.
+- Ces 2 clés sont incluses dans la sauvegarde hebdo.
+
+Vérifié : 197/197 assertions, modules connectés (UserDataSync, bouton
+backup, hooks push), console propre. 8/12 fonctions Vercel.
+
+---
+
 ## [v6.82-core-extract] — 2026-07-15
 
 ### ⚡ Extraction du monofichier — index.html 888 KB → 176 KB (SaaS P3b)

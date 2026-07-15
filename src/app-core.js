@@ -7793,6 +7793,28 @@ function doLogout() {
 
 function isAdmin() { return !currentUser || currentUser.role === 'admin'; }
 
+// v6.83 — télécharge l'export complet du cloud (coffre hors-ligne).
+async function downloadBackup() {
+  const email = (currentUser?.email || '').toLowerCase();
+  try {
+    const url = '/api/backup?action=download&user=' + encodeURIComponent(email);
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      alert(j.error === 'ADMIN_ONLY' ? 'Réservé aux administrateurs.' : (location.hostname === 'localhost' ? 'La sauvegarde fonctionne uniquement en production (base cloud).' : 'Erreur : ' + (j.error || r.status)));
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'fp-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    try { window.AuditLog?.log({ action: 'backup.download', target: 'cloud' }); } catch {}
+  } catch (e) { alert('Connexion impossible — réessaie.'); }
+}
+window.downloadBackup = downloadBackup;
+
 function showUserPanel() {
   const panel = document.createElement('div');
   panel.id = 'userPanel';
