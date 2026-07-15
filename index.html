@@ -45,6 +45,7 @@
 <script src="src/chains-intel.js" defer></script>
 <script src="src/reviews-history.js" defer></script>
 <script src="src/fcf-studio.js" defer></script>
+<script src="src/lexicon.js" defer></script>
 <script src="src/fp-logos.js" defer></script>
 <script src="src/i18n.js" defer></script>
 <script src="src/onboarding-tour.js" defer></script>
@@ -6652,6 +6653,32 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
           </div>`;
         }).join('')}
       </div>
+
+      <!-- v6.72 P2b — "verdict d'abord": 4 chiffres en langage décideur + phrase EN CLAIR -->
+      ${(() => {
+        const pb = r.pnl.base;
+        const ebA5 = pb.annualEBITDA?.[4] || 0;
+        const margeA5 = pb.annualCA?.[4] > 0 ? Math.round(ebA5 / pb.annualCA[4] * 100) : 0;
+        const tile = (val, label, reading, col) => `
+          <div style="flex:1;background:var(--bg);border-radius:8px;padding:9px 10px;min-width:0">
+            <div style="font-size:17px;font-weight:900;color:${col};line-height:1.1;white-space:nowrap">${val}</div>
+            <div style="font-size:8px;font-weight:700;color:var(--gray);margin-top:3px">${label}</div>
+            <div style="font-size:7.5px;color:var(--gray2);line-height:1.35;margin-top:2px">${reading}</div>
+          </div>`;
+        return `<div style="display:flex;gap:6px;margin-bottom:10px">
+          ${tile(fmt(r.realiste), 'MEMBRES À MATURITÉ', 'scénario base — vs cible BP ' + fmt(PNL_DEFAULTS.targetMembers), r.realiste >= PNL_DEFAULTS.targetMembers ? 'var(--green)' : 'var(--yellow)')}
+          ${tile((pb.irrEquity ?? 0).toFixed(0) + '%', 'IRR EQUITY', 'rendement annualisé de l’apport, dette incluse', pb.irrEquity > 30 ? 'var(--green)' : pb.irrEquity > 15 ? 'var(--yellow)' : 'var(--red)')}
+          ${tile(fmt(Math.round((pb.fcfe5y || 0) / 1000)) + 'k€', 'FCFE 5 ANS', 'cash rendu à l’actionnaire (apport: ' + fmt(Math.round(pb.equity / 1000)) + 'k€)', (pb.fcfe5y || 0) > pb.equity ? 'var(--green)' : 'var(--yellow)')}
+          ${tile(pb.paybackEquityMonth ? 'M' + pb.paybackEquityMonth : '>60M', 'RETOUR DE L’APPORT', pb.paybackEquityMonth ? 'ton argent est revenu — la suite est du gain' : 'apport non récupéré sur 5 ans', pb.paybackEquityMonth && pb.paybackEquityMonth <= 36 ? 'var(--green)' : pb.paybackEquityMonth ? 'var(--yellow)' : 'var(--red)')}
+        </div>
+        <div style="font-size:9px;color:var(--gray);line-height:1.55;background:var(--bg);border-left:3px solid ${exec.verdictColor};border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:10px">
+          <b style="color:var(--white)">EN CLAIR :</b> ce site peut atteindre <b style="color:var(--white)">${fmt(r.realiste)} membres</b>,
+          soit un EBITDA de <b style="color:var(--white)">${fmt(Math.round(ebA5/1000))} k€ (${margeA5}% de marge)</b> en année 5.
+          Avec le financement de référence (${Math.round((pb.financing?.equityRatio ?? 0.3)*100)}% d'apport = ${fmt(Math.round(pb.equity/1000))} k€),
+          l’apport ${pb.paybackEquityMonth ? 'revient en <b style="color:var(--white)">' + Math.ceil(pb.paybackEquityMonth/12*10)/10 + ' ans</b>' : 'n’est pas récupéré sur 5 ans'}
+          et rapporte <b style="color:${exec.verdictColor}">${(pb.irrEquity ?? 0).toFixed(0)}% par an</b> (sortie à ${getEffectiveExitMultiple()}× l'EBITDA incluse).
+        </div>`;
+      })()}
       ${exec.risks.length > 0 || exec.opportunities.length > 0 ? `<div style="display:flex;gap:8px;font-size:8px;line-height:1.4">
         ${exec.risks.length > 0 ? `<div style="flex:1"><div style="color:var(--red);font-weight:700;margin-bottom:2px">⚠ Risques</div>${exec.risks.map(r=>'<div style="color:var(--gray2)">• '+r+'</div>').join('')}</div>` : ''}
         ${exec.opportunities.length > 0 ? `<div style="flex:1"><div style="color:var(--green);font-weight:700;margin-bottom:2px">★ Opportunités</div>${exec.opportunities.map(o=>'<div style="color:var(--gray2)">• '+o+'</div>').join('')}</div>` : ''}
