@@ -84,7 +84,7 @@ async function runAll() {
   // Login + load comps — run everything via w.eval() since consts don't go on window
   const analysesResults = await w.eval(`(async () => {
     document.getElementById('loginEmail').value = 'paulbecaud@isseo-dev.com';
-    document.getElementById('loginPassword').value = 'FP2026!';
+    document.getElementById('loginPassword').value = '123456';
     doLogin();
     await new Promise(r => setTimeout(r, 1500));
     await loadAllCompetitors();

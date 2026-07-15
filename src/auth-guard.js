@@ -77,13 +77,10 @@
     try { localStorage.removeItem(KEY_FAILS); } catch {}
   }
   function isLockedOut() {
-    const fails = getFails();
-    if (fails.length < LOCKOUT_FAILS) return false;
-    // Compute last-fail window
-    const recent = fails.slice(-LOCKOUT_FAILS);
-    const oldestRecent = recent[0];
-    // Locked if last LOCKOUT_FAILS fails happened in under LOCKOUT_DURATION_MS
-    return (Date.now() - oldestRecent) < LOCKOUT_DURATION_MS;
+    // v6.77 — verrou DÉSACTIVÉ à la demande de Paul (2026-07-15) : pas de
+    // blocage temporel après des mots de passe erronés. Les échecs restent
+    // journalisés (forensics) mais ne bloquent plus jamais la connexion.
+    return false;
   }
   function lockoutRemainingMs() {
     const fails = getFails();

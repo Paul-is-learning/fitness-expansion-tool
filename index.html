@@ -8739,14 +8739,10 @@ catch(e) { console.warn('[fp] fpUsers corrompu, reset', e); try { localStorage.r
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000;
 let _inactivityTimer = null;
 function resetInactivityTimer() {
-  if(_authIsMobile()) return; // no auto-logout on mobile
-  if(_inactivityTimer) clearTimeout(_inactivityTimer);
-  _inactivityTimer = setTimeout(() => {
-    if(currentUser) {
-      alert('Session expirée — veuillez vous reconnecter');
-      doLogout();
-    }
-  }, SESSION_TIMEOUT_MS);
+  // v6.77 — auto-logout d'inactivité DÉSACTIVÉ à la demande de Paul
+  // (2026-07-15) : plus de "Session expirée" après 10 min sur desktop.
+  // La session desktop reste en sessionStorage (fermée avec l'onglet).
+  return;
 }
 ['click','mousemove','keydown','scroll','touchstart'].forEach(evt =>
   document.addEventListener(evt, resetInactivityTimer, {passive:true})

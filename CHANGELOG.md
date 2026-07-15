@@ -1,6 +1,22 @@
 
 # Changelog
 
+## [v6.77-auth-relax] — 2026-07-15
+
+### 🔓 Auth simplifiée (demande Paul)
+
+- **Mot de passe Paul → `123456`** (les 2 comptes admin). Ulysse/Tomescu inchangés.
+- **Verrou "trop de tentatives" désactivé** : plus jamais de blocage 5 min après
+  des mots de passe erronés (les échecs restent journalisés en console).
+- **Déconnexion d'inactivité désactivée** : plus de "Session expirée" après
+  10 min sur desktop (la session se ferme toujours avec l'onglet).
+- MODEL_VERSION bump → re-seed des users sur tous les devices (le nouveau mdp
+  prend effet partout au prochain chargement). Harnais de test mis à jour.
+
+NB : la phrase de récupération "Mot de passe oublié ?" reste active (FP2026-BECAUD).
+
+---
+
 ## [v6.76-breakeven-members] — 2026-07-15
 
 ### 🎯 POINT MORT EN ADHÉRENTS — combien de membres pour être neutre en FCFE ?
