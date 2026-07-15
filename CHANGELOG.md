@@ -1,6 +1,27 @@
 
 # Changelog
 
+## [v6.86-portfolio] — 2026-07-15
+
+### 📊 Dashboard Portefeuille + export Excel/CSV (chantier 18/20 #3 — le wow)
+
+- **Bouton 📊 Portefeuille** (Actions) : tous les sites analysés côte à côte,
+  triables par n'importe quelle colonne. 5 tuiles d'agrégats (sites GO,
+  membres cumulés, FCFE 5 ans cumulé, equity totale à déployer, score
+  moyen) + tableau : verdict, score, membres, IRR projet, **IRR equity**
+  (coloré), FCFE, MOIC, NPV, payback equity, DSCR.
+- **Export portefeuille CSV** : la vue d'ensemble dans Excel en 1 clic.
+- **Export BP par site → .xls** : P&L A1-A5 (CA/EBITDA/FCFE/marge) +
+  financement + tous les KPIs, format natif Excel (zéro dépendance) pour
+  retravailler le business plan.
+- `saveSiteAnalysis` enrichi : IRR equity, FCFE, MOIC, EBITDA A5, equity,
+  CAPEX, payback equity, DSCR, SAZ, secteur — stockés pour le portefeuille.
+
+Vérifié : dashboard 5 sites (28 239 membres, 4,3 M€ FCFE cumulé, IRR eq
+colorés jusqu'à 112%), tri live, CSV + xls générés (P&L + KPIs), 197/197.
+
+---
+
 ## [v6.85-anticonflit] — 2026-07-15
 
 ### 🔒 Anti-conflit d'édition simultanée (chantier 18/20 #2)

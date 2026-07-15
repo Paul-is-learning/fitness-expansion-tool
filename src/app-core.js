@@ -4903,7 +4903,12 @@ function saveSiteAnalysis(name, lat, lng, r, exec) {
     popTarget: r.popTarget, compsCount: r.comps.length, ltvCac: r.ltvCacRatio,
     arpu: r.arpu, npvBase: r.pnl.base.npv, caA1: r.pnl.base.annualCA[0],
     caA3: r.pnl.base.annualCA[2], captifs: r.totalCaptifs, natifs: r.native.captured,
-    walkIn: r.walkIn.walkInMembers
+    walkIn: r.walkIn.walkInMembers,
+    // v6.86 — KPIs investisseur pour le Dashboard Portefeuille
+    irrEquity: r.pnl.base.irrEquity, fcfe5y: r.pnl.base.fcfe5y, moic: r.pnl.base.moic,
+    ebitdaA5: r.pnl.base.annualEBITDA?.[4], equity: r.pnl.base.equity, capex: r.pnl.base.capex,
+    paybackEquity: r.pnl.base.paybackEquityMonth, dscrMin: r.pnl.base.dscrMinCruise,
+    sazTotal: r.saz?.total, sector: (typeof TARGETS!=='undefined' ? (TARGETS.find(t=>Math.abs(t.lat-lat)<0.01&&Math.abs(t.lng-lng)<0.01)?.sector) : null)
   };
   if (existing >= 0) window._siteAnalyses[existing] = entry;
   else window._siteAnalyses.push(entry);
