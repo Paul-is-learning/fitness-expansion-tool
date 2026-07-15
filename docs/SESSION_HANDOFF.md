@@ -8,14 +8,14 @@
 - **Outil** : SPA HTML/JS, single-file `index.html` ~7500L + modules extraits
 - **Deploy** : Vercel auto, domaine `fitnesspark.isseo-dev.com`
 - **Users** : Paul (admin), Ulysse, Tomescu (localStorage seed)
-- **Versions actuelle** : v6.63-bp-editor-live-P2a (voir CHANGELOG.md / git log pour détail)
+- **Versions actuelle** : v6.68-data-clubs-dedup (voir CHANGELOG.md / git log pour détail)
 
 ## Stack & structure
 ```
 api/sync.js             Vercel Serverless Function — backend KV pour sync custom sites (v6.29)
 index.html              ~6800L (UI + moteur analyse + auth inline)
 config.js               Constantes globales + MODEL_VERSION (cache-bust key)
-data/*.js               TARGETS (5 sites), VERIFIED_CLUBS (92), CARTIERE (83),
+data/*.js               TARGETS (5 sites), VERIFIED_CLUBS (90), CARTIERE (83),
                         POIS (37), CANONICAL_USERS
 src/utils.js            simpleHash, haversine, fmt
 src/mobile.js           Mobile v4.9+ : sheet 3 états + carousel + detail view
@@ -37,7 +37,7 @@ docs/ARCHITECTURE.md    Layout fichiers + load order
 2. **Baneasa Shopping City** (Sec 1) — GO COND, IRR **72.2%** — destination mall premium
 3. **Unirea Shopping Center** (Sec 3) — GO COND, IRR **50.2%**
 4. **Militari Shopping** (Sec 6) — WATCH, IRR **13.9%** (NPV +122k€, enfin positif)
-5. **Grand Arena** (Sec 4) — WATCH, IRR **8.6%**
+5. **Grand Arena** (Sec 4) — WATCH, IRR **12.5%** (NPV +32k€ depuis v6.68 dédoublonnage clubs — Monaco Towers réellement à Berceni)
 
 Custom sites additionnés via UI desktop/mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites` + sync auto cloud KV via `/api/sync` (v6.29+). Dans l'onglet "Mes sites" desktop (v6.34), TARGETS et customs sont mergés dans une seule liste numérotée 1-N, pins uniformes ronds dorés.
 

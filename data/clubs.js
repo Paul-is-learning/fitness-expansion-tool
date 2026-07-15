@@ -1,7 +1,7 @@
 // ================================================================
-// FITNESS PARK ROMANIA — VERIFIED CLUBS (92 competitors)
+// FITNESS PARK ROMANIA — VERIFIED CLUBS (90 competitors)
 // ================================================================
-// 92 verified fitness clubs in Bucharest metro area.
+// 90 verified fitness clubs (v6.68: -2 doublons World Class vérifiés via worldclass.ro) in Bucharest metro area.
 // Sources: worldclass.ro, stayfit.ro, 18gym.ro, downtownfitness.ro,
 //          absolutegym.ro, salsafitgym.ro, Overpass API, Nominatim
 // All coordinates verified against official websites & Google Maps.
@@ -21,7 +21,7 @@
 // ================================================================
 
 const VERIFIED_CLUBS = [
-  // === WORLD CLASS (34 clubs) — Source: worldclass.ro, business-review.eu, fitnet.ro ===
+  // === WORLD CLASS (33 clubs) — Source: worldclass.ro, business-review.eu, fitnet.ro ===
   // WC avg = 84,000 members / 45 clubs = 1,867 mbr/club. Ratio = 0.93 mbr/m2 (premium with pool)
   {name:'World Class Charles de Gaulle',lat:44.464661,lng:26.083435,segment:'premium',size:1250,members:1063,tier:'W',sv:true},
   {name:'World Class Downtown',lat:44.441133,lng:26.094974,segment:'premium',size:2200,members:1870,tier:'Platinum',sv:false},
@@ -32,7 +32,6 @@ const VERIFIED_CLUBS = [
   {name:'World Class Upground',lat:44.471500,lng:26.113000,segment:'premium',size:1800,members:1530,tier:'Gold',sv:false},
   {name:'World Class One Cotroceni',lat:44.425580,lng:26.063884,segment:'premium',size:2700,members:2295,tier:'Gold',sv:true},
   {name:'World Class Planet',lat:44.486500,lng:26.120000,segment:'premium',size:2000,members:1700,tier:'Gold',sv:false},
-  {name:'World Class Cosmopolis',lat:44.530000,lng:26.115000,segment:'premium',size:2700,members:2295,tier:'Gold',sv:true},
   {name:'World Class Asmita Gardens',lat:44.406933,lng:26.125157,segment:'premium',size:2000,members:1700,tier:'Silver',sv:true},
   {name:'World Class Mega Mall',lat:44.438000,lng:26.155000,segment:'premium',size:2000,members:1700,tier:'Silver',sv:false},
   {name:'World Class Militari Shopping',lat:44.436707,lng:25.982650,segment:'premium',size:1800,members:1530,tier:'Silver',sv:false},
@@ -86,7 +85,9 @@ const VERIFIED_CLUBS = [
   {name:'18GYM Mihai Bravu',lat:44.415195,lng:26.135871,segment:'mid',size:1200,members:1200},
   {name:'18GYM Pantelimon',lat:44.444800,lng:26.159500,segment:'mid',size:1200,members:1200},
   {name:'18GYM Chiajna',lat:44.432000,lng:25.968000,segment:'mid',size:1200,members:1200},
-  {name:'18GYM Monaco Towers',lat:44.487247,lng:26.114866,segment:'mid',size:1800,members:1800,sv:true},
+  // v6.68: re-géocodé — 18gym.ro donne Sos. Berceni nr. 96 (Monaco Towers, S4, sud),
+  // PAS Pipera. Coords approx complexe Monaco Towers Berceni.
+  {name:'18GYM Monaco Towers',lat:44.3785,lng:26.1215,segment:'mid',size:1800,members:1800,sv:true},
   {name:'18GYM Pipera',lat:44.490000,lng:26.118000,segment:'mid',size:1200,members:1200},
   // === DOWNTOWN FITNESS (5 clubs) — Source: downtownfitness.ro ===
   // DF Vitan confirmed 1,800m2. Obor = 2,000m2. Mihalache = 1,000m2. Ratio ~1.1 mbr/m2
@@ -98,7 +99,7 @@ const VERIFIED_CLUBS = [
   // === NR1 FITNESS (5 clubs, 24/7) — Source: outsourcing-today.ro ===
   // Nr1: low-cost 24/7 model, small format. Militari confirmed 400m2. Ratio low-cost: 1.5 mbr/m2
   {name:'Nr1 Fitness Militari',lat:44.434294,lng:26.000327,segment:'mid',size:400,members:600,sv:true},
-  {name:'Nr1 Fitness Pipera',lat:44.487000,lng:26.115000,segment:'mid',size:400,members:600},
+  {name:'Nr1 Fitness Pipera',lat:44.487000,lng:26.115000,segment:'mid',size:400,members:600}, // Bd. Pipera 166-168 Voluntari — coords approx zone
   {name:'Nr1 Fitness Ghencea',lat:44.408701,lng:25.982652,segment:'mid',size:400,members:600},
   {name:'Nr1 Fitness Pantelimon',lat:44.441127,lng:26.180056,segment:'mid',size:400,members:600},
   {name:'Nr1 Fitness Titan',lat:44.424248,lng:26.171397,segment:'mid',size:400,members:600},
@@ -126,9 +127,10 @@ const VERIFIED_CLUBS = [
   {name:'Stay Fit Popesti Leordeni',lat:44.3603,lng:26.1509,segment:'mid',size:1000,members:1100},
   {name:'Stay Fit Stefanesti',lat:44.5285,lng:26.1975,segment:'mid',size:900,members:990},
   {name:'Stay Fit Crevedia',lat:44.6180,lng:25.9132,segment:'mid',size:800,members:880},
-  // World Class banlieue (2 clubs) — renamed to avoid collision with Bucharest variants
-  {name:'World Class Cosmopolis (Ilfov)',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,sv:true},
-  {name:'World Class Otopeni (alt)',lat:44.5477,lng:26.0746,segment:'premium',size:1500,members:1275},
+  // World Class banlieue — v6.68: dédoublonné. worldclass.ro (club-sitemap.xml) confirme
+  // UN SEUL club Cosmopolis (Cosmopolis Plaza, Stefanestii de Jos, ~2300m2, Forbes 2025)
+  // et UN SEUL club Otopeni (Str. Polona 23A — déjà listé section World Class).
+  {name:'World Class Cosmopolis',lat:44.5377,lng:26.1701,segment:'premium',size:2316,members:1970,tier:'Gold',sv:true},
 ];
 
 // Alias — the verified database IS the real dataset (no fake demo data)

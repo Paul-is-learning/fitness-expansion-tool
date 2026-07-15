@@ -1,6 +1,34 @@
 
 # Changelog
 
+## [v6.68-data-clubs-dedup] — 2026-06-25
+
+### 🧹 Fiabilisation data — doublons clubs supprimés + re-géolocalisation (vérifiés sources officielles)
+
+Audit data complet (script Node + vérification web worldclass.ro / 18gym.ro / stayfit.ro) :
+
+- **World Class Cosmopolis compté 2×** → 1 seul club réel (Cosmopolis Plaza, Ștefăneștii de Jos, ~2 300 m², sitemap officiel worldclass.ro). Entrée fantôme supprimée (−2 295 membres concurrents fictifs, coords qui étaient celles du POI résidentiel).
+- **World Class Otopeni compté 2×** → 1 seul club réel (Str. Polonă 23A). Entrée "(alt)" supprimée (−1 275 membres fictifs).
+- **18GYM Monaco Towers re-géocodé** : 18gym.ro le situe Șos. Berceni 96 (Secteur 4, SUD) — il était placé par erreur à Pipera (nord, ~15 km d'écart).
+- Total clubs : 92 → **90**. Reste vérifié propre : 0 champ manquant, 0 aberration, comptages exacts, Titan/Titan Park = 2 vrais clubs (conservés), 18GYM + Stay Fit Pantelimon = 2 clubs réels co-localisés Bd. Chișinău 1 (conservés).
+
+### Impact baseline (protocole MODEL.md suivi, drift documenté)
+
+Seul **Grand Arena** bouge — Monaco Towers (1 800 mbr) entre dans sa vraie zone de captage :
+
+| Métrique | Avant | Après |
+|---|---:|---:|
+| Concurrents dans le rayon | 3 | 4 |
+| Captifs | 749 | 1 112 |
+| Membres théoriques | 3 135 | 3 285 |
+| **IRR Projet** | **8.61%** | **12.51%** |
+| **NPV** | **−202 k€** | **+32 k€** |
+| Score / verdict | 56.3 WATCH | 54.7 WATCH |
+
+Baneasa, Hala Laminor, Unirea, Militari : inchangés au centime. Baseline régénérée (`.baseline.json` + `tests/analysis.html`), 197/197 assertions vertes.
+
+---
+
 ## [v6.67-debt-fcfe-history] — 2026-06-25
 
 ### 💰 Toggle dette bancaire + FCFE/DSCR/MOIC · 📜 Historique des hypothèses avec impact KPI
