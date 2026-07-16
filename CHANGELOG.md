@@ -1,6 +1,29 @@
 
 # Changelog
 
+## [v7.12-demo-rock-solid] · 2026-07-16
+
+### 🎯 Démo guidée : halo immobile et ancres structurelles (fini le « en plein vol »)
+
+Les captures de Paul montraient un halo coupé au milieu du texte : la fiche
+se re-rend plusieurs fois pendant l'analyse (Overpass puis Google), chaque
+re-rendu recréait les éléments → l'enforceur voyait « une nouvelle cible »,
+re-scrollait et relançait une glissade de 0,6 s en boucle. Corrections :
+- stabilité par GÉOMÉTRIE (élément recréé au même endroit ±8 px = zéro
+  mouvement), scroll seulement si cible franchement hors écran (max 1×/1,2 s) ;
+- 1er placement DIRECT (sans vol d'arrivée), glissades courtes (.28 s) ;
+- scènes 03/04/05 ancrées sur la STRUCTURE du template (#exec-summary-header,
+  #exec-scores-bars + frères) au lieu de la recherche par texte qui débordait
+  pendant les rendus partiels — scopées dans la fiche (ids dupliqués dans
+  l'onglet Mes Sites, même piège que pnl-breakeven-block) ;
+- pendant le calcul, repli sur le bloc SAZ (l'audience a toujours un focus).
+
+Test anti-dérive headless : halo strictement immobile (0 px) sur les 6
+dernières secondes de la scène 3 malgré les re-rendus ; scène 4 pile sur les
+4 tuiles, scène 5 pile sur Risques/Opportunités.
+
+---
+
 ## [v7.11-demo-hardening] · 2026-07-16
 
 ### 🎬 Démo guidée : ferme le tour d'onboarding si ouvert

@@ -210,9 +210,22 @@
       tab: 'site',   // l'enforceur re-force la fiche si l'analyse rebascule sur MES SITES
       body: 'Population captable, transports, universités, pôles bureaux, concurrence — l’outil croise tout en temps réel et sort une fiche d’analyse notée en quelques secondes.',
       run: async () => { closeAllPanels(); await analyzeAndWait(hero); await showFiche(/EXECUTIVE SUMMARY/); },
-      // Cartouche exec exact = plus petit ancêtre contenant le titre ET « EN
-      // CLAIR » (layout-indépendant, ne déborde jamais sur les blocs voisins).
-      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; return boxWithAll(c, [/EXECUTIVE SUMMARY/, /EN CLAIR/]) || (t => t ? blockOf(t, 340, 150) : null)(findByText(c, /EXECUTIVE SUMMARY/)); },
+      // v7.12 — ANCRE STRUCTURELLE : la carte exec = parent de
+      // #exec-summary-header (id stable posé par renderCaptageAnalysis).
+      // La recherche par texte débordait pendant les re-rendus progressifs
+      // (« EN CLAIR » pas encore monté → ancêtre trop large → halo géant).
+      // Pendant le calcul (carte exec absente) : repli sur le bloc SAZ de la
+      // fiche pour que l'audience ait déjà quelque chose sous les yeux.
+      focus: () => {
+        // NB: les ids exec-* existent AUSSI dans l'onglet Mes Sites (même
+        // template) → on scope DANS la fiche (même piège que pnl-breakeven-block).
+        const c = $('captageContentSite');
+        const h = c && c.querySelector('#exec-summary-header');
+        if (h && h.offsetHeight > 0) return h.parentElement;
+        const sc = $('siteCardContent');
+        const saz = sc && sc.offsetHeight > 0 && findByText(sc, /Score Attractivite|Score Attractivité/i);
+        return saz ? blockOf(saz, 340, 120) : null;
+      },
     });
 
     // 04 — Le verdict : chiffres du MÊME site
@@ -224,10 +237,18 @@
       // financiers (identiques aux tuiles surlignées) pour rester cohérent.
       body: () => { const d = heroData(); return `La décision d’abord : IRR equity ${d.irrEquity != null ? Math.round(d.irrEquity) + ' %' : '—'}, FCFE 5 ans ${d.fcfe5y != null ? fmtN(Math.round(d.fcfe5y / 1000)) + ' k€' : '—'}, apport revenu en ${d.paybackEquity ? 'M' + d.paybackEquity : '—'}. Puis la démonstration chiffrée derrière.`; },
       run: async () => { await showFiche(/MEMBRES À MATURITÉ|IRR EQUITY|RETOUR DE L/); },
-      // v7.07 — showFiche a attendu que le layout soit FIGÉ, donc la grille des 4
-      // tuiles est stable : on la cible pile (ancêtre commun exact). Repli : le
-      // cartouche EXECUTIVE SUMMARY entier. Toujours dans la fiche visible.
-      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const grid = boxWithAll(c, [/MEMBRES À MATURITÉ/, /IRR EQUITY/, /RETOUR DE L/]); if (grid) return grid; const ex = findByText(c, /EXECUTIVE SUMMARY/); return ex ? blockOf(ex, 340, 150) : null; },
+      // v7.12 — ancre structurelle : la rangée des 4 tuiles = frère suivant de
+      // #exec-scores-bars (id stable du template renderCaptageAnalysis). Plus
+      // de recherche par texte, qui débordait pendant les re-rendus. Repli :
+      // la carte exec entière.
+      focus: () => {
+        const c = $('captageContentSite');
+        const b = c && c.querySelector('#exec-scores-bars');
+        const tiles = b && b.nextElementSibling;
+        if (tiles && tiles.offsetHeight > 0) return tiles;
+        const h = c && c.querySelector('#exec-summary-header');
+        return (h && h.offsetHeight > 0) ? h.parentElement : null;
+      },
     });
 
     // 05 — Forces / faiblesses en langage décideur (bloc Risques & Opportunités)
@@ -236,9 +257,19 @@
       title: 'Forces, faiblesses et synthèse — en langage décideur.',
       body: 'Pas de jargon : l’outil liste les risques et les opportunités du site, et résume le potentiel en une phrase. La lecture qu’un dirigeant fait en 5 secondes avant de trancher.',
       run: async () => { const t = await showFiche(/Opportunités|EN CLAIR/); try { t && t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {} },
-      // v7.07 — cible le bloc Risques + Opportunités (forces ET faiblesses), pile
-      // ce que dit la légende. Replis internes, jamais un autre onglet.
-      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const both = boxWithAll(c, [/Risques/, /Opportunités/]); if (both) return both; const t = findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/); return t ? blockOf(t, 320, 60) : null; },
+      // v7.12 — ancre structurelle dans la carte exec : après #exec-scores-bars
+      // viennent [tuiles] → [EN CLAIR] → [Risques/Opportunités]. On cible le
+      // bloc Risques/Opportunités, repli EN CLAIR (si aucun risque listé).
+      focus: () => {
+        const c = $('captageContentSite');
+        const b = c && c.querySelector('#exec-scores-bars');
+        const tiles = b && b.nextElementSibling;
+        const enclair = tiles && tiles.nextElementSibling;
+        const risks = enclair && enclair.nextElementSibling;
+        if (risks && risks.offsetHeight > 0) return risks;
+        if (enclair && enclair.offsetHeight > 0) return enclair;
+        return null;
+      },
     });
 
     // 06 — Point mort + modularité financière : Studio FCF (fiable, complet)
@@ -288,7 +319,9 @@
     /* SPOTLIGHT — assombrit tout sauf l'élément clé */
     #fpsrSpot{position:fixed;border-radius:16px;pointer-events:none;z-index:100061;
       box-shadow:0 0 0 4px rgba(212,160,23,.9), 0 0 0 9999px rgba(5,7,13,.74), 0 0 60px rgba(212,160,23,.55) inset;
-      transition:all .6s cubic-bezier(.16,1,.3,1);opacity:0}
+      /* v7.12 — glissade COURTE (.28s) : une transition longue laissait le halo
+         en plein vol entre deux positions à chaque re-rendu de la fiche. */
+      transition:opacity .45s ease, top .28s cubic-bezier(.16,1,.3,1), left .28s cubic-bezier(.16,1,.3,1), width .28s cubic-bezier(.16,1,.3,1), height .28s cubic-bezier(.16,1,.3,1);opacity:0}
     #fpsrSpot.on{opacity:1}
     #fpsrSpot::after{content:'';position:absolute;inset:-4px;border-radius:18px;border:2px solid rgba(244,214,126,.9);animation:fpsrRing 2.2s ease-in-out infinite}
     @keyframes fpsrRing{0%,100%{box-shadow:0 0 12px rgba(212,160,23,.4);opacity:.65}50%{box-shadow:0 0 26px rgba(244,214,126,.85);opacity:1}}
@@ -369,9 +402,18 @@
     window.removeEventListener('scroll', onSpotScroll, true);
     window.removeEventListener('resize', onSpotScroll);
   }
-  let _spotEl = null;    // cible actuellement suivie
-  let _spotWant = null;  // dernière géométrie posée (anti-thrash)
+  let _spotEl = null;      // dernière cible résolue (informative)
+  let _spotWant = null;    // dernière géométrie posée (anti-thrash)
+  let _lastSpotScroll = 0; // rate-limit du scrollIntoView
   function onSpotScroll() { updateSpot(_spotEl); }
+  // v7.12 — stabilité par GÉOMÉTRIE, plus par identité DOM : pendant l'analyse
+  // la fiche se re-rend plusieurs fois (Overpass, enrichissement Google) et
+  // recrée les mêmes éléments. L'ancienne logique voyait « une nouvelle
+  // cible » à chaque re-rendu → re-scroll + nouvelle glissade de 0,6 s en
+  // boucle = halo photographié en plein vol, coupé au milieu du texte.
+  // Désormais : même géométrie (±8 px) = aucun mouvement, scroll seulement si
+  // la cible est franchement hors écran (au plus 1×/1,2 s), et le halo
+  // apparaît DIRECTEMENT à sa place (pas de vol d'arrivée).
   function updateSpot(t) {
     const s = $('fpsrSpot');
     if (!t || !t.isConnected || t.offsetHeight === 0) {
@@ -379,24 +421,12 @@
       _spotEl = null; _spotWant = null;
       return;
     }
-    // nouvelle cible (ou cible revenue) hors écran → on la centre
-    if (t !== _spotEl) {
-      const r0 = t.getBoundingClientRect();
-      if (r0.top < 40 || r0.bottom > window.innerHeight - 40) {
-        try { t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
-      }
-      _spotEl = t; _spotWant = null;
-      // Esquive de la légende : si la cible tombe dans la zone bas-gauche par
-      // défaut de la carte, on envoie la carte en haut (règle déterministe
-      // basée sur la position PAR DÉFAUT — pas de flip-flop entre les ticks).
-      const card = $('fpsrCard');
-      if (card) {
-        const r1 = t.getBoundingClientRect();
-        const cw = card.offsetWidth || 640, ch = card.offsetHeight || 220;
-        const zone = { left: 38, right: 38 + cw, bottom: window.innerHeight - 48, top: window.innerHeight - 48 - ch };
-        const overlap = !(r1.bottom < zone.top - 8 || r1.top > zone.bottom + 8 || r1.right < zone.left - 8 || r1.left > zone.right + 8);
-        card.classList.toggle('fpsr-dodge', overlap);
-      }
+    _spotEl = t;
+    const raw = t.getBoundingClientRect();
+    const now = Date.now();
+    if ((raw.bottom < 80 || raw.top > window.innerHeight - 80) && now - _lastSpotScroll > 1200) {
+      try { t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
+      _lastSpotScroll = now;
     }
     const r = t.getBoundingClientRect();
     const pad = 12;
@@ -407,20 +437,37 @@
       h: Math.min(window.innerHeight - 12, r.height + pad * 2),
     };
     let el = s;
+    let created = false;
     if (!el) {
       el = document.createElement('div');
       el.id = 'fpsrSpot';
+      el.style.transition = 'none';            // 1er placement : direct, sans vol
       ($('fpShowreel') || document.body).appendChild(el);
-      setTimeout(() => { el.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
+      created = true;
       _spotWant = null;
     }
     el.style.opacity = '';
-    const moved = !_spotWant || Math.abs(_spotWant.top - want.top) > 6 || Math.abs(_spotWant.left - want.left) > 6
-      || Math.abs(_spotWant.w - want.w) > 6 || Math.abs(_spotWant.h - want.h) > 6;
+    const moved = !_spotWant || Math.abs(_spotWant.top - want.top) > 8 || Math.abs(_spotWant.left - want.left) > 8
+      || Math.abs(_spotWant.w - want.w) > 8 || Math.abs(_spotWant.h - want.h) > 8;
     if (moved) {
       el.style.top = want.top + 'px'; el.style.left = want.left + 'px';
       el.style.width = want.w + 'px'; el.style.height = want.h + 'px';
       _spotWant = want;
+      // Esquive de la légende — géométrique et déterministe (zone bas-gauche
+      // PAR DÉFAUT de la carte), réévaluée quand le halo bouge vraiment.
+      const card = $('fpsrCard');
+      if (card) {
+        const cw = card.offsetWidth || 640, ch = card.offsetHeight || 220;
+        const zone = { left: 38, right: 38 + cw, bottom: window.innerHeight - 48, top: window.innerHeight - 48 - ch };
+        const overlap = !(want.top + want.h < zone.top - 8 || want.top > zone.bottom + 8 || want.left + want.w < zone.left - 8 || want.left > zone.right + 8);
+        card.classList.toggle('fpsr-dodge', overlap);
+      }
+    }
+    if (created) {
+      // reflow pour figer la position posée, puis on rend la main au CSS
+      void el.offsetWidth;
+      el.style.transition = '';
+      setTimeout(() => { el.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
     }
   }
   // Ticker de scène : onglet + cible tenus en continu jusqu'à la scène suivante.
