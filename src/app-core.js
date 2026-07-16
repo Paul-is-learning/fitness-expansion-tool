@@ -2025,6 +2025,16 @@ function toggleAllBrands(state) {
 }
 
 function applyBrandFilter() {
+  // v6.98 — FIX : sur une session fraîche, lastDisplayedComps est vide tant
+  // qu'aucune analyse / "Charger concurrents" n'a tourné → "Tout" et les
+  // chips de marque n'affichaient RIEN (0/0). On amorce depuis la meilleure
+  // source dispo : allComps (déjà chargés) sinon la base vérifiée (90 clubs).
+  if (!lastDisplayedComps.length) {
+    lastDisplayedComps = (typeof allComps !== 'undefined' && allComps.length > 0)
+      ? allComps
+      : VERIFIED_CLUBS.map(c => ({ ...c, id: Math.random(), source: 'verified', est: false,
+          color: segColor(c.segment), threat: segThreat(c.segment), brand: 'local' }));
+  }
   const filtered = lastDisplayedComps.filter(c => brandVisibility[extractBrand(c.name, c.segment)] !== false);
   showCompsOnMap(filtered);
   buildBrandFilters(lastDisplayedComps);

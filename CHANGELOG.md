@@ -1,6 +1,25 @@
 
 # Changelog
 
+## [v6.98-brandfilter-fix] — 2026-07-16
+
+### 🐛 Onglet Concurrence : « Tout » n'affichait aucun concurrent
+
+Sur une session fraîche (avant toute analyse ou « Charger concurrents »),
+cliquer « Tout » dans Filtrer par marque ne montrait rien : 0/0 et carte
+vide. Cause : le filtre s'appliquait sur `lastDisplayedComps`, encore
+vide tant qu'aucune détection n'avait tourné.
+
+- **Fix** : `applyBrandFilter` amorce désormais la liste depuis la
+  meilleure source disponible — les concurrents déjà chargés (`allComps`)
+  sinon la base vérifiée (90 clubs). « Tout » = 90/90 immédiatement.
+- Filtres individuels intacts (masquer World Class → 56/90, Aucun → 0/90).
+- Une fois une analyse lancée, la vraie liste détectée reprend la main.
+
+Vérifié dans l'app réelle : 0/0 → 90/90, toggles OK, 197/197 tests.
+
+---
+
 ## [v6.97-brand-pins] — 2026-07-16
 
 ### 🏷️ Pins de marque pour les concurrents clés
