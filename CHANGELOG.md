@@ -1,6 +1,35 @@
 
 # Changelog
 
+## [v7.07-tour-fix] — 2026-07-16
+
+### 🎯 Démo guidée — surlignage « mal calibré » corrigé (scènes fiche)
+
+En prod, la scène 04 « Le verdict » surlignait la ligne **QUARTIER (CARTIER)**
+d'un AUTRE onglet (MES SITES) au lieu du verdict. Deux causes de course,
+invisibles en local (analyse en cache = rapide) :
+
+1. **Course d'onglet** : après l'analyse, `app-core` rebascule sur MES SITES
+   et scrolle sa carte ~300 ms plus tard — ça écrasait le `switchTab('site')`
+   de la démo. → `analyzeAndWait()` attend maintenant la fin réelle de l'analyse
+   **+ une marge** pour laisser ce dernier mouvement passer avant de forcer la
+   fiche ; `showFiche()` ré-affirme l'onglet fiche et attend le bloc VISIBLE.
+2. **Layout qui fluctue** : la largeur de la fiche oscille (445 ↔ 933 px) en
+   début de scène → un sous-bloc se recadrait de travers. → `showFiche()` attend
+   désormais que la largeur soit **STABLE** avant de surligner.
+
+Bonus robustesse :
+- `trackSpot()` **efface** le halo si sa cible devient masquée (plus de halo
+  fantôme en `position:fixed` par-dessus un bloc voisin) ;
+- `focus()` cible STRICTEMENT la fiche visible, replis internes — **jamais** un
+  élément d'un autre onglet.
+
+Résultat : 3 zooms nets et distincts sur la fiche — **03** cartouche d'analyse
+complet · **04** les 4 tuiles de décision (7 093 · 106 % · 2 192 k€ · M30) ·
+**05** Risques + Opportunités. Vérifié navigateur, halos pile sur la cible.
+
+---
+
 ## [v7.06-tour] — 2026-07-16
 
 ### 🎬 Démo guidée refondue — 10 scènes, cohérente et complète

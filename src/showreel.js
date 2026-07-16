@@ -12,6 +12,17 @@
 //   • pilotage clavier → ← Espace Échap, barre de progression, points.
 //
 // Autonome (window.Showreel = { start, stop }). Zéro donnée inventée.
+//
+// v7.07 — FIX calibrage : les scènes fiche (03/04/05) forçaient l'onglet
+// une seule fois puis surlignaient « à l'aveugle ». En prod (analyse plus
+// lente), app-core rebasculait sur MES SITES APRÈS coup → la scène 04
+// surlignait la ligne QUARTIER (CARTIER) au lieu du verdict. Corrigé par :
+//   • analyzeAndWait() attend la fin RÉELLE de l'analyse + marge avant fiche ;
+//   • showFiche(re) ré-affirme l'onglet fiche et attend le bloc VISIBLE ;
+//   • trackSpot() efface le halo si sa cible devient masquée (plus de halo
+//     fantôme en position:fixed par-dessus un bloc sans rapport) ;
+//   • focus() cible STRICTEMENT la fiche visible, repli interne (jamais un
+//     élément d'un autre onglet).
 // ─────────────────────────────────────────────────────────────────────
 (function () {
   'use strict';
@@ -23,7 +34,7 @@
   const val = v => (typeof v === 'function' ? v() : v);
   const capRun = (fn, ms) => Promise.race([Promise.resolve().then(fn).catch(() => {}), wait(ms)]);
 
-  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false, spotRAF = null;
+  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false, spotRAF = null, spotSettle = null;
 
   // ── Pilotage (défensif) ─────────────────────────────────────────────
   function closeAllPanels() {
@@ -43,12 +54,48 @@
       if (ti >= 0) window.analyzeTargetByIdx(ti);
       else if (typeof window.onMapClick === 'function') window.onMapClick({ latlng: { lat: site.lat, lng: site.lng } });
     } catch {}
-    for (let i = 0; i < 30; i++) {           // ~15 s max (le fetch a son propre timeout)
+    for (let i = 0; i < 44; i++) {           // ~22 s max (le fetch a son propre timeout)
       const t = $('captageContentSite')?.innerText || '';
-      if (/EN CLAIR|GO|WATCH|NO GO/.test(t)) break;
+      if (/EN CLAIR|GO CONDITIONNEL|WATCH|NO GO/.test(t)) break;
       await wait(500);
     }
+    // v7.07 — l'analyse (app-core, analyzeSiteAt/runSiteAnalysis) rebascule sur
+    // l'onglet MES SITES puis scrolle sa carte ~300 ms APRÈS la fin du calcul.
+    // On laisse ce dernier mouvement se produire AVANT de forcer la fiche,
+    // sinon la démo perd la course et atterrit sur MES SITES (mauvais onglet,
+    // halo à côté = « mal calibré »). Marge volontairement large.
+    await wait(1100);
     try { window.switchTab?.('site'); } catch {}
+    await wait(200);
+  }
+  // v7.07 — force l'onglet Fiche et attend que le bloc `re` y soit VISIBLE.
+  // Ré-affirme switchTab('site') si un callback tardif de l'analyse a rebasculé
+  // sur MES SITES. Renvoie l'élément trouvé (ou null au timeout).
+  async function showFiche(re, ms) {
+    ms = ms || 6000;
+    try { window.switchTab?.('site'); } catch {}
+    // v7.07 — attend non seulement le bloc VISIBLE, mais aussi que la LARGEUR de
+    // la fiche soit STABLE (le layout analyse↔présentation oscille en début de
+    // scène) : on ne surligne qu'une fois le layout figé, sinon un sous-bloc se
+    // recadre de travers pendant la transition.
+    let lastW = -1, stable = 0, found = null;
+    for (let waited = 0; waited < ms; waited += 250) {
+      const c = $('captageContentSite');
+      if (c && c.offsetHeight > 0) {
+        const t = findByText(c, re);
+        const w = Math.round(c.getBoundingClientRect().width);
+        if (t) {
+          found = t;
+          if (w === lastW) { if (++stable >= 2) return found; }
+          else { stable = 0; lastW = w; }
+        }
+      } else {
+        try { window.switchTab?.('site'); } catch {}   // un callback a rebasculé → on ré-affirme
+      }
+      await wait(250);
+    }
+    const c = $('captageContentSite');
+    return (c && c.offsetHeight > 0) ? (findByText(c, re) || found) : found;
   }
   const savedSites = () => (window._siteAnalyses || []).slice().sort((a, b) => (b.execScore || 0) - (a.execScore || 0));
 
@@ -63,6 +110,21 @@
       e = e.parentElement;
     }
     return el;
+  }
+
+  // v7.07 — plus petit ancêtre VISIBLE qui contient TOUS les textes donnés.
+  // Déterministe (contrairement à blockOf dont le seuil de taille dérivait
+  // avec la largeur variable de la fiche) : cible pile la grille des 4 tuiles.
+  function boxWithAll(root, res) {
+    if (!root) return null;
+    const first = findByText(root, res[0]);
+    let p = first;
+    for (let i = 0; i < 7 && p; i++) {
+      const t = p.innerText || '';
+      if (p.offsetHeight > 0 && res.every(re => re.test(t))) return p;
+      p = p.parentElement;
+    }
+    return null;
   }
 
   // Trouve l'élément le plus pertinent contenant un texte (pour le spotlight)
@@ -142,12 +204,13 @@
       focus: () => document.getElementById('brandFilterExplorer') || document.getElementById('brandFilters'),
     });
 
-    // 03 — Je choisis un site : analyse temps réel
+    // 03 — Je choisis un site : analyse temps réel → fiche d'analyse complète
     if (hero) s.push({
       kicker: '03 · L’ANALYSE', title: `Je pose un site : ${hero.name}.`,
-      body: 'Population captable, transports, universités, pôles bureaux, concurrence — l’outil croise tout en temps réel et sort un score d’attractivité en quelques secondes.',
-      run: async () => { closeAllPanels(); await analyzeAndWait(hero); },
-      focus: () => { const c = $('captageContentSite'); return c && (c.querySelector('.saz-hero') || c.querySelector('.saz-number') || findByText(c, /sur 100/)); },
+      hold: 13000,   // autoplay : laisse le calcul finir avant d'avancer
+      body: 'Population captable, transports, universités, pôles bureaux, concurrence — l’outil croise tout en temps réel et sort une fiche d’analyse notée en quelques secondes.',
+      run: async () => { closeAllPanels(); await analyzeAndWait(hero); await showFiche(/EXECUTIVE SUMMARY/); },
+      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const t = findByText(c, /EXECUTIVE SUMMARY/); return t ? blockOf(t, 340, 150) : null; },
     });
 
     // 04 — Le verdict : chiffres du MÊME site
@@ -157,16 +220,21 @@
       // (attractivité), distinct du verdict. On cite le verdict + les chiffres
       // financiers (identiques aux tuiles surlignées) pour rester cohérent.
       body: () => { const d = heroData(); return `La décision d’abord : IRR equity ${d.irrEquity != null ? Math.round(d.irrEquity) + ' %' : '—'}, FCFE 5 ans ${d.fcfe5y != null ? fmtN(Math.round(d.fcfe5y / 1000)) + ' k€' : '—'}, apport revenu en ${d.paybackEquity ? 'M' + d.paybackEquity : '—'}. Puis la démonstration chiffrée derrière.`; },
-      run: async () => { try { window.switchTab?.('site'); } catch {} await wait(200); const c = $('captageContentSite'); try { c && c.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} },
-      focus: () => { const c = $('captageContentSite'); if (!c) return null; const t = findByText(c, /MEMBRES À MATURITÉ|IRR EQUITY|RETOUR DE L/); return t ? blockOf(t, 300, 60) : findByText(c, /EN CLAIR/); },
+      run: async () => { await showFiche(/MEMBRES À MATURITÉ|IRR EQUITY|RETOUR DE L/); },
+      // v7.07 — showFiche a attendu que le layout soit FIGÉ, donc la grille des 4
+      // tuiles est stable : on la cible pile (ancêtre commun exact). Repli : le
+      // cartouche EXECUTIVE SUMMARY entier. Toujours dans la fiche visible.
+      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const grid = boxWithAll(c, [/MEMBRES À MATURITÉ/, /IRR EQUITY/, /RETOUR DE L/]); if (grid) return grid; const ex = findByText(c, /EXECUTIVE SUMMARY/); return ex ? blockOf(ex, 340, 150) : null; },
     });
 
     // 05 — Forces / faiblesses en langage décideur (bloc Risques & Opportunités)
     if (hero) s.push({
       kicker: '05 · EN CLAIR', title: 'Forces, faiblesses et synthèse — en langage décideur.',
       body: 'Pas de jargon : l’outil liste les risques et les opportunités du site, et résume le potentiel en une phrase. La lecture qu’un dirigeant fait en 5 secondes avant de trancher.',
-      run: async () => { try { window.switchTab?.('site'); } catch {} await wait(250); const c = $('captageContentSite'); const t = c && (findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/)); try { t && t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {} },
-      focus: () => { const c = $('captageContentSite'); const t = c && (findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/)); return t ? blockOf(t, 320, 60) : (c && (findByText(c, /MEMBRES À MATURITÉ/) || c.firstElementChild)); },
+      run: async () => { const t = await showFiche(/Opportunités|EN CLAIR/); try { t && t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {} },
+      // v7.07 — cible le bloc Risques + Opportunités (forces ET faiblesses), pile
+      // ce que dit la légende. Replis internes, jamais un autre onglet.
+      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const both = boxWithAll(c, [/Risques/, /Opportunités/]); if (both) return both; const t = findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/); return t ? blockOf(t, 320, 60) : null; },
     });
 
     // 06 — Point mort + modularité financière : Studio FCF (fiable, complet)
@@ -277,6 +345,7 @@
   // ── Spotlight ───────────────────────────────────────────────────────
   function clearSpotlight() {
     cancelAnimationFrame(spotRAF); spotRAF = null;
+    clearTimeout(spotSettle); clearInterval(spotSettle); spotSettle = null;
     const s = $('fpsrSpot'); if (s) { s.classList.remove('on'); setTimeout(() => s.remove(), 350); }
     $('fpShowreel')?.classList.remove('spot');
     window.removeEventListener('scroll', trackSpot, true);
@@ -285,7 +354,13 @@
   let _spotTarget = null;
   function trackSpot() {
     const s = $('fpsrSpot'), t = _spotTarget;
-    if (!s || !t || !t.isConnected) return;
+    if (!s || !t) return;
+    // v7.07 — si la cible a disparu ou est masquée (onglet rebasculé par un
+    // callback tardif de l'analyse), on EFFACE le halo plutôt que de le laisser
+    // à des coordonnées périmées : sinon il se retrouve, en position:fixed,
+    // par-dessus un bloc sans rapport (bug « QUARTIER surligné »).
+    if (!t.isConnected || t.offsetHeight === 0) { s.style.opacity = '0'; return; }
+    s.style.opacity = '';
     const r = t.getBoundingClientRect();
     const pad = 12;
     s.style.top = Math.max(6, r.top - pad) + 'px';
@@ -306,6 +381,12 @@
     ($('fpShowreel') || document.body).appendChild(s);
     trackSpot();
     setTimeout(() => { s.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
+    // v7.07 — un SEUL re-cadrage différé (post-transition/scroll), puis on laisse
+    // le halo tranquille : un suivi répété rechassait les compteurs animés v6.94
+    // et se décalait. trackSpot (scroll/resize) efface le halo si la cible est
+    // masquée par un changement d'onglet tardif.
+    clearInterval(spotSettle);
+    spotSettle = setTimeout(() => { trackSpot(); spotSettle = null; }, 700);
     window.addEventListener('scroll', trackSpot, true);
     window.addEventListener('resize', trackSpot);
   }
