@@ -2,7 +2,14 @@
 
 > **Purpose:** Every constant that drives the financial model, with source, reasoning, and date of last calibration. If you change a number here, bump `MODEL_VERSION` in `config.js` and re-run `tests/analysis.html`.
 
-Last audited: **2026-04-18** (v6.0-onair-calibrated)
+Last audited: **2026-07-16** (v7.10 — post-migration BP Avril 2026)
+
+> ⚠ **v6.35 (2026-04-20)** a migré le modèle vers le BP harmonisé Avril 2026
+> (« MF FP - BP RO - vFinancement mixte - Avril.xlsx »). Valeurs courantes :
+> targetMembers **3600**, prix base **27,80 € TTC** (ARPU HT 25,49), fonds pub
+> **2%**, staff **plug 3 ETP 85,89k A1 +6%/an**, dette club **4%** (SG-BPI),
+> exit **8×**, rentGrowth 2%, churn 4,3%. Les tableaux v6.0 ci-dessous sont
+> l'HISTORIQUE de la calibration OnAir — annotés là où la valeur a changé.
 
 ---
 
@@ -14,9 +21,9 @@ All % of revenue ratios have been calibrated against the **OnAir Montreuil** (TE
 |---|---:|---:|---:|---|
 | Cost of Sales | 5.0% | **2.8%** | 2.77% | Achats marchandises revendues |
 | OPEX ops (Y5+ steady) | 20.0% flat | **12.0%** + decay | 10.8% | Courbe [20,18,16,14,12]. Décote Romania modérée appliquée (OnAir FR est en Y5 mature, cruising). Romania avantages: salaires staff ops −60%, télécom −30%, marketing −25%, électricité −15-25%. +1.2pp marge vs OnAir. |
-| Fonds publicitaire | 2.0% | **1.0%** | 1.0% | Standard franchise fitness EU |
+| Fonds publicitaire | 2.0% | **1.0%** | 1.0% | ⚠ Depuis v6.35 : **2.0%** (HYPOTHESES!C17) |
 | Redevance franchise | 6.0% | **6.0%** | 4.0% | Maintenu 6% car **master-franchise Isseo** (vs franchise classique OnAir) |
-| Staff | 9.0% | **9.0%** | 9.0% | Identique — taux BP FP officiel aligné réel |
+| Staff | 9.0% | **9.0%** | 9.0% | ⚠ Depuis v6.35 : **plug 3 ETP** (85,89k chargé A1, +6%/an — HYPOTHESES!C55-C61), plus de % CA |
 | Loyer all-in | 12-15% | 12-15% | 12.4% | Steps Hala Laminor (real data) |
 
 **Impact 5 sites vs v5.x :**
@@ -32,11 +39,11 @@ All % of revenue ratios have been calibrated against the **OnAir Montreuil** (TE
 
 | Tier | Price TTC | Price HT | Source |
 |------|-----------|----------|--------|
-| Base (monthly, no commitment) | **28 €** | 23.14 € | BP V17, positioning vs Stay Fit 32€ / 18GYM 36€ |
+| Base (monthly, no commitment) | **27,80 €** | 22.98 € | BP Avril 2026 (HYPOTHESES!C42) — était 28 € (V17). Positioning vs Stay Fit 32€ / 18GYM 36€. ⚠ FP_DEFAULTS (défaut user-editable) reste à 28 € en attente de décision Paul. |
 | Premium | **40 €** | 33.06 € | Alignement offre FR, +accès club couple |
 | Ultimate | **50 €** | 41.32 € | Sports collectifs + coaching |
 
-Blended ARPU HT ≈ **27 €** depending on persona mix and `TAUX_VAD`.
+Blended ARPU HT = **25,49 €** (canonique BP Avril, VAD 20%) — varie avec le persona mix et `TAUX_VAD`.
 
 **TAUX_VAD = 20%** (default, user-adjustable 5-50% via slider): share of customers on Premium/Ultimate tiers. Source: BP V17 C46.
 
@@ -198,14 +205,16 @@ Adjusted by `estimateAge()` — clubs open > 5 years accumulate reviews, younger
 ## 11. Financial model defaults (FP_DEFAULTS)
 
 ```js
-priceBaseTTC:     28
+priceBaseTTC:     28            // ⚠ RESTE V17 — canonique BP Avril = 27.8 ;
+                                //   alignement en attente décision Paul (impacte
+                                //   ARPU/IRR de toutes les analyses + baseline tests)
 pricePremiumTTC:  40
 priceUltimateTTC: 50
 loyerAnnuel:      236,400 €     // 1,449 m² × 13.6 €/m² × 12 months
-clubSurface:      1,449 m²     // BP V17 standard
+clubSurface:      1,449 m²
 ```
 
-**CAPEX default:** **1,176,000 €** (BP V17: aménagement + équipement + franchise entry).
+**CAPEX default:** **1,176,000 €** (aménagement + équipement — inchangé V17 → BP Avril 2026).
 
 **DEFAULT_CAC:** **50 €** (marketing local estimation, BP V17).
 

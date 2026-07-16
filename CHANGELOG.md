@@ -1,6 +1,89 @@
 
 # Changelog
 
+## [v7.10-integrity] — 2026-07-16
+
+### 🧹 Audit intégrité : 31 restes V17 traqués et corrigés + démo guidée refaite
+
+Suite au bug du graphe Trajectoire (v7.09), audit multi-agents (44 agents,
+vérification adversariale) de TOUS les chiffres métier codés en dur contre le
+BP Avril 2026. **31 findings confirmés, 8 faux positifs rejetés.** Le moteur
+verrouillé n'était PAS touché · c'étaient des affichages/textes périmés.
+
+**Corrigés (app) :**
+- Fiche site : « Objectif maturité (4 000) » → **3 600** (libellé + seuils
+  OUI/POSSIBLE et EXCELLENT/VIABLE recâblés sur `PNL_DEFAULTS.targetMembers`) ;
+  texte reco NO-GO « objectif 4 000 adhérents » → dynamique ; titre « P&L
+  Calibré BP V17 » → BP Avril 2026.
+- Tours d'onboarding : taux dette **6,5 % (V17) → 4 % SG-BPI** (4 chaînes FR/EN) ;
+  verdict du tour BP pays affichait des chiffres du SITE Hala (IRR 57,6 %,
+  NPV 3,9 M€, payback 38 mois) → remplacés par le canon DCF BPI conso
+  (**Equity Value 40,4 / 86,0 / 127,8 M€** A5/A7/A10, TRI 64,5→50,0 %) ;
+  démos IRR figées (57,6 / 89,3 % calculés au taux V17) → lecture **live**
+  de l'analyse Hala, repli sur la valeur baseline des tests.
+- structure-couts.html : le KPI « TRI Mix » lisait la colonne **E (Voblig
+  pur)** au lieu de **D (Mixte)** dans DCF_COMPARAISON → corrigé (D42/D28).
+- Carte BP mobile : staff « 9,0 % CA » (V17) → plug 3 ETP dynamique ;
+  fallbacks 4 000/1 % → 3 600/2 % ; hint « BP V17 C34 » → HYPOTHESES!C34.
+- Docs remis d'équerre : SESSION_HANDOFF (section « état actuel » entièrement
+  V17 !) et MODEL.md (golden numbers annotés post-v6.35).
+
+**En attente de décision Paul (impacte les calculs, pas tranché à sa place) :**
+- `FP_DEFAULTS.priceBaseTTC = 28` (V17) vs canon 27,80 € · l'aligner décale
+  l'ARPU de ~0,6 % et IRR/NPV de toutes les analyses + régénération baseline.
+  Marqué ⚠ dans le code et les docs.
+
+**Démo guidée v7.10 — enforceur continu (fini le « tout décalé ») :**
+- Chaque scène déclare son onglet ; un ticker (450 ms) ré-affirme l'onglet,
+  re-résout la cible et recale le halo pendant TOUTE la scène. Plus aucun pari
+  sur le timing → le rebasculement tardif de l'analyse (10-20 s en prod) est
+  rattrapé en <1 s (test adversarial vérifié).
+- Cibles sémantiques layout-indépendantes (ancêtre commun des libellés,
+  ligne entière du tableau Studio) au lieu des seuils de taille qui cassaient
+  sur écran large.
+- La légende **esquive** en haut si la cible du halo est dans sa zone.
+
+**Tests : 197/197 assertions** (les seuils 3 600 ne déplacent aucun site de
+la baseline · aucune valeur verrouillée modifiée).
+
+---
+
+## [v7.09-bp-avril-chart] — 2026-07-16
+
+### 🚨 Graphe « Trajectoire financière réseau » : données V17 périmées · CORRIGÉ
+
+Repéré par Paul : le graphe du dashboard affichait EBITDA A10 = 9,6 M€ alors
+que le vrai BP (Avril 2026) donne **18,9 M€**. Cause : les 3 séries du graphe
+étaient **codées en dur depuis le BP V17** (mix 18 propres + 22 franchisés,
+ouvertures lentes, cible 4 000 adhérents) et ont **échappé à la migration
+v6.35** vers le BP Avril 2026 · l'infobulle disait d'ailleurs « Source : BP
+MF FP V17 ». À côté, la carte Paramètres et le P&L Consolidé affichaient les
+bons chiffres — d'où l'incohérence visible.
+
+**Important : le moteur d'analyse de sites (buildPnL, IRR/FCFE/verdicts) n'est
+PAS concerné** — il a été migré en v6.35 et reste verrouillé par les 197 tests.
+L'erreur était un affichage statique périmé, pas un calcul.
+
+Corrections (zéro chiffre inventé) :
+- **EBITDA conso** : série annuelle complète recopiée de la ligne Excel de
+  Paul (PL_CONSO) : Y0 -0,1 · A1 -0,3 · A2 0,36 · A3 2,53 · A4 7,41 · A5 6,62
+  · A6 8,53 · A7 13,13 · A8 16,56 · A9 18,15 · **A10 18,94 M€**.
+- **CA** : le graphe traçait le « CA Enseigne » (system-wide, 51,3 M€ A10)
+  face à un EBITDA conso — paire incohérente (marge apparente 19 %). Remplacé
+  par le **CA conso net interco** (33,7 M€ A10, marge 56,3 % ✓) aux années
+  connues du repo (A1/A3/A5/A7/A10, spanGaps relie les points).
+- **Clubs cumulés** : calendrier Avril 2026 (A1 2 · A3 15 · A5 32 · A7 40,
+  maturité) aux années connues.
+- Infobulle du graphe : V17 → **PL_CONSO · BP Avril 2026**, 27 succursales +
+  13 franchises, 27,80 €, 3 600 adhérents.
+- Onglet SOURCES : bloc BP V17 (4 000 mbr, 28 €, 18+22) → BP Avril 2026
+  (3 600 mbr, 27,80 € / ARPU 25,49 HT, 27+13).
+
+Audit multi-agents lancé sur tout le code pour traquer d'autres restes V17
+(résultats consignés ci-dessous le cas échéant).
+
+---
+
 ## [v7.08-no-emdash] — 2026-07-16
 
 ### ✒️ Plus de tirets longs dans le SaaS

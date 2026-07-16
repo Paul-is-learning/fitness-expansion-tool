@@ -41,42 +41,50 @@ docs/ARCHITECTURE.md    Layout fichiers + load order
 
 Custom sites additionnés via UI desktop/mobile (autocomplete Google Places) → stockés localStorage `fpCustomSites` + sync auto cloud KV via `/api/sync` (v6.29+). Dans l'onglet "Mes sites" desktop (v6.34), TARGETS et customs sont mergés dans une seule liste numérotée 1-N, pins uniformes ronds dorés.
 
-## Modèle financier — état actuel (v6.4)
+## Modèle financier — état actuel (v6.35+, BP harmonisé Avril 2026)
 
-### PNL_DEFAULTS (calibré OnAir Montreuil benchmark)
+⚠ Mis à jour v7.10 : l'ancienne version de cette section listait encore les
+valeurs V17 (4000 mbr, 6.5%, 6×, 1%, staff 9%) comme « état actuel » — piège
+pour toute session future. Référence = Excel Paul « MF FP - BP RO -
+vFinancement mixte - Avril.xlsx » (migration v6.35, cf. CHANGELOG).
+
+### PNL_DEFAULTS (BP Avril 2026 + calibration OnAir Montreuil)
 ```js
 // Revenus
-priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50
+priceBaseTTC: 27.8 (HYPOTHESES!C42), pricePremiumTTC: 40, priceUltimateTTC: 50
+arpuMeanHT: 25.49 (VAD 20%)
 TAUX_VAD: 0.20  // % clients forfaits supérieurs (slidable)
 TVA_RO: 0.21
+// NB: FP_DEFAULTS (user-editable, app-core ~3049) garde priceBaseTTC 28 (V17)
+//     → alignement 27.8 en attente de décision Paul (impacte baseline 197 tests).
 
-// Coûts % du CA
+// Coûts
 costOfSalesRate: 0.028      // OnAir réel 2.77%
 opexOpsRateByYear: [0.20, 0.18, 0.16, 0.14, 0.12]  // Y1→Y5+ time-decay
-  //                 Paul validé conservateur +1.2pp vs OnAir 10.8%
-redevanceRate: 0.06         // Master-franchise Isseo (vs 4% OnAir classique)
-fondsPubRate:  0.01         // Standard franchise EU
-taxLocalRate:  0.02         // Impôts locaux RO (taxa pe clădiri) — ajout v6.25 (OnAir 2.2%)
-staffRate: 0.09             // BP FP officiel
-staffFloorAnnual: 65000     // 4 ETP Romania +3%/an inflation
+redevanceRate: 0.06         // Master-franchise (6% CA HT)
+fondsPubRate:  0.02         // 2% CA (HYPOTHESES!C17 — doublé vs 1% V17)
+taxLocalRate:  0.02         // Impôts locaux RO (taxa pe clădiri) — ajout v6.25
+staff: plug 3 ETP (1 manager 36k + 2 vendeurs 24k), 85 890 chargé A1, +6%/an
+  // (HYPOTHESES!C55-C61 — plus de ratio 9% CA ni plancher 65k depuis v6.35)
+churnAnnual: 0.043
 
-// Loyer stepped objectifNego (Hala Laminor surface 1449 m²)
+// Loyer stepped objectifNego (Hala Laminor surface 1449 m²) — GELÉ demande Paul
 Y1-Y2: 10.5 €/m² + 5.5 charges → 16 €/m² all-in
 Y3-Y4: 11.5 + 5.5 → 17
 Y5+:   13   + 5.5 → 18.5
-Indexation HICP 3%/an à partir Y2
+Indexation HICP 3%/an à partir Y2 (clause bail Hala — distinct du rentGrowth 2% BP)
 Slider per-site rent (5-25) + slider per-site charges (0-12)
 
 // CAPEX 1 176 000 €
 Travaux 840k + Equip CAPEX 336k (leasing 504k @ 5 ans)
 
-// Financement (v6.3)
-equity 30% / emprunt 70% / taux 6.5% / 7 ans
+// Financement club
+equity 30% / emprunt 70% / taux 4% SG garantie BPI (01_DCF_BPI!C68) / 7 ans
 → IRR Projet (unlevered) + IRR Equity (levered)
 
 // Divers
-discountRate: 0.12, exitMultiple: 6, citRate: 0.16
-targetMembers: 4000 (A3 maturité), caGrowthA4A6: 0.05
+discountRate: 0.12, exitMultiple: 8 (HYPOTHESES!C116), citRate: 0.16
+targetMembers: 3600 (A3 maturité, HYPOTHESES!C34), rentGrowth: 0.02
 ```
 
 ### Benchmark OnAir Montreuil (TEMATACA, Fiteco audité)

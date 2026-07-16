@@ -439,7 +439,7 @@
       // Slide 6 FINANCEMENT
       'tour.s6.eyebrow': 'FINANCEMENT',
       'tour.s6.title': 'IRR Projet vs IRR Equity',
-      'tour.s6.subtitle': '30/70 equity/loan, 6,5% sur 7 ans. Effet levier calculé, intérêts cumulés modélisés, pitch banquier ready.',
+      'tour.s6.subtitle': '30/70 equity/loan, 4% sur 7 ans (SG garantie BPI). Effet levier calculé, intérêts cumulés modélisés, pitch banquier ready.',
       // Slide 7 SITES CUSTOM
       'tour.s7.eyebrow': 'SITES CUSTOM',
       'tour.s7.title': 'Ajoute une adresse, analyse auto',
@@ -465,13 +465,13 @@
       'bp.s4.subtitle': 'Staff, loyer, OPEX ops, royalties MF, fonds pub, impôts locaux RO. Total OPEX ~42% CA à maturité → EBITDA 53%+. Calibré sur OnAir (44,7% observé) avec 2% impôts locaux v6.25 (taxa pe clădiri).',
       'bp.s5.eyebrow': 'ÉTAPE 4 · CAPEX',
       'bp.s5.title': 'Investissement 1 176 k€ par club',
-      'bp.s5.subtitle': "Fit-out 840 k€ (600€/m² × 1 400 m²) + équipement 336 k€ dont 60% en leasing 5 ans (504 k€ lissés). Financement 30% equity / 70% dette bancaire 6,5% sur 7 ans.",
+      'bp.s5.subtitle': "Fit-out 840 k€ (600€/m² × 1 400 m²) + équipement 336 k€ dont 60% en leasing 5 ans (504 k€ lissés). Financement 30% equity / 70% dette 4% sur 7 ans (SG garantie BPI).",
       'bp.s6.eyebrow': 'ÉTAPE 5 · MONTE CARLO',
       'bp.s6.title': 'Distribution IRR simulée',
       'bp.s6.subtitle': "1 000 simulations Monte Carlo avec variables stochastiques : prix (±10%), membres (±15%), loyer (±20%), churn (±5pp), délai ouverture (±6 mois). Résultat : médiane 57% IRR, P10 38%, P90 79%.",
       'bp.s7.eyebrow': 'VERDICT',
       'bp.s7.title': 'BP robuste et défendable',
-      'bp.s7.subtitle': 'IRR équité +57,6% · NPV 3,9 M€ · Payback 38 mois. Scénarios stress-tested, sources documentées, méthodologie Monte Carlo auditable. Prêt pour pitch banquier.',
+      'bp.s7.subtitle': 'Equity Value post-IS : 40,4 M€ (A5) · 86,0 M€ (A7) · 127,8 M€ (A10), TRI equity 64,5% → 50,0% (DCF BPI). Scénarios stress-tested, sources documentées. Prêt pour pitch banquier.',
 
       // ─── TOUR Sources de données (6 slides) ──────────────────────
       'data.s1.eyebrow': 'SOURCES · TRANSPARENCE',
@@ -921,7 +921,7 @@
       // Slide 6 FINANCING
       'tour.s6.eyebrow': 'FINANCING',
       'tour.s6.title': 'Project IRR vs Equity IRR',
-      'tour.s6.subtitle': '30/70 equity/loan, 6.5% over 7 years. Leverage effect computed, cumulative interest modeled, bank-pitch ready.',
+      'tour.s6.subtitle': '30/70 equity/loan, 4% over 7 years (SG, BPI-guaranteed). Leverage effect computed, cumulative interest modeled, bank-pitch ready.',
       // Slide 7 CUSTOM SITES
       'tour.s7.eyebrow': 'CUSTOM SITES',
       'tour.s7.title': 'Add an address, auto-analysis',
@@ -947,13 +947,13 @@
       'bp.s4.subtitle': 'Staff, rent, OpEx, MF royalties, marketing fund, RO local taxes. Total OpEx ~42% revenue at maturity → EBITDA 53%+. Calibrated on OnAir (44.7% observed) with 2% RO local taxes added in v6.25 (taxa pe clădiri).',
       'bp.s5.eyebrow': 'STEP 4 · CAPEX',
       'bp.s5.title': '1,176 k€ investment per club',
-      'bp.s5.subtitle': 'Fit-out 840 k€ (600€/m² × 1,400 m²) + equipment 336 k€ of which 60% leased over 5 years (504 k€ smoothed). Financing 30% equity / 70% bank debt at 6.5% over 7 years.',
+      'bp.s5.subtitle': 'Fit-out 840 k€ (600€/m² × 1,400 m²) + equipment 336 k€ of which 60% leased over 5 years (504 k€ smoothed). Financing 30% equity / 70% debt at 4% over 7 years (SG, BPI-guaranteed).',
       'bp.s6.eyebrow': 'STEP 5 · MONTE CARLO',
       'bp.s6.title': 'Simulated IRR distribution',
       'bp.s6.subtitle': '1,000 Monte Carlo simulations with stochastic variables: price (±10%), members (±15%), rent (±20%), churn (±5pp), opening delay (±6 months). Result: median IRR 57%, P10 38%, P90 79%.',
       'bp.s7.eyebrow': 'VERDICT',
       'bp.s7.title': 'Robust, defensible BP',
-      'bp.s7.subtitle': 'Equity IRR +57.6% · NPV 3.9 M€ · Payback 38 months. Stress-tested scenarios, documented sources, auditable Monte Carlo methodology. Ready for the bank pitch.',
+      'bp.s7.subtitle': 'Post-tax Equity Value: €40.4M (Y5) · €86.0M (Y7) · €127.8M (Y10), equity IRR 64.5% → 50.0% (BPI DCF). Stress-tested scenarios, documented sources. Ready for the bank pitch.',
 
       // ─── Data sources tour (6 slides) ────────────────────────────
       'data.s1.eyebrow': 'SOURCES · TRANSPARENCY',

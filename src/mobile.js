@@ -1593,20 +1593,20 @@
     return `
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
         <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.revenues')}</div>
-        ${row('FP Base TTC', (P.priceBaseTTC || 28) + ' €/mo', '#34d399', '')}
+        ${row('FP Base TTC', (P.priceBaseTTC || 27.8) + ' €/mo', '#34d399', '')}
         ${row('FP Premium TTC', (P.pricePremiumTTC || 40) + ' €/mo', '#34d399', '')}
         ${row('FP Ultimate TTC', (P.priceUltimateTTC || 50) + ' €/mo', '#34d399', '')}
-        ${row(_t('bp.targetMembersMaturity'), fmtNum(P.targetMembers || 4000), 'var(--accent)', 'A3 (BP V17 C34)')}
+        ${row(_t('bp.targetMembersMaturity'), fmtNum(P.targetMembers || 3600), 'var(--accent)', 'A3 (HYPOTHESES!C34)')}
       </div>
 
       <div class="card" style="padding:14px 16px;margin-bottom:10px">
         <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${_t('bp.costRates')}</div>
-        ${row(_t('bp.staff'), '9.0% ' + _t('bp.perCA'), '#f87171', '')}
+        ${row(_t('bp.staff'), P.staff ? '3 ETP · ' + fmtNum(Math.round((P.staff.managerSalary * P.staff.nbManagers + P.staff.vendorSalary * P.staff.nbVendors) * (1 + P.staff.chargeRate))) + '/an +6%' : '3 ETP · 85 890/an +6%', '#f87171', '')}
         ${row(_t('bp.costOfSales'), ((P.costOfSalesRate || 0.028) * 100).toFixed(1) + '% ' + _t('bp.perCA'), '#f87171', '')}
         ${row(_t('bp.opexY1'), (opexCurve[0] * 100).toFixed(0) + '% ' + _t('bp.perCA'), '#f87171', '')}
         ${row(_t('bp.opexY5'), (opexCurve[4] * 100).toFixed(0) + '% ' + _t('bp.perCA'), '#f87171', '')}
         ${row(_t('bp.franchiseRoyalty'), ((P.redevanceRate || 0.06) * 100).toFixed(0) + '% ' + _t('bp.perCAAdh'), '#f87171', '')}
-        ${row(_t('bp.adFund'), ((P.fondsPubRate || 0.01) * 100).toFixed(0) + '% ' + _t('bp.perCAAdh'), '#f87171', '')}
+        ${row(_t('bp.adFund'), ((P.fondsPubRate || 0.02) * 100).toFixed(0) + '% ' + _t('bp.perCAAdh'), '#f87171', '')}
         ${row(_t('bp.fpCloud'), (P.fpCloudMonthly || 600) + ' ' + _t('bp.perMonth'), '#f87171', '')}
         ${row(_t('bp.leasing'), fmtNum((typeof getScaledLeasingAnnual === 'function' ? getScaledLeasingAnnual() : (P.leasingAnnual || 100800)) / 12) + ' ' + _t('bp.perMonth'), '#f87171', '')}
       </div>

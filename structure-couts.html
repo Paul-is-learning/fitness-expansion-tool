@@ -336,9 +336,11 @@ function extractKPIs() {
     netCashCumul: plcElems.netCashCumul,
   };
   // DCF TRI Mix = 02_DCF_Mix!I121 (horizon 10 ans — v_excel baseline 0.80)
-  // Voir audit : DCF_COMPARAISON!E42 = TRI 10a Mix
-  const tri10 = getVal('DCF_COMPARAISON', 'E42');
-  const tri5  = getVal('DCF_COMPARAISON', 'E28');
+  // v7.10 — FIX audit : DCF_COMPARAISON colonne D = Scénario B Mixte,
+  // colonne E = Scénario C Voblig pur (bp_ir.json D5/E5). L'ancien code
+  // lisait E42/E28 → le KPI « TRI Mix » affichait le TRI du scénario Voblig.
+  const tri10 = getVal('DCF_COMPARAISON', 'D42');
+  const tri5  = getVal('DCF_COMPARAISON', 'D28');
   // Payback MF = EXEC_SUMMARY à trouver — prenons le cumulatif cash positif
   return { plc, tri10, tri5 };
 }

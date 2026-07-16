@@ -1048,10 +1048,23 @@
         </div>
         <div class="irr-card">
           <div><div class="l">IRR projet · recalc live</div></div>
-          <div class="v" data-counter data-target="57.6" data-suffix="%" data-delay="600">0%</div>
+          <div class="v" data-counter data-target="${halaIrr().proj}" data-suffix="%" data-delay="600">0%</div>
         </div>
       </div>
     `;
+  }
+
+  // v7.10 — les démos site (sliders, financement) lisaient un IRR 57,6% figé
+  // à l'époque v6.0-v6.3 (et l'equity 89,3% calculé au taux V17 6,5%). On lit
+  // désormais la VRAIE analyse Hala Laminor (_siteAnalyses, synchro cloud) ;
+  // repli : 69.0 = IRR base Hala verrouillé par la baseline des 197 tests
+  // (.baseline.json — à tenir en phase si la baseline est régénérée).
+  function halaIrr() {
+    try {
+      const a = (window._siteAnalyses || []).find(s => /hala/i.test(s.name || ''));
+      if (a && isFinite(a.irrBase)) return { proj: Math.round(a.irrBase * 10) / 10, eq: isFinite(a.irrEquity) ? Math.round(a.irrEquity * 10) / 10 : null };
+    } catch {}
+    return { proj: 69.0, eq: null };
   }
 
   function demoSaz() {
@@ -1097,20 +1110,26 @@
   }
 
   function demoFinancing() {
+    // v7.10 — valeurs LIVE (analyse Hala) : le couple figé 57,6 / 89,3 datait
+    // du taux V17 6,5% (canonique : 4% SG-BPI). Sans analyse dispo, on montre
+    // l'IRR projet baseline et on laisse l'equity « recalculé en direct ».
+    const h = halaIrr();
     return `
       <div class="fp-onb-demo-fin" aria-hidden="true">
         <div class="bar">
           <div class="eq">Equity 30%</div>
-          <div class="ln">Emprunt 70%</div>
+          <div class="ln">Emprunt 70% @ 4%</div>
         </div>
         <div class="stats">
           <div class="stat">
             <div class="l">IRR projet</div>
-            <div class="v" data-counter data-target="57.6" data-suffix="%">0%</div>
+            <div class="v" data-counter data-target="${h.proj}" data-suffix="%">0%</div>
           </div>
           <div class="stat levered">
             <div class="l">IRR equity ⭐</div>
-            <div class="v" data-counter data-target="89.3" data-suffix="%">0%</div>
+            ${h.eq != null
+              ? `<div class="v" data-counter data-target="${h.eq}" data-suffix="%">0%</div>`
+              : `<div class="v" style="font-size:13px">recalculé en direct</div>`}
           </div>
         </div>
       </div>
@@ -1351,10 +1370,14 @@
             <path d="M 26 40 L 36 52 L 56 30" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="48" stroke-dashoffset="48" style="animation:fpOnbCheckDraw .5s cubic-bezier(.34,1.12,.52,1) .9s forwards;--to:0"/>
           </svg>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:320px">
-          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #22c55e;--blur-delay:1.2s"><div style="font-size:16px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,.5)"><span data-counter data-target="57.6" data-format="fr-decimal" data-prefix="+" data-suffix="%" data-delay="1300">+0%</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">IRR équité</div></div>
-          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #d4a017;--blur-delay:1.4s"><div style="font-size:16px;font-weight:900;color:#d4a017;text-shadow:0 0 14px rgba(212,160,23,.5)"><span data-counter data-target="3.9" data-format="fr-decimal" data-suffix=" M€" data-delay="1500">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">NPV 5 ans</div></div>
-          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #60a5fa;--blur-delay:1.6s"><div style="font-size:16px;font-weight:900;color:#60a5fa;text-shadow:0 0 14px rgba(96,165,250,.5)"><span data-counter data-target="38" data-suffix=" mois" data-delay="1700">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">Payback</div></div>
+        <!-- v7.10 — les 3 tuiles affichaient des chiffres du SITE Hala (IRR
+             57,6% / NPV 3,9 M€ / payback 38 mois) présentés comme verdict du
+             BP PAYS. Remplacées par le canon DCF BPI conso (Equity Value
+             post-IS A5/A7/A10), identique à la carte Paramètres du dashboard. -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:340px">
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #22c55e;--blur-delay:1.2s"><div style="font-size:16px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,.5)"><span data-counter data-target="40.4" data-format="fr-decimal" data-suffix=" M€" data-delay="1300">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">Equity Value A5 · TRI 64,5%</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #d4a017;--blur-delay:1.4s"><div style="font-size:16px;font-weight:900;color:#d4a017;text-shadow:0 0 14px rgba(212,160,23,.5)"><span data-counter data-target="86.0" data-format="fr-decimal" data-suffix=" M€" data-delay="1500">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">Equity Value A7 · MOIC 29,2x</div></div>
+          <div class="fp-onb-wow-glass fp-onb-wow-frame fp-onb-blur-in" style="border-radius:12px;padding:10px 6px;text-align:center;border-top:2px solid #60a5fa;--blur-delay:1.6s"><div style="font-size:16px;font-weight:900;color:#60a5fa;text-shadow:0 0 14px rgba(96,165,250,.5)"><span data-counter data-target="127.8" data-format="fr-decimal" data-suffix=" M€" data-delay="1700">0</span></div><div style="font-size:8px;letter-spacing:.6px;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:2px">Equity Value A10 · MOIC 57,8x</div></div>
         </div>
       </div>
     `;

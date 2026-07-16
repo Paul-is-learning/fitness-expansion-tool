@@ -34,7 +34,7 @@
   const val = v => (typeof v === 'function' ? v() : v);
   const capRun = (fn, ms) => Promise.race([Promise.resolve().then(fn).catch(() => {}), wait(ms)]);
 
-  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false, spotRAF = null, spotSettle = null;
+  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false, spotRAF = null, spotSettle = null, sceneTicker = null;
 
   // ── Pilotage (défensif) ─────────────────────────────────────────────
   function closeAllPanels() {
@@ -59,12 +59,10 @@
       if (/EN CLAIR|GO CONDITIONNEL|WATCH|NO GO/.test(t)) break;
       await wait(500);
     }
-    // v7.07 — l'analyse (app-core, analyzeSiteAt/runSiteAnalysis) rebascule sur
-    // l'onglet MES SITES puis scrolle sa carte ~300 ms APRÈS la fin du calcul.
-    // On laisse ce dernier mouvement se produire AVANT de forcer la fiche,
-    // sinon la démo perd la course et atterrit sur MES SITES (mauvais onglet,
-    // halo à côté = « mal calibré »). Marge volontairement large.
-    await wait(1100);
+    // v7.10 — plus de grosse marge : l'ENFORCEUR de scène re-force l'onglet
+    // fiche en continu, même si un callback tardif de l'analyse rebascule sur
+    // MES SITES 10-20 s plus tard (réseau lent en prod). Petit settle suffit.
+    await wait(400);
     try { window.switchTab?.('site'); } catch {}
     await wait(200);
   }
@@ -193,6 +191,7 @@
     s.push({
       kicker: '02 · LE TERRAIN', title: 'Chaque salle concurrente, géolocalisée et filtrable.',
       body: 'Toute la concurrence de Bucarest sur la carte, avec les logos des enseignes. Je filtre par marque, je vois les zones saturées et les trous à conquérir.',
+      tab: 'explore',
       run: async () => {
         closeAllPanels();
         try { window.switchTab?.('explore'); } catch {}
@@ -207,15 +206,19 @@
     // 03 — Je choisis un site : analyse temps réel → fiche d'analyse complète
     if (hero) s.push({
       kicker: '03 · L’ANALYSE', title: `Je pose un site : ${hero.name}.`,
-      hold: 13000,   // autoplay : laisse le calcul finir avant d'avancer
+      hold: 15000,   // autoplay : laisse le calcul finir avant d'avancer
+      tab: 'site',   // l'enforceur re-force la fiche si l'analyse rebascule sur MES SITES
       body: 'Population captable, transports, universités, pôles bureaux, concurrence — l’outil croise tout en temps réel et sort une fiche d’analyse notée en quelques secondes.',
       run: async () => { closeAllPanels(); await analyzeAndWait(hero); await showFiche(/EXECUTIVE SUMMARY/); },
-      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; const t = findByText(c, /EXECUTIVE SUMMARY/); return t ? blockOf(t, 340, 150) : null; },
+      // Cartouche exec exact = plus petit ancêtre contenant le titre ET « EN
+      // CLAIR » (layout-indépendant, ne déborde jamais sur les blocs voisins).
+      focus: () => { const c = $('captageContentSite'); if (!c || c.offsetHeight === 0) return null; return boxWithAll(c, [/EXECUTIVE SUMMARY/, /EN CLAIR/]) || (t => t ? blockOf(t, 340, 150) : null)(findByText(c, /EXECUTIVE SUMMARY/)); },
     });
 
     // 04 — Le verdict : chiffres du MÊME site
     if (hero) s.push({
-      kicker: '04 · LE VERDICT', title: () => { const d = heroData(); return `${vlabel(d.verdict)} · ${fmtN(d.totalTheo)} adhérents potentiels.`; },
+      kicker: '04 · LE VERDICT', tab: 'site',
+      title: () => { const d = heroData(); return `${vlabel(d.verdict)} · ${fmtN(d.totalTheo)} adhérents potentiels.`; },
       // NB : pas de « score /100 » ici — le gros chiffre à l'écran est le SAZ
       // (attractivité), distinct du verdict. On cite le verdict + les chiffres
       // financiers (identiques aux tuiles surlignées) pour rester cohérent.
@@ -229,7 +232,8 @@
 
     // 05 — Forces / faiblesses en langage décideur (bloc Risques & Opportunités)
     if (hero) s.push({
-      kicker: '05 · EN CLAIR', title: 'Forces, faiblesses et synthèse — en langage décideur.',
+      kicker: '05 · EN CLAIR', tab: 'site',
+      title: 'Forces, faiblesses et synthèse — en langage décideur.',
       body: 'Pas de jargon : l’outil liste les risques et les opportunités du site, et résume le potentiel en une phrase. La lecture qu’un dirigeant fait en 5 secondes avant de trancher.',
       run: async () => { const t = await showFiche(/Opportunités|EN CLAIR/); try { t && t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {} },
       // v7.07 — cible le bloc Risques + Opportunités (forces ET faiblesses), pile
@@ -242,7 +246,9 @@
       kicker: '06 · LE POINT MORT & LA MODULARITÉ', title: 'Combien d’adhérents pour être rentable — et je change tout en direct.',
       body: 'Point mort en adhérents, dette ou 100 % fonds propres, CAPEX, loyer, multiple de sortie, droit d’entrée master-franchise (+400 k€) : je coche, je décoche, je compare deux scénarios côte à côte. La Référence BP reste verrouillée comme garde-fou.',
       run: async () => { closeAllPanels(); try { window.FcfStudio?.open?.(); } catch {} await wait(500); },
-      focus: () => { const p = $('fpFcfStudio'); return p && (findByText(p, /Point mort FCFE/) || findByText(p, /Master-franchise/) || p.querySelector('table')); },
+      // v7.10 — la LIGNE entière du tableau (closest tr), pas le mini-label :
+      // sur écran large le label seul donnait un halo minuscule au bord gauche.
+      focus: () => { const p = $('fpFcfStudio'); if (!p) return null; const lbl = findByText(p, /Point mort FCFE/) || findByText(p, /Master-franchise/); if (lbl) { const row = lbl.closest('tr'); if (row) return row; return blockOf(lbl, 420, 26); } return p.querySelector('table'); },
     });
 
     // 07 — Le portefeuille : consolidation
@@ -295,6 +301,9 @@
       border:1px solid rgba(212,160,23,.4);border-left:3px solid var(--accent,#d4a017);border-radius:18px;
       padding:22px 26px;box-shadow:0 30px 80px rgba(0,0,0,.66);transform:translateY(16px) scale(.98);opacity:0;transition:all .6s cubic-bezier(.16,1,.3,1)}
     #fpsrCard.show{transform:none;opacity:1}
+    /* v7.10 — esquive : si la cible du halo est dans la zone bas-gauche, la
+       légende monte en haut pour ne jamais recouvrir ce qu'elle commente. */
+    #fpsrCard.fpsr-dodge{bottom:auto;top:84px}
     #fpsrKicker{font-size:11px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:9px;
       background:linear-gradient(90deg,#d4a017,#f4d67e,#d4a017);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:fpsrSheen 4s linear infinite}
     @keyframes fpsrSheen{to{background-position:200% center}}
@@ -342,53 +351,94 @@
     setTimeout(() => o.classList.add('on'), 20);
   }
 
-  // ── Spotlight ───────────────────────────────────────────────────────
+  // ── Spotlight v7.10 — ENFORCEUR CONTINU ─────────────────────────────
+  // Leçon des v7.06-7.09 : un halo posé UNE fois + des marges de timing
+  // perdent toujours la course en prod (l'analyse rebascule l'onglet 10-20 s
+  // plus tard sur réseau lent, la largeur de la fiche change, les compteurs
+  // animés bougent les blocs). Nouveau contrat : pendant TOUTE la scène, un
+  // ticker (450 ms) ré-affirme l'onglet déclaré par la scène (sc.tab),
+  // RE-RÉSOUT la cible (sc.focus()) et recale le halo si elle a bougé de
+  // plus de 6 px. Cible masquée → halo caché. Plus aucun pari sur le timing.
   function clearSpotlight() {
     cancelAnimationFrame(spotRAF); spotRAF = null;
     clearTimeout(spotSettle); clearInterval(spotSettle); spotSettle = null;
+    clearInterval(sceneTicker); sceneTicker = null;
+    _spotEl = null; _spotWant = null;
     const s = $('fpsrSpot'); if (s) { s.classList.remove('on'); setTimeout(() => s.remove(), 350); }
     $('fpShowreel')?.classList.remove('spot');
-    window.removeEventListener('scroll', trackSpot, true);
-    window.removeEventListener('resize', trackSpot);
+    window.removeEventListener('scroll', onSpotScroll, true);
+    window.removeEventListener('resize', onSpotScroll);
   }
-  let _spotTarget = null;
-  function trackSpot() {
-    const s = $('fpsrSpot'), t = _spotTarget;
-    if (!s || !t) return;
-    // v7.07 — si la cible a disparu ou est masquée (onglet rebasculé par un
-    // callback tardif de l'analyse), on EFFACE le halo plutôt que de le laisser
-    // à des coordonnées périmées : sinon il se retrouve, en position:fixed,
-    // par-dessus un bloc sans rapport (bug « QUARTIER surligné »).
-    if (!t.isConnected || t.offsetHeight === 0) { s.style.opacity = '0'; return; }
-    s.style.opacity = '';
+  let _spotEl = null;    // cible actuellement suivie
+  let _spotWant = null;  // dernière géométrie posée (anti-thrash)
+  function onSpotScroll() { updateSpot(_spotEl); }
+  function updateSpot(t) {
+    const s = $('fpsrSpot');
+    if (!t || !t.isConnected || t.offsetHeight === 0) {
+      if (s) s.style.opacity = '0';
+      _spotEl = null; _spotWant = null;
+      return;
+    }
+    // nouvelle cible (ou cible revenue) hors écran → on la centre
+    if (t !== _spotEl) {
+      const r0 = t.getBoundingClientRect();
+      if (r0.top < 40 || r0.bottom > window.innerHeight - 40) {
+        try { t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
+      }
+      _spotEl = t; _spotWant = null;
+      // Esquive de la légende : si la cible tombe dans la zone bas-gauche par
+      // défaut de la carte, on envoie la carte en haut (règle déterministe
+      // basée sur la position PAR DÉFAUT — pas de flip-flop entre les ticks).
+      const card = $('fpsrCard');
+      if (card) {
+        const r1 = t.getBoundingClientRect();
+        const cw = card.offsetWidth || 640, ch = card.offsetHeight || 220;
+        const zone = { left: 38, right: 38 + cw, bottom: window.innerHeight - 48, top: window.innerHeight - 48 - ch };
+        const overlap = !(r1.bottom < zone.top - 8 || r1.top > zone.bottom + 8 || r1.right < zone.left - 8 || r1.left > zone.right + 8);
+        card.classList.toggle('fpsr-dodge', overlap);
+      }
+    }
     const r = t.getBoundingClientRect();
     const pad = 12;
-    s.style.top = Math.max(6, r.top - pad) + 'px';
-    s.style.left = Math.max(6, r.left - pad) + 'px';
-    s.style.width = Math.min(window.innerWidth - 12, r.width + pad * 2) + 'px';
-    s.style.height = Math.min(window.innerHeight - 12, r.height + pad * 2) + 'px';
+    const want = {
+      top: Math.max(6, r.top - pad),
+      left: Math.max(6, r.left - pad),
+      w: Math.min(window.innerWidth - 12, r.width + pad * 2),
+      h: Math.min(window.innerHeight - 12, r.height + pad * 2),
+    };
+    let el = s;
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fpsrSpot';
+      ($('fpShowreel') || document.body).appendChild(el);
+      setTimeout(() => { el.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
+      _spotWant = null;
+    }
+    el.style.opacity = '';
+    const moved = !_spotWant || Math.abs(_spotWant.top - want.top) > 6 || Math.abs(_spotWant.left - want.left) > 6
+      || Math.abs(_spotWant.w - want.w) > 6 || Math.abs(_spotWant.h - want.h) > 6;
+    if (moved) {
+      el.style.top = want.top + 'px'; el.style.left = want.left + 'px';
+      el.style.width = want.w + 'px'; el.style.height = want.h + 'px';
+      _spotWant = want;
+    }
   }
-  async function spotlight(target) {
-    clearSpotlight();
-    if (!target || !target.getBoundingClientRect) return;
-    // v7.06 — scroll INSTANTANÉ (pas 'smooth') : un scroll fluide n'était pas
-    // terminé quand on positionnait le halo → cible profonde ratée (hors écran).
-    try { target.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
-    await wait(260);
-    _spotTarget = target;
-    const s = document.createElement('div');
-    s.id = 'fpsrSpot';
-    ($('fpShowreel') || document.body).appendChild(s);
-    trackSpot();
-    setTimeout(() => { s.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
-    // v7.07 — un SEUL re-cadrage différé (post-transition/scroll), puis on laisse
-    // le halo tranquille : un suivi répété rechassait les compteurs animés v6.94
-    // et se décalait. trackSpot (scroll/resize) efface le halo si la cible est
-    // masquée par un changement d'onglet tardif.
-    clearInterval(spotSettle);
-    spotSettle = setTimeout(() => { trackSpot(); spotSettle = null; }, 700);
-    window.addEventListener('scroll', trackSpot, true);
-    window.addEventListener('resize', trackSpot);
+  // Ticker de scène : onglet + cible tenus en continu jusqu'à la scène suivante.
+  function enforceScene(sc, sceneIdx) {
+    clearInterval(sceneTicker);
+    const tick = () => {
+      if (!running || idx !== sceneIdx) { clearInterval(sceneTicker); sceneTicker = null; return; }
+      if (sc.tab) {
+        const panel = $('tab-' + sc.tab);
+        if (panel && panel.offsetHeight === 0) { try { window.switchTab?.(sc.tab); } catch {} }
+      }
+      let t = null; try { t = sc.focus && sc.focus(); } catch {}
+      updateSpot(t);
+    };
+    tick();
+    sceneTicker = setInterval(tick, 450);
+    window.addEventListener('scroll', onSpotScroll, true);
+    window.addEventListener('resize', onSpotScroll);
   }
 
   function renderDots() {
@@ -418,12 +468,12 @@
     card?.classList.add('show');
     busy = false;
     // 2) action en arrière-plan, plafonnée → jamais de blocage
-    capRun(sc.run, 16000).then(async () => {
+    capRun(sc.run, 16000).then(() => {
       if (!running || idx !== i) return;
       renderLegend(sc);                        // rafraîchit avec les données calculées
       const o = $('fpShowreel'); if (o) document.body.appendChild(o); // reste au-dessus des panneaux
-      let tgt = null; try { tgt = sc.focus && sc.focus(); } catch {}
-      if (tgt) await spotlight(tgt);           // 3) guide l'œil sur l'élément clé
+      // v7.10 — l'enforceur tient onglet + halo pendant TOUTE la scène
+      if (sc.focus || sc.tab) enforceScene(sc, i);
     });
     if (autoplay) autoTimer = setTimeout(() => go(idx + 1), sc.hold || 9000);
   }

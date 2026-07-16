@@ -2347,14 +2347,20 @@ function initCharts() {
     }
   });
 
+  // v7.09 — séries recâblées sur PL_CONSO (BP Avril 2026, 27 succursales + 13
+  // franchises). L'ancien graphe traçait encore le BP V17 (18 propres + 22
+  // franchisés → EBITDA conso A10 9,6 M€) : jamais migré en v6.35, repéré par
+  // Paul (vrai EBITDA A10 = 18,9 M€). EBITDA = ligne Excel Paul complète ;
+  // CA conso & clubs = uniquement les années présentes dans le repo (A1/A3/A5/
+  // A7/A10, spanGaps relie les points connus — AUCUNE valeur inventée).
   finChart=new Chart(el('finChart'),{
     type:'line',
     data:{
       labels:['Y0','A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'],
       datasets:[
-        {label:'CA Enseigne (M EUR)',data:[0,0.44,1.95,4.9,11.5,18.9,31.0,40.5,45.8,49.0,51.3],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
-        {label:'EBITDA (M EUR)',data:[-0.1,-0.3,-0.1,0.4,1.1,1.9,3.1,3.3,5.6,8.0,9.6],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
-        {label:'Clubs cumul.',data:[0,1,3,7,16,26,37,38,40,40,40],borderColor:'#eab308',borderDash:[5,3],yAxisID:'y1',tension:.3,pointRadius:2}
+        {label:'CA conso (M EUR)',data:[0,0.9,null,9.1,null,16.7,null,26.8,null,null,33.7],spanGaps:true,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
+        {label:'EBITDA conso (M EUR)',data:[-0.1,-0.3,0.36,2.53,7.41,6.62,8.53,13.13,16.56,18.15,18.94],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',fill:true,tension:.35,pointRadius:3,pointHoverRadius:5},
+        {label:'Clubs cumul.',data:[0,2,null,15,null,32,null,40,40,40,40],spanGaps:true,borderColor:'#eab308',borderDash:[5,3],yAxisID:'y1',tension:.3,pointRadius:2}
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,
@@ -2546,7 +2552,7 @@ function genSiteCard(lat,lng,sector,saz,comps) {
   let recoText;
   if(saz.total>=70) recoText='<strong style="color:var(--green)">Zone a fort potentiel.</strong> La combinaison d\'une population cible dense, d\'un pouvoir d\'achat favorable et d\'une pression concurrentielle moderee en fait un candidat prioritaire pour l\'implantation. La penetration fitness actuelle estimee a '+penetration+'% laisse un gap de marche de '+fmt(Math.max(0,gap))+' membres potentiels. Recommandation : <strong>poursuivre l\'analyse detaillee</strong> (negociation bail, etude de surface, visibilite).';
   else if(saz.total>=45) recoText='<strong style="color:var(--yellow)">Zone a potentiel modere.</strong> La pression concurrentielle ('+comps.length+' acteurs dans le rayon) et/ou le profil socio-demographique requierent une analyse approfondie. La penetration estimee de '+penetration+'% est '+(parseFloat(penetration)>5?'deja significative':'encore modeste')+'. Recommandation : <strong>analyse complementaire</strong> avant engagement — evaluer les conditions locatives et la visibilite du local.';
-  else recoText='<strong style="color:var(--red)">Zone defavorable a l\'implantation.</strong> Le ratio population cible / concurrence est insuffisant pour garantir la viabilite du modele economique FP (objectif: 4,000 adherents a maturite). La penetration estimee de '+penetration+'% avec '+comps.length+' concurrents existants laisse peu de marge. Recommandation : <strong>explorer d\'autres localisations</strong>.';
+  else recoText='<strong style="color:var(--red)">Zone defavorable a l\'implantation.</strong> Le ratio population cible / concurrence est insuffisant pour garantir la viabilite du modele economique FP (objectif: '+PNL_DEFAULTS.targetMembers.toLocaleString('en-US')+' adherents a maturite). La penetration estimee de '+penetration+'% avec '+comps.length+' concurrents existants laisse peu de marge. Recommandation : <strong>explorer d\'autres localisations</strong>.';
 
   el('siteCardContent').innerHTML=`
     <div class="sc-section animate-in">
@@ -3038,7 +3044,11 @@ function showOverlapAnalysis() {
 
 // ================================================================
 // USER-EDITABLE PARAMS — persisted in localStorage, impact BP en direct
-// 3 subscription tiers + loyer — calibre BP V17 (MF FP - BP RO)
+// 3 subscription tiers + loyer.
+// ⚠ priceBaseTTC: 28 est un RESTE V17 (canonique BP Avril 2026 = 27,80,
+//   cf. PNL_DEFAULTS.priceBaseTTC). L'aligner décale l'ARPU de ~0,6% et donc
+//   IRR/NPV de toutes les analyses (+ régénération .baseline.json des 197
+//   tests) → décision métier en attente de validation Paul (audit v7.10).
 // ================================================================
 const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400, clubSurface: 1449 };
 let TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46) — modifiable par utilisateur
@@ -5707,7 +5717,9 @@ function runCaptageAnalysis(lat, lng, captageRadius) {
     totalTheorique, pessimiste, realiste, optimiste,
     rampUp, saz,
     breakeven2800: totalTheorique >= 2800 ? 'OUI' : totalTheorique >= 2000 ? 'POSSIBLE' : 'NON',
-    breakeven4000: totalTheorique >= 4000 ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
+    // v7.10 — seuil aligné sur la cible BP Avril 2026 (3600, était 4000 V17).
+    // La clé garde son nom historique breakeven4000 (stabilité API/tests).
+    breakeven4000: totalTheorique >= PNL_DEFAULTS.targetMembers ? 'OUI' : totalTheorique >= 3000 ? 'POSSIBLE' : 'NON',
     // Bain-level data
     personaMix, arpu, churnY1, churnRate,
     scenarios, pnl, sensitivity, monteCarlo,
@@ -5743,8 +5755,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
   window._lastCaptageLocation.siteName = siteName;
   saveSiteAnalysis(siteName, lat, lng, r, exec);
 
-  const recoColor = r.totalTheorique >= 4000 ? 'var(--green)' : r.totalTheorique >= 2800 ? 'var(--yellow)' : 'var(--red)';
-  const recoText = r.totalTheorique >= 4000 ? 'EXCELLENT' : r.totalTheorique >= 2800 ? 'VIABLE' : r.totalTheorique >= 2000 ? 'RISQUE' : 'INSUFFISANT';
+  // v7.10 — seuil EXCELLENT = cible BP Avril 2026 (3600, était 4000 V17)
+  const recoColor = r.totalTheorique >= PNL_DEFAULTS.targetMembers ? 'var(--green)' : r.totalTheorique >= 2800 ? 'var(--yellow)' : 'var(--red)';
+  const recoText = r.totalTheorique >= PNL_DEFAULTS.targetMembers ? 'EXCELLENT' : r.totalTheorique >= 2800 ? 'VIABLE' : r.totalTheorique >= 2000 ? 'RISQUE' : 'INSUFFISANT';
 
   c.innerHTML = `
     <div style="background:linear-gradient(135deg,${exec.verdictColor}12,${exec.verdictColor}04);border:2px solid ${exec.verdictColor}50;border-radius:10px;padding:14px;margin-bottom:12px;position:relative">
@@ -5852,7 +5865,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div class="metric-row" style="color:var(--yellow)"><span class="metric-label"><b>Realiste</b></span><span class="metric-value" style="font-weight:800">${fmt(r.realiste)} mbr</span></div>
       <div class="metric-row" style="color:var(--green)"><span class="metric-label">Optimiste (x1.4)</span><span class="metric-value">${fmt(r.optimiste)} mbr</span></div>
       <div class="metric-row"><span class="metric-label">Breakeven A1 (2,800)</span><span class="metric-value" style="color:${r.breakeven2800==='OUI'?'var(--green)':r.breakeven2800==='POSSIBLE'?'var(--yellow)':'var(--red)'};font-weight:700">${r.breakeven2800}</span></div>
-      <div class="metric-row"><span class="metric-label">Objectif maturite (4,000)</span><span class="metric-value" style="color:${r.breakeven4000==='OUI'?'var(--green)':r.breakeven4000==='POSSIBLE'?'var(--yellow)':'var(--red)'};font-weight:700">${r.breakeven4000}</span></div>
+      <div class="metric-row"><span class="metric-label">Objectif maturite (${PNL_DEFAULTS.targetMembers.toLocaleString('en-US')})</span><span class="metric-value" style="color:${r.breakeven4000==='OUI'?'var(--green)':r.breakeven4000==='POSSIBLE'?'var(--yellow)':'var(--red)'};font-weight:700">${r.breakeven4000}</span></div>
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
@@ -5928,7 +5941,7 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
     </div>
 
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">P&L / MODELE FINANCIER 5 ANS — Calibre BP V17</div>
+      <div style="font-size:9px;font-weight:700;color:var(--green);margin-bottom:6px">P&L / MODELE FINANCIER 5 ANS — Calibre BP Avril 2026</div>
       <div style="position:relative;height:160px;width:100%;margin-bottom:8px"><canvas id="pnlChart"></canvas></div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         ${Object.entries(SCENARIOS).map(([k,sc]) => `<div style="font-size:8px;color:${sc.color}">● ${sc.label}</div>`).join('')}
