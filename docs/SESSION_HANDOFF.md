@@ -56,7 +56,7 @@ arpuMeanHT: 25.49 (VAD 20%)
 TAUX_VAD: 0.20  // % clients forfaits supérieurs (slidable)
 TVA_RO: 0.21
 // NB: FP_DEFAULTS (user-editable, app-core ~3049) garde priceBaseTTC 28 (V17)
-//     → alignement 27.8 en attente de décision Paul (impacte baseline 197 tests).
+//     → DÉCISION PAUL 2026-07-16 : 28 conservé volontairement. Ne pas "corriger".
 
 // Coûts
 costOfSalesRate: 0.028      // OnAir réel 2.77%

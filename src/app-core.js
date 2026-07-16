@@ -3045,10 +3045,10 @@ function showOverlapAnalysis() {
 // ================================================================
 // USER-EDITABLE PARAMS — persisted in localStorage, impact BP en direct
 // 3 subscription tiers + loyer.
-// ⚠ priceBaseTTC: 28 est un RESTE V17 (canonique BP Avril 2026 = 27,80,
-//   cf. PNL_DEFAULTS.priceBaseTTC). L'aligner décale l'ARPU de ~0,6% et donc
-//   IRR/NPV de toutes les analyses (+ régénération .baseline.json des 197
-//   tests) → décision métier en attente de validation Paul (audit v7.10).
+// DÉCISION PAUL (2026-07-16, audit v7.10/v7.11) : priceBaseTTC reste à 28 €
+// (prix de rue), écart assumé vs 27,80 du BP Avril 2026 (PNL_DEFAULTS).
+// Ne pas « corriger » : changer cette valeur décale l'ARPU/IRR de toutes
+// les analyses et casse la baseline des 197 tests.
 // ================================================================
 const FP_DEFAULTS = { priceBaseTTC: 28, pricePremiumTTC: 40, priceUltimateTTC: 50, loyerAnnuel: 236400, clubSurface: 1449 };
 let TAUX_VAD = 0.20; // 20% clients sur forfaits superieurs (BP V17 C46) — modifiable par utilisateur

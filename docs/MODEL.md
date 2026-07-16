@@ -39,7 +39,7 @@ All % of revenue ratios have been calibrated against the **OnAir Montreuil** (TE
 
 | Tier | Price TTC | Price HT | Source |
 |------|-----------|----------|--------|
-| Base (monthly, no commitment) | **27,80 €** | 22.98 € | BP Avril 2026 (HYPOTHESES!C42) — était 28 € (V17). Positioning vs Stay Fit 32€ / 18GYM 36€. ⚠ FP_DEFAULTS (défaut user-editable) reste à 28 € en attente de décision Paul. |
+| Base (monthly, no commitment) | **27,80 €** | 22.98 € | BP Avril 2026 (HYPOTHESES!C42) — était 28 € (V17). Positioning vs Stay Fit 32€ / 18GYM 36€. Décision Paul 2026-07-16 : FP_DEFAULTS (moteur/user-editable) reste à 28 € volontairement (prix de rue, écart assumé). |
 | Premium | **40 €** | 33.06 € | Alignement offre FR, +accès club couple |
 | Ultimate | **50 €** | 41.32 € | Sports collectifs + coaching |
 
@@ -205,9 +205,9 @@ Adjusted by `estimateAge()` — clubs open > 5 years accumulate reviews, younger
 ## 11. Financial model defaults (FP_DEFAULTS)
 
 ```js
-priceBaseTTC:     28            // ⚠ RESTE V17 — canonique BP Avril = 27.8 ;
-                                //   alignement en attente décision Paul (impacte
-                                //   ARPU/IRR de toutes les analyses + baseline tests)
+priceBaseTTC:     28            // DÉCISION PAUL 2026-07-16 : 28 € conservé
+                                //   volontairement (prix de rue) — écart assumé
+                                //   vs 27.8 BP Avril. NE PAS "corriger".
 pricePremiumTTC:  40
 priceUltimateTTC: 50
 loyerAnnuel:      236,400 €     // 1,449 m² × 13.6 €/m² × 12 months
