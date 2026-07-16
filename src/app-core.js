@@ -2037,9 +2037,15 @@ function applyBrandFilter() {
 function showCompsOnMap(comps) {
   compCluster.clearLayers();
   comps.forEach(c=>{
-    const icon=L.divIcon({className:'',
-      html:`<div style="width:13px;height:13px;background:${c.color};border:2px solid rgba(255,255,255,.8);border-radius:50%;box-shadow:0 0 8px ${c.color}80"></div>`,
-      iconSize:[13,13],iconAnchor:[7,7]});
+    // v6.97 — enseignes clés (World Class, Stay Fit, 18GYM, Downtown…) :
+    // pin de MARQUE (favicon officiel, fallback monogramme) au lieu du
+    // point coloré. Le liseré garde la couleur du segment (lecture menace).
+    const brandHtml = (typeof window.brandPinHTML === 'function') ? window.brandPinHTML(c.name, c.color) : null;
+    const icon = brandHtml
+      ? L.divIcon({className:'', html: brandHtml, iconSize:[30,30], iconAnchor:[15,15]})
+      : L.divIcon({className:'',
+          html:`<div style="width:13px;height:13px;background:${c.color};border:2px solid rgba(255,255,255,.8);border-radius:50%;box-shadow:0 0 8px ${c.color}80"></div>`,
+          iconSize:[13,13],iconAnchor:[7,7]});
     const dist=selectedPt?haversine(selectedPt.lat,selectedPt.lng,c.lat,c.lng):null;
     const ts=dist!==null?threatScore(c,dist):null;
 

@@ -111,6 +111,34 @@
     </div>`;
   };
 
+  // ═══ v6.97 — PINS DE MARQUE pour les concurrents (demande Paul) ═════
+  // Les 4 enseignes clés (et extensibles) apparaissent sur la carte avec
+  // leur identité visuelle : favicon officiel de leur site (via le service
+  // public de favicons Google, sz=64) dans une pastille blanche premium.
+  // Si l'image ne charge pas (offline, CI aux hôtes bloqués, service KO),
+  // le onerror bascule sur un MONOGRAMME aux couleurs de la marque —
+  // aucun réseau requis, rendu toujours propre.
+  const BRANDS = [
+    { match: /world\s*class/i,               domain: 'worldclass.ro',       mono: 'WC', bg: '#0b2447', fg: '#f4d67e' },
+    { match: /stay\s*fit/i,                  domain: 'stayfit.ro',          mono: 'SF', bg: '#e11d48', fg: '#ffffff' },
+    { match: /18\s*-?\s*gym|eighteen\s*gym/i, domain: '18gym.ro',           mono: '18', bg: '#111827', fg: '#f97316' },
+    { match: /downtown\s*fitness/i,          domain: 'downtownfitness.ro',  mono: 'DT', bg: '#0f172a', fg: '#38bdf8' },
+  ];
+
+  // Pin 30px : pastille blanche, liseré couleur segment, favicon centré.
+  // Fallback monogramme injecté par onerror (échappé pour l'attribut inline).
+  window.brandPinHTML = function brandPinHTML(name, segColor) {
+    const b = BRANDS.find(x => x.match.test(String(name || '')));
+    if (!b) return null;
+    const ring = segColor || '#94a3b8';
+    const monoHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${b.bg};color:${b.fg};display:flex;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:11px;letter-spacing:-.5px">${b.mono}</div>`;
+    const onerr = `this.parentNode.innerHTML='${monoHtml.replace(/'/g, '&#39;')}'`;
+    return `<div class="fp-brand-pin" title="${b.mono}" style="width:30px;height:30px;border-radius:50%;background:#f8fafc;border:2px solid ${ring};box-shadow:0 3px 10px rgba(0,0,0,.45),0 0 6px ${ring}66;overflow:hidden;display:flex;align-items:center;justify-content:center">
+      <img src="https://www.google.com/s2/favicons?domain=${b.domain}&sz=64" width="22" height="22" alt="" loading="lazy"
+        style="border-radius:50%;display:block" onerror="${onerr}">
+    </div>`;
+  };
+
   // v6.55 — signal au code inline (index.html) qu'il peut re-render les pins
   // avec le vrai logo. Avant ce signal, renderTargetPinsDesktop peut avoir
   // fallback au HTML simplifié "FP N" faute de fpLogoPinHTML dispo (script defer).

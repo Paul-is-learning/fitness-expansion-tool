@@ -1,6 +1,25 @@
 
 # Changelog
 
+## [v6.97-brand-pins] — 2026-07-16
+
+### 🏷️ Pins de marque pour les concurrents clés
+
+Sur la carte, World Class, Stay Fit Gym, 18GYM et Downtown Fitness
+apparaissent désormais avec leur **identité visuelle** (favicon officiel
+de la marque, sz=64) dans une pastille blanche premium, au lieu du point
+coloré. Le liseré garde la couleur du segment (lecture menace conservée).
+
+- Fallback **monogramme** aux couleurs de la marque (WC / SF / 18 / DT)
+  si le favicon ne charge pas (offline, CI, service KO) — zéro réseau
+  requis, rendu toujours propre.
+- Les autres clubs (indépendants, CrossFit…) gardent le point coloré.
+- Extensible : ajouter une enseigne = 1 ligne dans BRANDS (src/fp-logos.js).
+- Zéro impact moteur : les popups, estimations et le clustering sont
+  inchangés. 197/197 tests, matching marque testé (13/13).
+
+---
+
 ## [v6.96-vector-map] — 2026-07-16
 
 ### 🗺️ Fond de carte VECTORIEL (MapLibre GL × CARTO Dark Matter)
