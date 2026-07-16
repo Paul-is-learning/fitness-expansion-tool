@@ -1,6 +1,39 @@
 
 # Changelog
 
+## [v6.89-conquest-ux] — 2026-07-16
+
+### 🗺️ Plan de Conquête refondu — clair, visuel, comparateur de scénarios
+
+Refonte complète de l'expérience, à la demande : « combien d'ouvertures,
+et à quel moment c'est possible ? »
+
+- **Barre-réponse** en tête : une phrase directe — « Tu ouvres N clubs en
+  10 ans · 1re ouverture A1 M1 · dernière A4 M4 · pic de trésorerie X M€
+  · bancable A2 M5 ». La réponse concrète, tout de suite.
+- **Comparateur des 3 stratégies de financement** côte à côte (Dette /
+  100% Fonds propres / Hybride) sur le MÊME projet et le même ordre :
+  nb de clubs, dernière ouverture, pic de financement, FP engagés, cash
+  10 ans, bancabilité — avec ✦ sur la meilleure valeur de chaque ligne.
+  Clique une carte pour l'afficher en détail. Le mode **Full equity**
+  (zéro dette) est un choix de premier plan, comme demandé.
+- **Calendrier d'ouvertures visuel** par année : chaque club posé sur sa
+  colonne d'année avec mois, membres, financement (💰/🏦), badge de
+  cannibalisation et ⏳ si l'ouverture a été décalée faute de cash.
+  Réordonne les priorités avec ▲▼ ; survol → surligne la courbe.
+- **Trésorerie : 3 scénarios superposés** sur un même graphe (affiché en
+  gras, les deux autres en pointillés) — on VOIT que le 100% fonds propres
+  ouvre plus lentement et exige plus de cash que la dette.
+
+Moteur refactoré : `runScenario(finMode)` pur → les 3 scénarios calculés
+en parallèle pour un même projet (ordre + contraintes figés). Modèle de
+référence inchangé.
+
+Vérifié : 3 scénarios calculés et comparés, calendrier lisible, courbes
+superposées, changement de scénario instantané, 197/197, E2E maj.
+
+---
+
 ## [v6.88-intel] — 2026-07-16
 
 ### 🎯 Intel Concurrence — 3 sources publiques & légales de données concurrent

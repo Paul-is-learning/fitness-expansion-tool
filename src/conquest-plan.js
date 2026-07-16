@@ -143,7 +143,10 @@
   }
 
   // ─── Moteur de séquencement ───────────────────────────────────────
-  function computePlan() {
+  // Calcule UN scénario de financement (finMode) sur l'ordre/contraintes
+  // courants et RETOURNE son résultat (sans muter S) — permet de calculer
+  // les 3 scénarios côte à côte pour un même projet.
+  function runScenario(finMode) {
     const cfg = S.cfg;
     const enabled = S.order.filter(id => S.sites[id].enabled);
     const elders = [];
@@ -162,11 +165,13 @@
     for (const meta of perSite) {
       let m = Math.max(0, lastOpen + minGap);
       let chosen = null;
+      let reason = null; // pourquoi ce mois (pour la lisibilité)
       for (; m <= HORIZON - 6; m++) {
         const y = Math.floor(m / 12);
-        if ((opensInYear[y] || 0) >= perYearCap) { m = (y + 1) * 12 - 1; continue; }
+        if ((opensInYear[y] || 0) >= perYearCap) { m = (y + 1) * 12 - 1; reason = 'cap'; continue; }
         // mode de financement de CE club à CE mois
-        const useDebt = cfg.finMode === 'ref' || (cfg.finMode === 'hybrid' && bankableAt(m, plan, cfg));
+        const bankable = bankableAt(m, plan, cfg);
+        const useDebt = finMode === 'ref' || (finMode === 'hybrid' && bankable);
         const variant = useDebt ? 'ref' : 'equity';
         if (!meta['_p_' + variant]) {
           const p = sitePnl(meta.site, meta.cannFactor, variant);
@@ -175,13 +180,13 @@
         }
         const p = meta['_p_' + variant];
         if (!cfg.enforceCash || cashAvailableAt(m, plan, cfg) >= p.equity) {
-          chosen = { ...meta, ...p, openMonth: m, financedByDebt: useDebt };
+          chosen = { ...meta, ...p, openMonth: m, financedByDebt: useDebt, reason };
           break;
         }
+        reason = 'cash'; // le cash manque à ce mois → on décale
       }
       if (!chosen) {
-        // jamais finançable sur l'horizon → non planifié
-        chosen = { ...meta, ...(meta['_p_equity'] || meta['_p_ref'] || sitePnl(meta.site, meta.cannFactor, cfg.finMode === 'ref' ? 'ref' : 'equity')), openMonth: null, financedByDebt: false };
+        chosen = { ...meta, ...(meta['_p_equity'] || meta['_p_ref'] || sitePnl(meta.site, meta.cannFactor, finMode === 'ref' ? 'ref' : 'equity')), openMonth: null, financedByDebt: false, reason: 'blocked' };
         plan.push(chosen);
         continue;
       }
@@ -190,7 +195,6 @@
       lastOpen = chosen.openMonth;
     }
     const scheduled = plan.filter(p => p.openMonth != null);
-    // courbe consolidée (hors enveloppe initiale)
     const curve = new Array(HORIZON + 1).fill(0);
     scheduled.forEach(ps => {
       curve[ps.openMonth] -= ps.equity;
@@ -204,18 +208,27 @@
     const peakNeed = Math.max(0, -Math.min(...cum));
     const rM = Math.pow(1.12, 1 / 12) - 1;
     const npv = curve.reduce((a, v, t) => a + v / Math.pow(1 + rM, t), 0);
-    // mois de bancabilité (post-hoc, sur le plan final)
     let bankMonth = null;
-    for (let m = 0; m <= HORIZON; m++) {
-      if (bankableAt(m, scheduled, cfg)) { bankMonth = m; break; }
-    }
-    S.results = {
-      plan, scheduled, curve, cum, peakNeed, npv, bankMonth,
+    for (let m = 0; m <= HORIZON; m++) { if (bankableAt(m, scheduled, cfg)) { bankMonth = m; break; } }
+    const openMonths = scheduled.map(p => p.openMonth);
+    return {
+      finMode, plan, scheduled, curve, cum, peakNeed, npv, bankMonth,
+      firstOpen: openMonths.length ? Math.min(...openMonths) : null,
+      lastOpen: openMonths.length ? Math.max(...openMonths) : null,
+      nbClubs: scheduled.length,
+      nbBlocked: plan.length - scheduled.length,
       totalEquity: scheduled.reduce((a, p) => a + p.equity, 0),
       totalTV: scheduled.reduce((a, p) => a + p.tv, 0),
       fcfeAtHorizon: cum[HORIZON],
       loanService: standardLoanAnnualService(),
+      feasible: peakNeed <= cfg.equityPool,
     };
+  }
+
+  // Calcule les 3 scénarios pour le même projet (ordre + contraintes figés).
+  function computePlan() {
+    S.scenarios = { ref: runScenario('ref'), equity: runScenario('equity'), hybrid: runScenario('hybrid') };
+    S.results = S.scenarios[S.cfg.finMode] || S.scenarios.ref;
   }
 
   function cashAvailableAt(month, alreadyPlanned, cfg) {
@@ -281,98 +294,116 @@
     return 'A' + (Math.floor(m / 12) + 1) + ' M' + ((m % 12) + 1);
   }
 
+  const SCEN = {
+    ref:    { icon: '🏦', label: 'Dette dès le départ', sub: 'structure BP 30/70', color: '#60a5fa' },
+    equity: { icon: '💰', label: '100% Fonds propres', sub: 'zéro dette, autofinancé', color: '#d4a017' },
+    hybrid: { icon: '💰→🏦', label: 'Hybride', sub: 'FP puis dette dès bancabilité', color: '#34d399' },
+  };
+  const esc = s => String(s).replace(/</g, '&lt;');
+
   function render() {
     const wrap = document.getElementById('fpConquest');
     if (!wrap || !S) return;
     try { S.chart?.destroy(); } catch {}
-    const R = S.results, cfg = S.cfg;
-    const feasible = R.peakNeed <= cfg.equityPool;
-    const scheduledCount = R.scheduled.length;
-    const unscheduled = R.plan.filter(p => p.openMonth == null);
+    const cfg = S.cfg, SC = S.scenarios, active = cfg.finMode, R = SC[active];
+    const meta = SCEN[active];
 
-    const ganttRow = (ps, idx) => {
-      if (ps.openMonth == null) return `
-        <div style="display:grid;grid-template-columns:24px 150px 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(71,85,115,.12);opacity:.5">
-          <div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--red)">${idx + 1}. ${ps.site.name.replace(/</g,'&lt;')}</div>
-          <div style="font-size:8px;color:var(--red)">non finançable sur 10 ans</div></div><div></div>
-        </div>`;
-      const left = (ps.openMonth / HORIZON * 100).toFixed(1);
-      const width = Math.min(100 - left, ((HORIZON - ps.openMonth) / HORIZON * 100)).toFixed(1);
-      const finBadge = ps.financedByDebt
-        ? '<span style="color:#60a5fa;font-weight:700">🏦 dette 70%</span>'
-        : '<span style="color:var(--accent);font-weight:700">💰 100% FP</span>';
-      return `
-        <div style="display:grid;grid-template-columns:24px 150px 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(71,85,115,.12)">
-          <div style="display:flex;flex-direction:column;gap:1px">
-            <button onclick="ConquestPlan._move(${idx},-1)" ${idx === 0 ? 'disabled' : ''} style="background:transparent;border:none;color:var(--gray2);cursor:pointer;font-size:9px;padding:0">▲</button>
-            <button onclick="ConquestPlan._move(${idx},1)" ${idx === R.plan.length - 1 ? 'disabled' : ''} style="background:transparent;border:none;color:var(--gray2);cursor:pointer;font-size:9px;padding:0">▼</button>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${idx + 1}. ${ps.site.name.replace(/</g,'&lt;')}</div>
-            <div style="font-size:8px;color:var(--gray2)">${monthLabel(ps.openMonth)} · ${kE(ps.equity)} · ${finBadge}${ps.penaltyPct > 0 ? ` · <span style="color:var(--orange)">−${ps.penaltyPct}% cannib.</span>` : ''}</div>
-          </div>
-          <div style="position:relative;height:16px;background:var(--bg);border-radius:4px;overflow:hidden">
-            <div style="position:absolute;left:${left}%;width:${width}%;height:100%;background:linear-gradient(90deg,${ps.financedByDebt ? '#60a5fa55' : '#d4a01766'},#34d39955);border-left:3px solid ${ps.financedByDebt ? '#60a5fa' : 'var(--accent)'};border-radius:3px"></div>
-            <div style="position:absolute;left:${left}%;top:0;font-size:7px;color:var(--white);padding:2px 4px;font-weight:700">${F(ps.members)} mbr</div>
-          </div>
-        </div>`;
+    // "meilleur" par métrique (pour surligner l'avantage de chaque scénario)
+    const modes = ['ref', 'equity', 'hybrid'];
+    const best = {
+      nbClubs: Math.max(...modes.map(m => SC[m].nbClubs)),
+      peakNeed: Math.min(...modes.map(m => SC[m].peakNeed)),
+      fcfe: Math.max(...modes.map(m => SC[m].fcfeAtHorizon)),
     };
 
-    const bankTile = R.bankMonth != null
-      ? [`🏦 ${monthLabel(R.bankMonth)}`, 'BANCABLE À PARTIR DE', 'critères remplis (détail à gauche)', 'var(--green)']
-      : ['🏦 non atteint', 'BANCABILITÉ', 'critères non remplis sur 10 ans', 'var(--red)'];
+    // ── Barre-réponse : combien d'ouvertures et quand ──
+    const answer = R.nbClubs === 0
+      ? `<span style="color:var(--red)">Aucune ouverture possible avec ces réglages.</span> Augmente l'enveloppe ou assouplis les contraintes.`
+      : `Tu ouvres <b style="color:${meta.color}">${R.nbClubs} club${R.nbClubs > 1 ? 's' : ''}</b>${R.nbBlocked ? ` <span style="color:var(--red);font-size:12px">(+${R.nbBlocked} bloqué${R.nbBlocked > 1 ? 's' : ''})</span>` : ''} en 10 ans · 1<sup>re</sup> ouverture <b>${monthLabel(R.firstOpen)}</b> · dernière <b>${monthLabel(R.lastOpen)}</b> · pic de trésorerie <b style="color:${R.feasible ? 'var(--green)' : 'var(--red)'}">${mE(R.peakNeed)}</b>${R.bankMonth != null ? ` · bancable <b style="color:var(--green)">${monthLabel(R.bankMonth)}</b>` : ''}`;
+
+    // ── Carte scénario ──
+    const scenCard = (m) => {
+      const s = SC[m], meta2 = SCEN[m], on = m === active;
+      const cell = (val, isBest, help) => `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(71,85,115,.15)">
+        <span style="font-size:8.5px;color:var(--gray2)">${help}</span>
+        <b style="font-size:10.5px;color:${isBest ? 'var(--green)' : 'var(--white)'}">${val}${isBest ? ' ✦' : ''}</b></div>`;
+      return `<div onclick="ConquestPlan._selectScenario('${m}')" style="flex:1;cursor:pointer;background:${on ? 'linear-gradient(180deg,' + meta2.color + '18,var(--bg2))' : 'var(--bg2)'};border:1.5px solid ${on ? meta2.color : 'var(--border)'};border-radius:11px;padding:11px 12px;transition:all .15s">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:11px;font-weight:800;color:${on ? meta2.color : 'var(--white)'}">${meta2.icon} ${meta2.label}</div>
+          ${on ? `<span style="font-size:7.5px;font-weight:800;color:${meta2.color};background:${meta2.color}22;padding:2px 6px;border-radius:20px">✓ AFFICHÉ</span>` : `<span style="font-size:8px;color:var(--gray2)">cliquer</span>`}
+        </div>
+        <div style="font-size:26px;font-weight:900;color:${on ? meta2.color : 'var(--white)'};line-height:1">${s.nbClubs}<span style="font-size:10px;color:var(--gray2);font-weight:600"> clubs${s.nbBlocked ? ' <span style="color:var(--red)">+' + s.nbBlocked + ' bloqués</span>' : ''}</span></div>
+        <div style="margin-top:8px">
+          ${cell(monthLabel(s.lastOpen), false, 'Dernière ouverture')}
+          ${cell(mE(s.peakNeed), s.peakNeed === best.peakNeed, 'Pic de financement')}
+          ${cell(mE(s.totalEquity), false, 'Fonds propres engagés')}
+          ${cell(mE(Math.max(0, s.fcfeAtHorizon)), s.fcfeAtHorizon === best.fcfe, 'Cash 10 ans')}
+          ${cell(s.bankMonth != null ? monthLabel(s.bankMonth) : '—', false, 'Bancable dès')}
+        </div>
+      </div>`;
+    };
+
+    // ── Calendrier d'ouvertures (scénario affiché) — grille par année ──
+    // On n'affiche que les années utiles (jusqu'à la dernière ouverture + 1),
+    // stable entre scénarios → colonnes larges et noms lisibles.
+    const lastY = Math.max(0, ...modes.map(m => SC[m].lastOpen != null ? Math.floor(SC[m].lastOpen / 12) : 0));
+    const nYears = Math.min(10, Math.max(5, lastY + 2));
+    const byYear = Array.from({ length: nYears }, () => []);
+    R.scheduled.forEach((ps) => { const y = Math.floor(ps.openMonth / 12); if (y < nYears) byYear[y].push(ps); });
+    const globalIdx = new Map(R.plan.map((p, i) => [p, i]));
+    const chip = (ps) => {
+      const finBadge = ps.financedByDebt ? '🏦' : '💰';
+      const reasonChip = ps.reason === 'cash' ? '<span title="Décalé : le cash manquait avant" style="color:var(--orange)">⏳</span>'
+        : (ps.financedByDebt && active === 'hybrid') ? '<span title="Financé par dette (portefeuille bancable)" style="color:#60a5fa">🏦</span>' : '';
+      const idx = globalIdx.get(ps);
+      return `<div onmouseover="ConquestPlan._hi(${ps.openMonth})" title="${esc(ps.site.name)} — ouverture ${monthLabel(ps.openMonth)}, ${F(ps.members)} membres, ${ps.financedByDebt ? 'financé par dette (70%)' : '100% fonds propres'} (${kE(ps.equity)})" style="background:linear-gradient(180deg,${ps.financedByDebt ? '#60a5fa22' : '#d4a01722'},var(--bg));border:1px solid ${ps.financedByDebt ? '#60a5fa66' : '#d4a01766'};border-left:3px solid ${ps.financedByDebt ? '#60a5fa' : 'var(--accent)'};border-radius:7px;padding:6px 8px;margin-bottom:5px;cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+          <span style="font-size:9.5px;font-weight:800;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${finBadge} ${esc(ps.site.name)}</span>
+          <span style="display:flex;flex-direction:column">
+            <button onclick="event.stopPropagation();ConquestPlan._move(${idx},-1)" style="background:none;border:none;color:var(--gray2);cursor:pointer;font-size:8px;padding:0;line-height:1">▲</button>
+            <button onclick="event.stopPropagation();ConquestPlan._move(${idx},1)" style="background:none;border:none;color:var(--gray2);cursor:pointer;font-size:8px;padding:0;line-height:1">▼</button>
+          </span>
+        </div>
+        <div style="font-size:8px;color:var(--gray2);margin-top:2px">M${(ps.openMonth % 12) + 1} · ${F(ps.members)} mbr · ${kE(ps.equity)} ${reasonChip}${ps.penaltyPct > 0 ? ` <span style="color:var(--orange)" title="Cannibalisation">−${ps.penaltyPct}%</span>` : ''}</div>
+      </div>`;
+    };
+    const yearCol = (clubs, y) => {
+      const isBank = R.bankMonth != null && Math.floor(R.bankMonth / 12) === y;
+      return `<div style="flex:1;min-width:0;background:${isBank ? 'rgba(96,165,250,.06)' : 'transparent'};border-right:1px solid rgba(71,85,115,.15);padding:0 4px">
+        <div style="text-align:center;font-size:9px;font-weight:800;color:${isBank ? '#60a5fa' : 'var(--gray)'};padding:3px 0;border-bottom:1px solid rgba(71,85,115,.2);margin-bottom:6px">A${y + 1}${isBank ? ' 🏦' : ''}</div>
+        ${clubs.map(chip).join('') || '<div style="height:2px"></div>'}
+      </div>`;
+    };
+    const blocked = R.plan.filter(p => p.openMonth == null);
 
     wrap.innerHTML = `
       <header style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
         <div>
           <div style="font-size:16px;font-weight:900;color:var(--white)">🗺️ Plan de Conquête — Bucarest</div>
-          <div style="font-size:9px;color:var(--gray2);margin-top:2px">Séquencement sous contraintes de cash · cannibalisation inter-FP · bancabilité modélisée · horizon 10 ans</div>
+          <div style="font-size:9px;color:var(--gray2);margin-top:2px">Combien de clubs, dans quel ordre, à quel rythme, avec quel financement — 3 scénarios comparés · horizon 10 ans</div>
         </div>
         <button onclick="ConquestPlan.close()" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--gray);width:34px;height:34px;cursor:pointer;font-size:15px;font-weight:700">✕</button>
       </header>
 
       <div style="flex:1;overflow-y:auto;padding:14px 20px">
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px">
-          ${[
-            [String(scheduledCount) + (unscheduled.length ? '<span style="font-size:10px;color:var(--red)"> +' + unscheduled.length + ' bloqués</span>' : ''), 'CLUBS PLANIFIÉS', 'sur ' + S.sites.filter(s => s.enabled).length + ' retenus', 'var(--white)'],
-            [mE(R.peakNeed), 'PIC DE FINANCEMENT', 'besoin externe max (ramp-up inclus)', feasible ? 'var(--green)' : 'var(--red)'],
-            bankTile,
-            [mE(R.totalEquity), 'FONDS PROPRES ENGAGÉS', cfg.finMode === 'equity' ? '100% FP — aucune dette' : cfg.finMode === 'hybrid' ? 'FP puis dette dès bancabilité' : 'structure BP 30/70', 'var(--accent)'],
-            [mE(Math.max(0, R.fcfeAtHorizon)), 'CASH GÉNÉRÉ À 10 ANS', 'FCFE consolidé cumulé net', R.fcfeAtHorizon > 0 ? 'var(--green)' : 'var(--red)'],
-            [mE(R.totalTV), 'VALEUR PORTEFEUILLE', 'Σ sorties à ' + (typeof getEffectiveExitMultiple === 'function' ? getEffectiveExitMultiple() : 8) + '× EBITDA A5', 'var(--cyan)'],
-          ].map(([v, l, h, c]) => `
-            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
-              <div style="font-size:16px;font-weight:900;color:${c};white-space:nowrap">${v}</div>
-              <div style="font-size:7.5px;font-weight:700;color:var(--gray);letter-spacing:.5px;margin-top:2px">${l}</div>
-              <div style="font-size:7px;color:var(--gray2);margin-top:1px">${h}</div>
-            </div>`).join('')}
+        <!-- BARRE-RÉPONSE -->
+        <div style="background:linear-gradient(90deg,${meta.color}1c,var(--bg2));border:1px solid ${meta.color}55;border-left:4px solid ${meta.color};border-radius:11px;padding:12px 16px;margin-bottom:14px">
+          <div style="font-size:8px;font-weight:800;color:${meta.color};letter-spacing:1px;margin-bottom:3px">🎯 SCÉNARIO ${meta.label.toUpperCase()}</div>
+          <div style="font-size:14px;color:var(--white);line-height:1.5">${answer}</div>
+          ${!R.feasible && R.nbClubs > 0 ? `<div style="font-size:9.5px;color:var(--red);margin-top:5px;font-weight:700">⚠ Le pic (${mE(R.peakNeed)}) dépasse ton enveloppe (${mE(cfg.equityPool)}) — augmente l'enveloppe, espace les ouvertures, ou choisis un scénario avec dette.</div>` : ''}
         </div>
-        ${!feasible ? `<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:8px 12px;font-size:10px;color:var(--red);font-weight:700;margin-bottom:12px">
-          ⚠ Le pic de financement (${mE(R.peakNeed)}) dépasse ton enveloppe (${mE(cfg.equityPool)}) — augmente l'enveloppe, espace les ouvertures, ou passe en mode hybride.
-        </div>` : ''}
 
-        <div style="display:grid;grid-template-columns:290px 1fr;gap:14px;align-items:start">
+        <!-- COMPARATEUR 3 SCÉNARIOS -->
+        <div style="font-size:9px;font-weight:800;color:var(--gray);letter-spacing:.5px;margin-bottom:6px">⚖️ COMPARE LES 3 STRATÉGIES DE FINANCEMENT — même projet, même ordre <span style="color:var(--gray2);font-weight:500">· clique une carte pour l'afficher en détail · ✦ = meilleur</span></div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          ${modes.map(scenCard).join('')}
+        </div>
+
+        <div style="display:grid;grid-template-columns:270px 1fr;gap:14px;align-items:start">
+          <!-- CONTRÔLES -->
           <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px">
-            <div style="font-size:10px;font-weight:800;color:var(--accent);margin-bottom:6px">FINANCEMENT</div>
-            ${[['ref', '🏦 Dette dès le départ (réf. BP 30/70)'], ['equity', '💰 Fonds propres uniquement'], ['hybrid', '💰→🏦 FP puis dette dès bancabilité']].map(([v, l]) => `
-              <label style="display:flex;align-items:center;gap:6px;font-size:9.5px;color:${cfg.finMode === v ? 'var(--white)' : 'var(--gray2)'};cursor:pointer;padding:2px 0">
-                <input type="radio" name="finMode" ${cfg.finMode === v ? 'checked' : ''} onchange="ConquestPlan._cfg('finMode','${v}')" style="accent-color:var(--accent)">${l}
-              </label>`).join('')}
-
-            <div style="font-size:9px;font-weight:800;color:#60a5fa;margin:10px 0 4px" title="Conventions bancaires standard — ajuste selon tes échanges avec les banques roumaines (BCR, BT, BRD…)">🏦 CRITÈRES DE BANCABILITÉ (réglables)</div>
-            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Historique minimum du 1er club (mois)</label>
-            <input type="number" min="6" max="36" value="${cfg.bankTrackMonths}" onchange="ConquestPlan._cfg('bankTrackMonths', parseInt(this.value,10))"
-              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:6px;font-family:var(--font)">
-            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Mois consécutifs d'EBITDA positif exigés</label>
-            <input type="number" min="3" max="24" value="${cfg.bankPosMonths}" onchange="ConquestPlan._cfg('bankPosMonths', parseInt(this.value,10))"
-              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:6px;font-family:var(--font)">
-            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">DSCR consolidé exigé (EBITDA 12M / service prêt : ${kE(R.loanService)}/an)</label>
-            <input type="number" step="0.1" min="1" max="3" value="${cfg.bankDscr}" onchange="ConquestPlan._cfg('bankDscr', parseFloat(this.value))"
-              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:10px;font-family:var(--font)">
-
-            <div style="font-size:10px;font-weight:800;color:var(--accent);margin:6px 0 6px">CONTRAINTES</div>
-            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Enveloppe fonds propres (M€)</label>
+            <div style="font-size:10px;font-weight:800;color:var(--accent);margin-bottom:6px">CONTRAINTES</div>
+            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Enveloppe fonds propres disponible (M€)</label>
             <input type="number" step="0.1" min="0" value="${(cfg.equityPool / 1e6).toFixed(1)}" onchange="ConquestPlan._cfg('equityPool', parseFloat(this.value) * 1e6)"
               style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:6px;font-family:var(--font)">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -392,32 +423,44 @@
               Retarder une ouverture si le cash manque
             </label>
 
-            <div style="font-size:10px;font-weight:800;color:var(--accent);margin:6px 0 6px">SITES (${S.sites.filter(s => s.enabled).length}/${S.sites.length})</div>
+            <div style="font-size:9px;font-weight:800;color:#60a5fa;margin:6px 0 4px" title="Conventions bancaires standard — ajuste selon tes échanges avec les banques roumaines (BCR, BT, BRD…)">🏦 CRITÈRES DE BANCABILITÉ (réglables)</div>
+            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Historique min. du 1<sup>er</sup> club (mois)</label>
+            <input type="number" min="6" max="36" value="${cfg.bankTrackMonths}" onchange="ConquestPlan._cfg('bankTrackMonths', parseInt(this.value,10))"
+              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:6px;font-family:var(--font)">
+            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">Mois consécutifs d'EBITDA positif</label>
+            <input type="number" min="3" max="24" value="${cfg.bankPosMonths}" onchange="ConquestPlan._cfg('bankPosMonths', parseInt(this.value,10))"
+              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:6px;font-family:var(--font)">
+            <label style="display:block;font-size:8.5px;color:var(--gray);margin-bottom:2px">DSCR exigé (service prêt ${kE(R.loanService)}/an)</label>
+            <input type="number" step="0.1" min="1" max="3" value="${cfg.bankDscr}" onchange="ConquestPlan._cfg('bankDscr', parseFloat(this.value))"
+              style="width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;margin-bottom:10px;font-family:var(--font)">
+
+            <div style="font-size:10px;font-weight:800;color:var(--accent);margin:6px 0 6px">SITES RETENUS (${S.sites.filter(s => s.enabled).length}/${S.sites.length})</div>
             ${S.sites.map((s, i) => `
               <label style="display:flex;align-items:center;gap:6px;font-size:9.5px;color:${s.enabled ? 'var(--white)' : 'var(--gray2)'};cursor:pointer;padding:2px 0">
                 <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="ConquestPlan._toggle(${i}, this.checked)" style="accent-color:var(--accent)">
-                <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name.replace(/</g,'&lt;')}</span>
-                <span style="font-size:8px;color:var(--gray2)">${s.soloIrrEq != null ? s.soloIrrEq.toFixed(0) + '%' : ''}</span>
+                <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</span>
+                <span style="font-size:8px;color:var(--gray2)" title="IRR fonds propres en solo">${s.soloIrrEq != null ? s.soloIrrEq.toFixed(0) + '%' : ''}</span>
               </label>`).join('')}
           </div>
 
+          <!-- CALENDRIER + COURBES -->
           <div>
             <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
-              <div style="font-size:10px;font-weight:800;color:var(--white);margin-bottom:6px">TRÉSORERIE CONSOLIDÉE HOLDING
-                <span style="font-size:8px;color:var(--gray2);font-weight:500">— cumul des flux (hors enveloppe, hors sorties). Point bas = besoin externe.${R.bankMonth != null ? ' Le point 🏦 = bancabilité.' : ''}</span></div>
-              <div style="position:relative;height:240px"><canvas id="conquestChart"></canvas></div>
+              <div style="font-size:10px;font-weight:800;color:var(--white);margin-bottom:8px">📅 CALENDRIER D'OUVERTURES <span style="font-size:8px;color:var(--gray2);font-weight:500">— scénario ${meta.label} · 💰 fonds propres · 🏦 dette · ⏳ décalé faute de cash · glisse ▲▼ pour changer les priorités</span></div>
+              <div style="display:flex;align-items:stretch;min-height:60px">${byYear.map(yearCol).join('')}</div>
+              ${blocked.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,.3);font-size:9px;color:var(--red)">🚫 Non finançables sur 10 ans avec ce scénario : <b>${blocked.map(p => esc(p.site.name)).join(', ')}</b> — passe en mode dette ou augmente l'enveloppe.</div>` : ''}
             </div>
             <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px">
-              <div style="font-size:10px;font-weight:800;color:var(--white);margin-bottom:6px">SÉQUENCE D'OUVERTURES <span style="font-size:8px;color:var(--gray2);font-weight:500">— A1 à A10 · 💰 = fonds propres · 🏦 = dette 70%</span></div>
-              ${R.plan.map((ps, idx) => ganttRow(ps, idx)).join('')}
-              <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--gray2);margin-top:4px;padding-left:182px">
-                ${Array.from({ length: 10 }, (_, y) => `<span>A${y + 1}</span>`).join('')}
+              <div style="font-size:10px;font-weight:800;color:var(--white);margin-bottom:2px">💶 TRÉSORERIE CONSOLIDÉE — les 3 scénarios superposés
+                <span style="font-size:8px;color:var(--gray2);font-weight:500">— cumul des flux (hors enveloppe/sorties). Point bas = besoin externe max. Le scénario affiché est en gras.</span></div>
+              <div style="display:flex;gap:12px;margin:6px 0 4px">
+                ${modes.map(m => `<span style="font-size:8.5px;color:${SCEN[m].color};font-weight:${m === active ? 800 : 500}">${m === active ? '● ' : '○ '}${SCEN[m].icon} ${SCEN[m].label}</span>`).join('')}
               </div>
+              <div style="position:relative;height:230px"><canvas id="conquestChart"></canvas></div>
             </div>
             <div style="font-size:8px;color:var(--gray2);margin-top:10px;line-height:1.6">
-              Bancabilité = ① 1er club ≥ ${cfg.bankTrackMonths} mois d'exploitation · ② ≥ ${cfg.bankPosMonths} mois consécutifs d'EBITDA positif · ③ (EBITDA−leasing) 12 derniers mois ≥ ${cfg.bankDscr}× le service annuel d'un prêt club standard (${kE(R.loanService)}).
-              Conventions standard à confronter aux banques roumaines — critères réglables à gauche.
-              Cannibalisation : réduction de cohorte 50% × overlap (<4 km), avant P&L · >M60 : FCFE moyen année 5 · NPV @12% : ${kE(R.npv)}.
+              Bancabilité = ① 1<sup>er</sup> club ≥ ${cfg.bankTrackMonths} mois d'exploitation · ② ≥ ${cfg.bankPosMonths} mois consécutifs d'EBITDA positif · ③ (EBITDA−leasing) 12 derniers mois ≥ ${cfg.bankDscr}× le service d'un prêt club standard (${kE(R.loanService)}/an). Conventions standard à confronter aux banques roumaines.
+              Cannibalisation : réduction de cohorte 50% × overlap (<4 km), avant P&L · >M60 : FCFE moyen année 5 · NPV @12% du scénario affiché : ${kE(R.npv)}.
             </div>
           </div>
         </div>
@@ -426,26 +469,33 @@
     try {
       if (typeof Chart !== 'undefined') {
         const labels = Array.from({ length: HORIZON + 1 }, (_, i) => i % 12 === 0 ? 'A' + (i / 12 + 1) : '');
-        const datasets = [{
-          data: R.cum, borderColor: '#d4a017', borderWidth: 2, pointRadius: 0,
-          fill: { target: 'origin', above: 'rgba(52,211,153,.08)', below: 'rgba(239,68,68,.12)' },
-        }];
+        const datasets = modes.map(m => ({
+          label: SCEN[m].label,
+          data: SC[m].cum,
+          borderColor: SCEN[m].color,
+          borderWidth: m === active ? 2.6 : 1.2,
+          borderDash: m === active ? [] : [4, 3],
+          pointRadius: 0, tension: 0.15,
+          fill: m === active ? { target: 'origin', above: 'rgba(52,211,153,.07)', below: 'rgba(239,68,68,.1)' } : false,
+          order: m === active ? 0 : 2,
+        }));
         if (R.bankMonth != null) {
           const pt = new Array(HORIZON + 1).fill(null);
           pt[R.bankMonth] = R.cum[R.bankMonth];
-          datasets.push({ data: pt, pointRadius: 7, pointStyle: 'rectRot', pointBackgroundColor: '#60a5fa', pointBorderColor: '#fff', pointBorderWidth: 1.5, showLine: false });
+          datasets.push({ label: 'Bancable', data: pt, pointRadius: 7, pointStyle: 'rectRot', pointBackgroundColor: meta.color, pointBorderColor: '#fff', pointBorderWidth: 1.5, showLine: false, order: 0 });
         }
         S.chart = new Chart(document.getElementById('conquestChart'), {
           type: 'line',
           data: { labels, datasets },
           options: {
             responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+            interaction: { mode: 'index', intersect: false },
             plugins: { legend: { display: false }, tooltip: { callbacks: {
-              title: items => 'Mois ' + items[0].dataIndex + (R.bankMonth === items[0].dataIndex ? ' — 🏦 BANCABLE' : ''),
-              label: ctx => 'Cumul : ' + F(Math.round(ctx.parsed.y / 1000)) + ' k€',
+              title: items => 'A' + (Math.floor(items[0].dataIndex / 12) + 1) + ' M' + ((items[0].dataIndex % 12) + 1) + (R.bankMonth === items[0].dataIndex ? ' — 🏦 BANCABLE' : ''),
+              label: ctx => ctx.dataset.label + ' : ' + F(Math.round(ctx.parsed.y / 1000)) + ' k€',
             }}},
             scales: {
-              x: { ticks: { color: '#94a3b8', font: { size: 8 }, maxRotation: 0 }, grid: { color: '#1e293b' } },
+              x: { ticks: { color: '#94a3b8', font: { size: 8 }, maxRotation: 0, autoSkip: false, callback: (v, i) => i % 12 === 0 ? 'A' + (i / 12 + 1) : '' }, grid: { color: '#1e293b' } },
               y: { ticks: { color: '#94a3b8', font: { size: 8 }, callback: v => (v / 1e6).toFixed(1) + 'M' }, grid: { color: '#1e293b' } },
             },
           },
@@ -462,6 +512,25 @@
     persistCfg();
     recompute();
   }
+  // Choisir le scénario AFFICHÉ : les 3 sont déjà calculés → simple re-render
+  // (pas de recompute), et on persiste le choix.
+  function _selectScenario(mode) {
+    if (!S || !S.scenarios[mode]) return;
+    S.cfg.finMode = mode;
+    S.results = S.scenarios[mode];
+    persistCfg();
+    render();
+  }
+  // Survol d'une ouverture → surligne le mois sur la courbe de trésorerie.
+  function _hi(month) {
+    try {
+      if (!S?.chart) return;
+      const idx = S.chart.data.datasets.findIndex(d => d.label === SCEN[S.cfg.finMode].label);
+      if (idx >= 0) S.chart.setActiveElements([{ datasetIndex: idx, index: month }]);
+      S.chart.tooltip?.setActiveElements([{ datasetIndex: idx, index: month }], {});
+      S.chart.update();
+    } catch {}
+  }
   function _toggle(siteIdx, on) { if (!S) return; S.sites[siteIdx].enabled = on; recompute(); }
   function _move(planIdx, dir) {
     if (!S) return;
@@ -474,5 +543,5 @@
     recompute();
   }
 
-  window.ConquestPlan = { open, close, _cfg, _toggle, _move };
+  window.ConquestPlan = { open, close, _cfg, _selectScenario, _hi, _toggle, _move };
 })();

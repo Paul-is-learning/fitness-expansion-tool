@@ -98,30 +98,30 @@ try {
   check('Studio FCF: 13 lignes KPI', studio.rows === 13, `rows=${studio.rows}`);
   check('Studio FCF: cocher CAPEX 900k recalcule', studio.capexReflects900);
 
-  // ── 5. PLAN DE CONQUÊTE : 3 modes financement ──
+  // ── 5. PLAN DE CONQUÊTE : comparateur 3 scénarios (v6.89) ──
   const conquest = await page.evaluate(async () => {
     ConquestPlan.open();
     await new Promise(r => setTimeout(r, 700));
     const grab = () => (document.getElementById('fpConquest')?.innerText || '').replace(/\s+/g, ' ');
-    const ref = grab();
-    ConquestPlan._cfg('finMode', 'equity');
-    await new Promise(r => setTimeout(r, 700));
-    const eq = grab();
-    ConquestPlan._cfg('finMode', 'hybrid');
-    await new Promise(r => setTimeout(r, 700));
-    const hy = grab();
+    ConquestPlan._selectScenario('ref');    await new Promise(r => setTimeout(r, 300)); const ref = grab();
+    ConquestPlan._selectScenario('equity'); await new Promise(r => setTimeout(r, 300)); const eq = grab();
+    ConquestPlan._selectScenario('hybrid'); await new Promise(r => setTimeout(r, 300)); const hy = grab();
     const out = {
-      refDebt: (ref.match(/🏦 dette 70%/g) || []).length,
-      eqFp: (eq.match(/💰 100% FP/g) || []).length,
-      hyMix: (hy.match(/🏦 dette 70%/g) || []).length > 0 && (hy.match(/💰 100% FP/g) || []).length > 0,
-      bankable: /🏦 A\d+ M\d+/.test(hy),
+      comparator: /COMPARE LES 3 STRAT/.test(ref) && /Dette dès le départ/.test(ref) && /100% Fonds propres/.test(ref) && /Hybride/.test(ref),
+      answer: /Tu ouvres \d+ club/.test(ref),
+      refActive: /SCÉNARIO DETTE DÈS LE DÉPART/.test(ref),
+      eqActive: /SCÉNARIO 100% FONDS PROPRES/.test(eq),
+      hyActive: /SCÉNARIO HYBRIDE/.test(hy),
+      calendar: /CALENDRIER D'OUVERTURES/.test(ref),
+      bankable: /bancable A\d+ M\d+/i.test(hy) || /Bancable dès A\d+ M\d+/i.test(hy),
     };
     ConquestPlan.close();
     return out;
   });
-  check('Conquête: mode ref = dette partout', conquest.refDebt >= 4, `${conquest.refDebt} clubs en dette`);
-  check('Conquête: mode fonds propres', conquest.eqFp >= 4, `${conquest.eqFp} clubs FP`);
-  check('Conquête: mode hybride mélange FP+dette', conquest.hyMix);
+  check('Conquête: comparateur 3 scénarios', conquest.comparator);
+  check('Conquête: réponse « combien d\'ouvertures »', conquest.answer);
+  check('Conquête: scénarios dette / fonds propres / hybride', conquest.refActive && conquest.eqActive && conquest.hyActive);
+  check('Conquête: calendrier d\'ouvertures', conquest.calendar);
   check('Conquête: point de bancabilité calculé', conquest.bankable);
 
   // ── 6. TOP CLUBS ──
