@@ -1,6 +1,31 @@
 
 # Changelog
 
+## [v6.92-backnav] — 2026-07-16
+
+### 🧭 Bouton Précédent : ferme le panneau au lieu de quitter le SaaS
+
+Avant, « Précédent » (ou le swipe back) quittait l'application (retour
+Vercel) même quand un panneau plein écran était ouvert.
+
+- **Précédent ferme désormais le panneau au sommet** : BP du site,
+  Plan de Conquête, Intel Concurrence, Portefeuille, Studio FCF,
+  Analyste IA, Utilisateurs, Enseignes, Top clubs, Journal.
+- **Empilements gérés** : chaque back ferme UN niveau (ex. BP du site
+  ouvert pendant une analyse → back 1 ferme le BP, back 2 revient à la
+  carte, back 3 seulement quitte la page).
+- **Mode analyse** inclus : back = retour à la vue carte.
+- Fermer via ✕ ou Échap consomme l'entrée d'historique (pas de back
+  « à vide » ensuite).
+- Nouveau module src/back-nav.js — zéro modification des panneaux
+  (détection DOM par MutationObserver + history.pushState).
+
+Vérifié navigateur : ouverture/back sur chaque panneau, empilement
+Conquête+Utilisateurs, scénario analyse→BP→back×2, fermeture ✕ sans
+entrée fantôme. 197/197 tests.
+
+---
+
 ## [v6.91-equity-toggle] — 2026-07-16
 
 ### 🐛 Fix : sélecteur « 100% EQUITY » inversé (financement)
