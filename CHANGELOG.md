@@ -1,6 +1,29 @@
 
 # Changelog
 
+## [v6.96-vector-map] — 2026-07-16
+
+### 🗺️ Fond de carte VECTORIEL (MapLibre GL × CARTO Dark Matter)
+
+Le raster CARTO est remplacé par le style vectoriel « Dark Matter »
+rendu par MapLibre GL, embarqué DANS Leaflet (plugin officiel
+@maplibre/maplibre-gl-leaflet) — textes et routes nets à tous les
+niveaux de zoom, rendu haute densité, zoom fractionnaire fluide
+(zoomSnap 0.25). Gratuit (styles GL CARTO), attribution inchangée.
+
+- **Zéro réécriture** : heatmaps, secteurs, cercles, isochrones et pins
+  restent du pur Leaflet, au-dessus du canvas GL (tilePane).
+- **Enhancement progressif** : chargé après le boot (load + idle) →
+  aucun impact perf ; sans WebGL / CDN KO → raster conservé, aucune
+  régression possible. Pas d'upgrade dans les iframes (tests).
+- **Sélecteur de fonds intact** : 🛰️🗺️🌐 retirent le vecteur, retour 🌙
+  le réactive (resize forcé au retour — le canvas GL re-ajouté restait
+  parfois non peint).
+- CI/E2E : hôtes externes bloqués → repli raster automatique,
+  déterminisme conservé. 197/197.
+
+---
+
 ## [v6.95-search-study] — 2026-07-16
 
 ### 🔎 Barre d'adresse : étude de potentiel immédiate
