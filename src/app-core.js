@@ -1129,6 +1129,9 @@ function init() {
   initCharts();
   initTabs();
   initSearch();
+  // v7.02 — chips de marques construites DÈS le boot (base vérifiée) : la
+  // boîte « Filtrer concurrents » n'est plus jamais vide sur Explorer/Concurrence.
+  try { buildBrandFilters(); } catch {}
 
   // ─── Pre-compute Monte Carlo pour Hala Laminor (~200ms, idle-time) ─────
   // Utilisé par le tour BP (slide Monte Carlo) pour afficher des chiffres
@@ -2032,6 +2035,12 @@ function toggleBrand(name) {
 }
 
 function toggleAllBrands(state) {
+  // v7.02 — s'assure que la liste des marques existe AVANT d'appliquer l'état,
+  // sinon « Aucun » sur une session fraîche (brandVisibility vide) ne masquait
+  // rien. On amorce depuis la meilleure source dispo (comps chargés ou base
+  // vérifiée), puis on force tout à `state`.
+  const source = (typeof allComps !== 'undefined' && allComps.length > 0) ? allComps : VERIFIED_CLUBS;
+  source.forEach(c => { const b = extractBrand(c.name, c.segment); if (brandVisibility[b] === undefined) brandVisibility[b] = true; });
   Object.keys(brandVisibility).forEach(b => brandVisibility[b] = state);
   applyBrandFilter();
 }
@@ -6869,6 +6878,9 @@ function initTabs() {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  // v7.02 — filet de sécurité : à chaque ouverture d'Explorer/Concurrence, on
+  // (re)garantit que les chips de marques sont présentes (jamais de boîte vide).
+  if (name === 'explore' || name === 'compete') { try { buildBrandFilters(); } catch {} }
   // Peupler les compareSelects avec TARGETS dès l'ouverture — sinon l'user voit
   // des dropdowns quasi-vides tant qu'aucune zone n'a été analysée.
   if(name==='dash' && typeof updateCompareSelects==='function') updateCompareSelects();

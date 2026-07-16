@@ -1,6 +1,29 @@
 
 # Changelog
 
+## [v7.02-brandfilter-boot] — 2026-07-16
+
+### 🐛 Filtre concurrents (Explorer/Concurrence) — corrigé de bout en bout
+
+Sur l'onglet Explorer, la boîte « Filtrer concurrents » était vide et
+« Aucun » ne masquait rien. Trois causes, corrigées d'un coup :
+
+- **Chips construites au boot** : les marques (World Class, Stay Fit,
+  18GYM…) s'affichent dès l'ouverture, base vérifiée à l'appui, sans
+  avoir à charger les concurrents d'abord. Filet de sécurité aussi à
+  chaque changement d'onglet Explorer/Concurrence.
+- **« Aucun » fonctionne sur session fraîche** : la liste des marques est
+  amorcée avant d'appliquer l'état → « Aucun » masque bien tout, « Tout »
+  réaffiche tout.
+- **« Tout » affiche les 90 concurrents** immédiatement (déjà amorcé en
+  v6.98, consolidé ici).
+
+Vérifié dans l'app réelle : chips 11 marques au boot (Explorer ET
+Concurrence), Tout 90/90, masquer World Class 56/90, Aucun 0/90, retour
+Tout 90/90. 197/197 tests.
+
+---
+
 ## [v7.01-analysis-nonblocking] — 2026-07-16
 
 ### 🐛 CORRECTIF MAJEUR — l'analyse ne peut plus jamais rester bloquée
