@@ -1,6 +1,30 @@
 
 # Changelog
 
+## [v6.99-showreel] — 2026-07-16
+
+### 🎬 Démo guidée (showreel investisseur)
+
+Le mode présentation lance désormais un **didacticiel qui pilote l'outil
+tout seul**, scène par scène, sur tes vrais sites sauvegardés — pour
+montrer les fonctionnalités avec un effet « wow, il maîtrise son sujet ».
+
+- **8 scènes storytelling** : intro → analyse live d'un site → le verdict
+  (chiffres LIVE lus dans le portefeuille : score, adhérents, IRR) → la
+  concurrence géolocalisée → le comparateur de cash (Studio FCF) → le
+  portefeuille consolidé → le plan de conquête → conclusion.
+- **L'outil se pilote seul** : il analyse, ouvre les panneaux, vole sur
+  la carte pendant qu'une légende cinématique raconte l'histoire.
+- **Contrôle au clavier** : → avance · ← revient · Espace = lecture
+  auto · Échap quitte. Barre de progression + points de scène cliquables.
+- **Zéro chiffre inventé** : tout vient de _siteAnalyses / du moteur réel.
+- Nouveau bouton 🎬 dans le header (à côté de 🎥). Module autonome
+  src/showreel.js — aucun panneau existant modifié.
+
+197/197 tests. Mécaniques validées (scènes, navigation, données live).
+
+---
+
 ## [v6.98-brandfilter-fix] — 2026-07-16
 
 ### 🐛 Onglet Concurrence : « Tout » n'affichait aucun concurrent
