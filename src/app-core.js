@@ -3805,11 +3805,17 @@ function getSurfaceScale() {
 // FcfStudio.computeWith(), jamais persistés.
 window._capexOverride = null;         // {capex: EUR} — remplace capex AVANT scale surface
 window._exitMultipleOverride = null;  // {x: number} — remplace exitMultiple
+// v6.93 — coût one-off AJOUTÉ après scale (droit d'entrée master-franchise
+// 400 k€ HT, demande Paul). Sandbox Studio FCF uniquement : null partout
+// ailleurs → zéro impact baseline (197 assertions intactes).
+window._capexExtraOverride = null;    // {extra: EUR, label: string}
 
 function getScaledCapex() {
   const base = (window._capexOverride && typeof window._capexOverride.capex === 'number')
     ? window._capexOverride.capex : PNL_DEFAULTS.capex;
-  return Math.round(base * getSurfaceScale());
+  const extra = (window._capexExtraOverride && typeof window._capexExtraOverride.extra === 'number')
+    ? window._capexExtraOverride.extra : 0;
+  return Math.round(base * getSurfaceScale()) + extra;
 }
 function getScaledLeasingAnnual() { return Math.round(PNL_DEFAULTS.leasingAnnual * getSurfaceScale()); }
 function getEffectiveExitMultiple() {

@@ -1,6 +1,31 @@
 
 # Changelog
 
+## [v6.93-studio-plus] — 2026-07-16
+
+### ⚖️ Studio FCF : lecture claire, point mort par scénario, frais master-franchise
+
+- **🎯 Point mort FCFE en ADHÉRENTS** pour les 4 colonnes (Référence BP,
+  Réglages outil, 🅰, 🅱) : adhérents stabilisés requis pour être neutre
+  en bas de page (année 5, dette du scénario incluse). Calculé par
+  inversion du vrai moteur (bisection sandbox, mémoïsé pour la fluidité).
+  Ex. vérifié : sans dette 1 903 mbr vs dette 30/70 2 367 mbr (+464 =
+  le service de la dette).
+- **🏷 Frais master-franchise** : simple case à cocher par scénario →
+  +400 k€ HT ajoutés au CAPEX, financés selon la structure du scénario.
+  Nouveau canal moteur _capexExtraOverride (sandbox Studio uniquement —
+  Référence BP intouchée, 197/197). Ligne dédiée dans le tableau.
+- **Lisibilité** : colonne Δ 🅱−🅰 dédiée (signée, colorée, unités pp/×/
+  mois), noms des scénarios dans les en-têtes, lignes où 🅰≠🅱 surlignées,
+  police +, **badge « vérité financement »** sous chaque titre (💰 100%
+  fonds propres / 🏦 apport x% · dette y%) dérivé du P&L calculé — un
+  preset renommé ne peut plus mentir, et « Sans dette » perd son nom si
+  sa dette est réactivée.
+- Robustesse : scénarios sauvegardés avant v6.93 rechargés sans trou
+  (merge défauts).
+
+---
+
 ## [v6.92-backnav] — 2026-07-16
 
 ### 🧭 Bouton Précédent : ferme le panneau au lieu de quitter le SaaS

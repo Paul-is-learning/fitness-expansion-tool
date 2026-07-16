@@ -50,6 +50,12 @@
     { key: 'exit',    group: 'Investissement', label: 'Multiple de sortie', type: 'range', min: 4, max: 12, step: 0.5, unit: '× EBITDA',
       hint: 'Valeur terminale = multiple × EBITDA A5 (réf: 8×)',
       get: () => PNL_DEFAULTS.exitMultiple, fmt: v => v + '×' },
+    // v6.93 — droit d'entrée master-franchise (demande Paul, montant fourni :
+    // 400 k€ HT). Simple case à cocher : ajouté au CAPEX du scénario et
+    // financé selon sa structure apport/dette.
+    { key: 'mf',      group: 'Investissement', label: 'Master-franchise', type: 'flag',
+      hint: 'Droit d’entrée master-franchise : +400 k€ HT ajoutés au CAPEX, financés selon la structure du scénario',
+      get: () => false, fmt: v => v ? '+400 k€ HT' : '—' },
     { key: 'rent',    group: 'Immobilier', label: 'Loyer Y1', type: 'range', min: 5, max: 25, step: 0.5, unit: '€/m²',
       hint: 'Palier Y1-Y2 — Y3/Y5 suivent proportionnellement',
       get: () => PNL_DEFAULTS.rentSteps.objectifNego[0].rent, fmt: v => v.toFixed(1) + ' €/m²' },
@@ -72,13 +78,17 @@
   }
 
   // ─── Sandbox compute ─────────────────────────────────────────────
-  function computeWith(hyp) {
-    // hyp == null → référence BP (zéro override)
-    // hyp == 'tool' → réglages outil actuels (on ne touche à rien)
+  const MF_FEE = 400000; // droit d'entrée master-franchise, HT (montant Paul)
+
+  // Pose les overrides du scénario, exécute fn(), restaure TOUT (finally).
+  //   hyp == null   → référence BP (zéro override)
+  //   hyp == 'tool' → réglages outil actuels (on ne touche à rien)
+  function withOverrides(hyp, fn) {
     const saves = {
       rent: window._rentOverride, charge: window._chargeOverride,
       surf: window._surfaceOverride, fin: window._financingOverride,
       capex: window._capexOverride, exit: window._exitMultipleOverride,
+      extra: window._capexExtraOverride,
     };
     try {
       if (hyp !== 'tool') {
@@ -86,9 +96,11 @@
         window._rentOverride = null; window._chargeOverride = null;
         window._surfaceOverride = null; window._financingOverride = null;
         window._capexOverride = null; window._exitMultipleOverride = null;
+        window._capexExtraOverride = null;
         if (hyp) {
           // …puis applique les hypothèses ACTIVÉES du scénario
-          const g = k => hyp[k];
+          // (g(k) peut être absent sur un scénario sauvegardé avant v6.93)
+          const g = k => hyp[k] || { on: false, v: null };
           const finOn = g('equity').on || g('rate').on || g('term').on || g('debt').on;
           if (g('debt').on && g('debt').v === false) {
             window._financingOverride = { enabled: false };
@@ -105,14 +117,37 @@
           if (g('rent').on)    window._rentOverride = { y1: g('rent').v };
           if (g('charges').on) window._chargeOverride = { chargeTotal: g('charges').v };
           if (g('surface').on) window._surfaceOverride = { surface: g('surface').v };
+          if (g('mf').on && g('mf').v) window._capexExtraOverride = { extra: MF_FEE, label: 'Master-franchise' };
         }
       }
-      return buildPnL(S.cohort, S.avgPrice);
+      return fn();
     } finally {
       window._rentOverride = saves.rent; window._chargeOverride = saves.charge;
       window._surfaceOverride = saves.surf; window._financingOverride = saves.fin;
       window._capexOverride = saves.capex; window._exitMultipleOverride = saves.exit;
+      window._capexExtraOverride = saves.extra;
     }
+  }
+  function computeWith(hyp) { return withOverrides(hyp, () => buildPnL(S.cohort, S.avgPrice)); }
+
+  // v6.93 — point mort en ADHÉRENTS par scénario (neutre FCFE, année 5 de
+  // croisière) : réutilise computeBreakEvenMembers (bisection sur le vrai
+  // moteur) DANS le sandbox du scénario. Mémoïsé (la bisection = ~20
+  // buildPnL) pour garder les sliders fluides.
+  const _beCache = new Map();
+  function breakEvenWith(hyp, colKey) {
+    const ck = colKey === 'tool'
+      ? 'tool:' + JSON.stringify([window._rentOverride, window._chargeOverride, window._surfaceOverride, window._financingOverride, window._capexOverride, window._exitMultipleOverride])
+      : colKey + ':' + (hyp ? JSON.stringify(hyp) : 'ref');
+    if (_beCache.has(ck)) return _beCache.get(ck);
+    let be = null;
+    try {
+      be = withOverrides(hyp, () =>
+        typeof window.computeBreakEvenMembers === 'function' ? window.computeBreakEvenMembers('fcfe', 4) : null);
+    } catch {}
+    if (_beCache.size > 300) _beCache.clear();
+    _beCache.set(ck, be);
+    return be;
   }
 
   // ─── Persistance scénarios ───────────────────────────────────────
@@ -144,7 +179,11 @@
     const list = loadSaved()[S.siteKey] || [];
     const item = list[idx];
     if (!item) return;
-    S[which] = { name: item.name, hyp: JSON.parse(JSON.stringify(item.hyp)) };
+    // v6.93 — merge avec les défauts : un scénario sauvegardé avant l'ajout
+    // d'une hypothèse (ex. master-franchise) reste chargeable sans trou.
+    const hyp = defaultScenario('').hyp;
+    Object.assign(hyp, JSON.parse(JSON.stringify(item.hyp)));
+    S[which] = { name: item.name, hyp };
     render();
   }
   function deleteSaved(idx) {
@@ -167,12 +206,12 @@
     { label: 'EBITDA A5', hint: 'Rentabilité opérationnelle en vitesse de croisière', v: p => kE(p.annualEBITDA?.[4]), raw: p => p.annualEBITDA?.[4], better: 'high' },
     { label: 'FCFF 5 ans', hint: 'Free cash flow projet cumulé (avant dette)', v: p => kE(p.annualEBITDA.reduce((a, b) => a + b, 0) - p.leasingMonthly * 12 * Math.min(5, PNL_DEFAULTS.leasingYears)), raw: p => p.annualEBITDA.reduce((a, b) => a + b, 0), better: 'high' },
     { label: 'FCFE 5 ans', hint: 'Net free cash flow to equity cumulé (après service dette, avant IS)', v: p => kE(p.fcfe5y), raw: p => p.fcfe5y, better: 'high', star: true },
-    { label: 'IRR Projet', hint: 'TRI unlevered — qualité intrinsèque du site', v: p => p.irr + '%', raw: p => p.irr, better: 'high' },
-    { label: 'IRR Equity', hint: 'TRI levered — ton rendement d’actionnaire', v: p => p.irrEquity + '%', raw: p => p.irrEquity, better: 'high', star: true },
+    { label: 'IRR Projet', hint: 'TRI unlevered — qualité intrinsèque du site', v: p => p.irr + '%', raw: p => p.irr, better: 'high', fmtDelta: d => Math.abs(d).toFixed(1) + ' pp' },
+    { label: 'IRR Equity', hint: 'TRI levered — ton rendement d’actionnaire', v: p => p.irrEquity + '%', raw: p => p.irrEquity, better: 'high', star: true, fmtDelta: d => Math.abs(d).toFixed(1) + ' pp' },
     { label: 'NPV @12%', hint: 'Valeur actuelle nette au WACC de référence', v: p => kE(p.npv), raw: p => p.npv, better: 'high' },
-    { label: 'DSCR min (A2+)', hint: 'Couverture du service de la dette — banque exige ≥ 1.2', v: p => p.dscrMinCruise != null ? p.dscrMinCruise.toFixed(2) + '×' : 'n/a', raw: p => p.dscrMinCruise, better: 'high' },
-    { label: 'MOIC 5 ans', hint: 'Multiple sur equity investie (avec sortie)', v: p => p.moic != null ? p.moic.toFixed(1) + '×' : 'n/a', raw: p => p.moic, better: 'high' },
-    { label: 'Payback equity', hint: 'Mois de récupération de l’apport via FCFE', v: p => p.paybackEquityMonth ? 'M' + p.paybackEquityMonth : '>60M', raw: p => p.paybackEquityMonth || 99, better: 'low' },
+    { label: 'DSCR min (A2+)', hint: 'Couverture du service de la dette — banque exige ≥ 1.2', v: p => p.dscrMinCruise != null ? p.dscrMinCruise.toFixed(2) + '×' : 'n/a', raw: p => p.dscrMinCruise, better: 'high', fmtDelta: d => Math.abs(d).toFixed(2) + '×' },
+    { label: 'MOIC 5 ans', hint: 'Multiple sur equity investie (avec sortie)', v: p => p.moic != null ? p.moic.toFixed(1) + '×' : 'n/a', raw: p => p.moic, better: 'high', fmtDelta: d => Math.abs(d).toFixed(1) + '×' },
+    { label: 'Payback equity', hint: 'Mois de récupération de l’apport via FCFE', v: p => p.paybackEquityMonth ? 'M' + p.paybackEquityMonth : '>60M', raw: p => p.paybackEquityMonth || 99, better: 'low', fmtDelta: d => Math.abs(Math.round(d)) + ' mois' },
     { label: 'Valeur terminale', hint: 'Multiple de sortie × EBITDA A5', v: p => kE(p.terminalValue), raw: p => p.terminalValue, better: 'high' },
   ];
 
@@ -218,7 +257,10 @@
         : '';
       lastGroup = h.group;
       const refVal = h.fmt(h.get());
-      const control = h.type === 'bool'
+      const active = h.type === 'flag' ? (st.on && st.v) : st.on;
+      const control = h.type === 'flag'
+        ? `<span id="fcf-${which}-${h.key}-val" style="font-size:10px;font-weight:800;color:${active ? CLR[which] : 'var(--gray2)'}">${active ? '+400 k€ HT ajoutés au CAPEX' : '— (coche pour ajouter 400 k€ HT)'}</span>`
+        : h.type === 'bool'
         ? `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;color:var(--white)">
              <input type="checkbox" ${st.v ? 'checked' : ''} ${st.on ? '' : 'disabled'}
                onchange="FcfStudio._set('${which}','${h.key}','v',this.checked)" style="accent-color:${CLR[which]}">
@@ -232,9 +274,9 @@
            </div>`;
       return `${groupHdr}
         <div style="display:grid;grid-template-columns:16px 92px 1fr;gap:6px;align-items:center;padding:3px 0" title="${h.hint} · Référence: ${refVal}">
-          <input type="checkbox" ${st.on ? 'checked' : ''} onchange="FcfStudio._set('${which}','${h.key}','on',this.checked)"
-            title="Cocher = personnaliser cette hypothèse · Décocher = valeur de référence" style="accent-color:${CLR[which]};cursor:pointer">
-          <span style="font-size:9.5px;color:${st.on ? 'var(--white)' : 'var(--gray2)'}">${h.label}</span>
+          <input type="checkbox" ${(h.type === 'flag' ? active : st.on) ? 'checked' : ''} onchange="FcfStudio._set('${which}','${h.key}','${h.type === 'flag' ? 'flag' : 'on'}',this.checked)"
+            title="${h.type === 'flag' ? h.hint : 'Cocher = personnaliser cette hypothèse · Décocher = valeur de référence'}" style="accent-color:${CLR[which]};cursor:pointer">
+          <span style="font-size:9.5px;color:${active ? 'var(--white)' : 'var(--gray2)'}">${h.label}</span>
           ${control}
         </div>`;
     }).join('');
@@ -246,16 +288,35 @@
     try { S.chart?.destroy(); } catch {}
 
     const pnls = { ref: computeWith(null), tool: computeWith('tool'), A: computeWith(S.A.hyp), B: computeWith(S.B.hyp) };
+    // v6.93 — point mort FCFE en adhérents, par colonne (mémoïsé)
+    const beMap = { ref: breakEvenWith(null, 'ref'), tool: breakEvenWith('tool', 'tool'), A: breakEvenWith(S.A.hyp, 'A'), B: breakEvenWith(S.B.hyp, 'B') };
+    const mfOn = w => !!(S[w].hyp.mf && S[w].hyp.mf.on && S[w].hyp.mf.v);
     const saved = loadSaved()[S.siteKey] || [];
 
-    const deltaChip = (rowRaw, better, base, val) => {
-      if (base == null || val == null || typeof base !== 'number' || typeof val !== 'number') return '';
-      const d = val - base;
-      if (Math.abs(d) < 1e-9) return '';
+    // v6.93 — badge « vérité financement » : dérivé du P&L calculé, jamais
+    // du nom du scénario (un preset renommé ne peut plus mentir).
+    const finBadge = (w) => {
+      const p = pnls[w];
+      if (!p) return '';
+      const debt = p.loanPrincipal > 0;
+      const pct = debt ? Math.round(p.loanPrincipal / p.capex * 100) : 0;
+      const core = debt
+        ? `<span style="color:#60a5fa">🏦 apport ${100 - pct}% · dette ${pct}%</span>`
+        : `<span style="color:#34d399">💰 100% fonds propres</span>`;
+      return `<div style="font-size:9px;font-weight:700;margin-top:2px">${core}${mfOn(w) ? ' <span style="color:var(--accent)">· 🏷 +400k master-franchise</span>' : ''}</div>`;
+    };
+
+    // Δ 🅱−🅰 : cellule dédiée, signée et colorée (vert = B meilleur)
+    const deltaCell = (raw, better, fmtDelta) => {
+      const a = raw(pnls.A), b = raw(pnls.B);
+      if (a == null || b == null || typeof a !== 'number' || typeof b !== 'number')
+        return '<td style="padding:6px 10px;text-align:right;color:var(--gray2)">·</td>';
+      const d = b - a;
+      if (Math.abs(d) < 1e-9) return '<td style="padding:6px 10px;text-align:right;color:var(--gray2)">=</td>';
       const good = better === 'high' ? d > 0 : better === 'low' ? d < 0 : null;
       const col = good == null ? 'var(--gray2)' : good ? 'var(--green)' : 'var(--red)';
-      const txt = Math.abs(d) >= 1000 ? F(Math.round(d / 1000)) + 'k' : (Math.round(d * 100) / 100);
-      return `<span style="font-size:8px;color:${col};font-weight:700"> ${d > 0 ? '+' : ''}${txt}</span>`;
+      const txt = fmtDelta ? fmtDelta(d) : (Math.abs(d) >= 1000 ? F(Math.round(d / 1000)) + ' k€' : String(Math.round(d * 100) / 100));
+      return `<td style="padding:6px 10px;text-align:right;color:${col};font-weight:800">${d > 0 ? '+' : '−'}${txt.replace(/^[-−]/, '')}</td>`;
     };
 
     wrap.innerHTML = `
@@ -281,6 +342,7 @@
                 <div style="font-size:11px;font-weight:800;color:${CLR[w]}">
                   ${w === 'A' ? '🅰' : '🅱'} ${S[w].name.replace(/</g,'&lt;')}
                   <span style="font-size:8px;color:var(--gray2);font-weight:500">· ${Object.values(S[w].hyp).filter(x => x.on).length} hypothèse(s) personnalisée(s)</span>
+                  ${finBadge(w)}
                 </div>
                 <div style="display:flex;gap:5px">
                   <button onclick="FcfStudio._reset('${w}')" title="Tout décocher (retour référence)" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--gray2);font-size:8.5px;padding:4px 8px;cursor:pointer">↺ Réf</button>
@@ -293,27 +355,76 @@
 
         <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:14px;align-items:start">
           <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse;font-size:10px">
+            ${(() => {
+              const nameA = S.A.name.replace(/</g, '&lt;').slice(0, 16);
+              const nameB = S.B.name.replace(/</g, '&lt;').slice(0, 16);
+              const rowHtml = (r) => {
+                const differs = (() => { const a = r.raw(pnls.A), b = r.raw(pnls.B); return typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) > 1e-9; })();
+                const bg = differs ? 'background:rgba(96,165,250,.06)' : (r.star ? 'background:rgba(212,160,23,.05)' : '');
+                return `
+                  <tr style="border-bottom:1px solid rgba(71,85,115,.12);${bg}" title="${r.hint}">
+                    <td style="padding:6px 10px;color:var(--${r.star ? 'white' : 'gray'});font-weight:${r.star ? 800 : 500}">${r.label}${r.star ? ' ⭐' : ''}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.ref}">${r.v(pnls.ref)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.tool}">${r.v(pnls.tool)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.A};font-weight:700">${r.v(pnls.A)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.B};font-weight:700">${r.v(pnls.B)}</td>
+                    ${deltaCell(r.raw, r.better, r.fmtDelta)}
+                  </tr>`;
+              };
+              // v6.93 — lignes spéciales : point mort (adhérents) + master-franchise
+              const beRow = (() => {
+                const f = v => v == null ? 'n/a' : F(v) + ' mbr';
+                const a = beMap.A, b = beMap.B;
+                const differs = typeof a === 'number' && typeof b === 'number' && a !== b;
+                const dCell = (typeof a === 'number' && typeof b === 'number')
+                  ? (a === b ? '<td style="padding:6px 10px;text-align:right;color:var(--gray2)">=</td>'
+                     : `<td style="padding:6px 10px;text-align:right;color:${b < a ? 'var(--green)' : 'var(--red)'};font-weight:800">${b > a ? '+' : '−'}${F(Math.abs(b - a))} mbr</td>`)
+                  : '<td style="padding:6px 10px;text-align:right;color:var(--gray2)">·</td>';
+                return `
+                  <tr style="border-bottom:1px solid rgba(71,85,115,.12);${differs ? 'background:rgba(96,165,250,.06)' : 'background:rgba(212,160,23,.05)'}"
+                      title="Adhérents stabilisés requis pour être NEUTRE en FCFE (bas de page, année 5 de croisière) — dette du scénario incluse. Moins = mieux.">
+                    <td style="padding:6px 10px;color:var(--white);font-weight:800">🎯 Point mort FCFE (adhérents) ⭐</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.ref}">${f(beMap.ref)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.tool}">${f(beMap.tool)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.A};font-weight:800">${f(beMap.A)}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.B};font-weight:800">${f(beMap.B)}</td>
+                    ${dCell}
+                  </tr>`;
+              })();
+              const mfRow = `
+                  <tr style="border-bottom:1px solid rgba(71,85,115,.12);${mfOn('A') !== mfOn('B') ? 'background:rgba(96,165,250,.06)' : ''}"
+                      title="Droit d'entrée master-franchise (+400 k€ HT) — coché dans le panneau du scénario, ajouté à son CAPEX">
+                    <td style="padding:6px 10px;color:var(--gray)">🏷 Frais master-franchise</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.ref}">—</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.tool}">—</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.A};font-weight:700">${mfOn('A') ? '400 k€' : '—'}</td>
+                    <td style="padding:6px 6px;text-align:right;color:${CLR.B};font-weight:700">${mfOn('B') ? '400 k€' : '—'}</td>
+                    <td style="padding:6px 10px;text-align:right;color:var(--gray2)">${mfOn('A') === mfOn('B') ? '=' : '·'}</td>
+                  </tr>`;
+              // Injection : MF après « Dette bancaire », point mort après « FCFE 5 ans »
+              const parts = [];
+              ROWS.forEach(r => {
+                parts.push(rowHtml(r));
+                if (r.label === 'Dette bancaire') parts.push(mfRow);
+                if (r.label === 'FCFE 5 ans') parts.push(beRow);
+              });
+              return `
+            <table style="width:100%;border-collapse:collapse;font-size:10.5px">
               <thead><tr style="border-bottom:1px solid var(--border)">
                 <th style="text-align:left;padding:8px 10px;font-size:8px;color:var(--gray2);letter-spacing:.5px">INDICATEUR</th>
-                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.ref}">RÉFÉRENCE BP 🔒</th>
-                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.tool}">RÉGLAGES OUTIL</th>
-                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.A}">🅰</th>
-                <th style="text-align:right;padding:8px 10px;font-size:8px;color:${CLR.B}">🅱 <span style="color:var(--gray2)">(Δ vs 🅰)</span></th>
+                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.ref}">RÉF. BP 🔒</th>
+                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.tool}">OUTIL</th>
+                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.A}" title="${S.A.name.replace(/"/g,'&quot;')}">🅰 ${nameA}</th>
+                <th style="text-align:right;padding:8px 6px;font-size:8px;color:${CLR.B}" title="${S.B.name.replace(/"/g,'&quot;')}">🅱 ${nameB}</th>
+                <th style="text-align:right;padding:8px 10px;font-size:8px;color:var(--white)">Δ 🅱−🅰</th>
               </tr></thead>
-              <tbody>
-                ${ROWS.map(r => `
-                  <tr style="border-bottom:1px solid rgba(71,85,115,.12)${r.star ? ';background:rgba(212,160,23,.05)' : ''}" title="${r.hint}">
-                    <td style="padding:5px 10px;color:var(--${r.star ? 'white' : 'gray'});font-weight:${r.star ? 800 : 500}">${r.label}${r.star ? ' ⭐' : ''}</td>
-                    <td style="padding:5px 6px;text-align:right;color:${CLR.ref}">${r.v(pnls.ref)}</td>
-                    <td style="padding:5px 6px;text-align:right;color:${CLR.tool}">${r.v(pnls.tool)}</td>
-                    <td style="padding:5px 6px;text-align:right;color:${CLR.A};font-weight:700">${r.v(pnls.A)}</td>
-                    <td style="padding:5px 10px;text-align:right;color:${CLR.B};font-weight:700">${r.v(pnls.B)}${deltaChip(r.raw, r.better, r.raw(pnls.A), r.raw(pnls.B))}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
+              <tbody>${parts.join('')}</tbody>
+            </table>`;
+            })()}
             <div style="font-size:8px;color:var(--gray2);padding:8px 10px;line-height:1.5">
               🔒 Référence BP = modèle verrouillé (OnAir calibré), jamais modifiable ici. Réglages outil = tes sliders actuels dans l'app.
+              Les lignes <span style="display:inline-block;width:8px;height:8px;background:rgba(96,165,250,.35);border-radius:2px"></span> = 🅰 et 🅱 diffèrent.
+              🎯 Point mort = adhérents stabilisés pour FCFE neutre (année 5, dette du scénario incluse).
               FCFE = EBITDA − leasing − service de dette (avant IS). Sortie = multiple × EBITDA A5 incluse dans IRR/NPV/MOIC.
             </div>
           </div>
@@ -374,8 +485,21 @@
   // ─── Handlers exposés (inline onclick) ───────────────────────────
   function _set(which, key, prop, val) {
     if (!S) return;
-    S[which].hyp[key][prop] = val;
-    if (S[which].name.startsWith('Scénario') === false && prop === 'v') { /* garde le nom custom */ }
+    if (!S[which].hyp[key]) S[which].hyp[key] = { on: false, v: null };
+    if (prop === 'flag') {
+      // v6.93 — hypothèse à case unique (master-franchise) : cocher = activer
+      S[which].hyp[key].on = !!val;
+      S[which].hyp[key].v = !!val;
+    } else {
+      S[which].hyp[key][prop] = val;
+    }
+    // v6.93 — anti-mensonge : le preset « Sans dette (100% equity) » perd son
+    // nom si sa dette est réactivée (le titre ne doit jamais contredire les
+    // chiffres — le badge financement sous le titre dit la vérité calculée).
+    if (key === 'debt' && S[which].name === 'Sans dette (100% equity)') {
+      const d = S[which].hyp.debt;
+      if (!d.on || d.v !== false) S[which].name = 'Scénario ' + which;
+    }
     render();
   }
   function _reset(which) { if (!S) return; const n = S[which].name; S[which] = defaultScenario(n); render(); }
