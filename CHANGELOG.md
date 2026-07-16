@@ -1,6 +1,30 @@
 
 # Changelog
 
+## [v7.01-analysis-nonblocking] — 2026-07-16
+
+### 🐛 CORRECTIF MAJEUR — l'analyse ne peut plus jamais rester bloquée
+
+Le vrai fond du problème « ça mouline sans jamais afficher » : le rendu
+du cœur de l'analyse (SAZ, verdict, P&L) était placé APRÈS l'appel
+réseau Google Distance Matrix. Si cet appel (ou Overpass) ne rendait
+jamais la main, RIEN ne s'affichait.
+
+- **Rendu découplé** : le cœur de l'analyse s'affiche désormais TOUT DE
+  SUITE, dès que les concurrents sont détectés. Les temps de trajet
+  Google (bonus cosmétique) sont enrichis ENSUITE, en arrière-plan,
+  bornés à 5 s, sans jamais bloquer le rendu.
+- **Timeout Overpass 12 s** : un Overpass qui stalle bascule sur la base
+  vérifiée au lieu de bloquer.
+- **Service Worker bump (v2)** : purge le cache pour livrer le code frais
+  sans hard-refresh manuel.
+
+Vérifié : Distance Matrix simulé en hang ÉTERNEL + clé forcée → l'analyse
+s'affiche et se termine quand même (fiche + verdict, loader caché).
+197/197 tests.
+
+---
+
 ## [v7.00-showreel-focus] — 2026-07-16
 
 ### 🐛 Analyse qui moulinait à l'infini — corrigé

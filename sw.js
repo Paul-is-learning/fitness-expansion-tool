@@ -9,7 +9,7 @@
 //
 // Versionné : bump CACHE quand la stratégie change → vieux caches purgés.
 // ─────────────────────────────────────────────────────────────────────
-const CACHE = 'fp-cache-v1';
+const CACHE = 'fp-cache-v2';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

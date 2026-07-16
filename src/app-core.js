@@ -1447,23 +1447,29 @@ async function analyzePoint(lat,lng,sector) {
 
   curComps = comps;
 
-  // Enrich with Google Distance Matrix (real driving times)
-  if (_googleHasKey() && comps.length > 0) {
-    showLoad('Calcul distances reelles...', `${comps.length} concurrents via Google Distance Matrix`);
-    await googleDistanceMatrix(lat, lng, comps);
-  }
-
+  // ═══ v7.01 — RENDU IMMÉDIAT, enrichissement ENSUITE ═══════════════
+  // Le cœur de l'analyse (SAZ, verdict, P&L, concurrents) ne dépend
+  // d'AUCUN appel réseau bloquant : on l'affiche TOUT DE SUITE. Les
+  // temps de trajet Google (bonus cosmétique dans les popups) sont
+  // enrichis après coup, en arrière-plan et bornés → l'analyse ne peut
+  // plus jamais rester bloquée sur « Calcul distances réelles ».
   const saz = calcSAZ(lat,lng,sector,comps);
   displaySAZ(saz);
   displayComps(comps,lat,lng);
   updateSegChart(comps);
   addZone(lat,lng,sector,saz,comps);
   genSiteCard(lat,lng,sector,saz,comps);
-
-  // Run captage analysis for this point (visible in Fiche Site tab)
-  showCaptageForPoint(lat, lng);
-
+  showCaptageForPoint(lat, lng);   // fiche site (verdict + P&L)
   hideLoad();
+
+  // Enrichissement temps de trajet réels — fire-and-forget, borné à 5 s,
+  // puis re-render des popups concurrents (sans jamais bloquer le reste).
+  if (_googleHasKey() && comps.length > 0) {
+    Promise.race([
+      Promise.resolve().then(() => googleDistanceMatrix(lat, lng, comps)).catch(() => {}),
+      new Promise(r => setTimeout(r, 5000)),
+    ]).then(() => { try { displayComps(comps, lat, lng); } catch {} });
+  }
 }
 
 function findSector(lat,lng) {
@@ -1485,7 +1491,13 @@ async function fetchOverpass(lat,lng,r) {
   const q=`[out:json][timeout:30];(node["leisure"="fitness_centre"](around:${r},${lat},${lng});way["leisure"="fitness_centre"](around:${r},${lat},${lng});node["leisure"="sports_centre"](around:${r},${lat},${lng});way["leisure"="sports_centre"](around:${r},${lat},${lng});node["sport"="fitness"](around:${r},${lat},${lng});way["sport"="fitness"](around:${r},${lat},${lng});node["amenity"="gym"](around:${r},${lat},${lng});way["amenity"="gym"](around:${r},${lat},${lng}););out center body;`;
 
   try {
-    const res=await fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+    // v7.01 — timeout dur : sans ça, un Overpass qui stalle ne rejette jamais
+    // → le catch (fallback base vérifiée) n'était jamais atteint et l'analyse
+    // bloquait avant même les distances.
+    const _ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const _t = _ac ? setTimeout(() => _ac.abort(), 12000) : null;
+    const res=await fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q),signal:_ac?_ac.signal:undefined});
+    if (_t) clearTimeout(_t);
     const data=await res.json();
 
     const comps=data.elements.map(el=>{
