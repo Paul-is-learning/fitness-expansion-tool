@@ -1,6 +1,30 @@
 
 # Changelog
 
+## [v6.94-wow] — 2026-07-16
+
+### ✨ Couche wow — l'outil prend vie
+
+Par-dessus le polish v6.90, des effets dynamiques dans le même registre
+premium (module autonome src/wow-fx.js, zéro modification des panneaux) :
+
+- **Compteurs animés** : les gros chiffres (KPIs, IRR, k€, adhérents)
+  comptent jusqu'à leur valeur à l'ouverture des panneaux et de la
+  fiche d'analyse. Le texte final est restauré à l'octet près (filet de
+  sécurité par minuterie, aucune animation si l'onglet est caché —
+  zéro risque d'affichage figé ou faux).
+- **Cascade** : les blocs d'un panneau apparaissent en escalier (50 ms).
+- **Carte vivante** : halo doré qui respire sur les pins Fitness Park,
+  plus marqué sur le pin actif.
+- **Verdict** : pop élastique du chip GO/WATCH/NO GO.
+- **Courbes** : tous les graphiques Chart.js se dessinent en douceur
+  (800 ms, easeOutQuart).
+- `prefers-reduced-motion` : tout est coupé proprement.
+
+197/197 tests (texte des compteurs garanti identique après animation).
+
+---
+
 ## [v6.93-studio-plus] — 2026-07-16
 
 ### ⚖️ Studio FCF : lecture claire, point mort par scénario, frais master-franchise
