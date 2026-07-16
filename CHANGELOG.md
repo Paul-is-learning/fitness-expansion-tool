@@ -1,6 +1,27 @@
 
 # Changelog
 
+## [v7.05-routes] — 2026-07-16
+
+### 🧭 Itinéraires concurrent → mon club (voiture & à pied)
+
+Nouveau : depuis la carte Explorer, un bouton **🧭 Itinéraire vers mon
+club** dans le popup de chaque concurrent trace la route jusqu'à TON site
+FP le plus proche (TARGETS + sites custom + point sélectionné).
+
+- **Route tracée sur la carte** (ligne dorée voiture, pointillés cyan à
+  pied) avec ombre douce, points de départ/arrivée nommés.
+- **Carte de résultat premium** : durée en gros + distance, bascule
+  🚗 Voiture / 🚶 À pied (redessine la route), les deux durées d'un coup
+  d'œil, lien « Ouvrir dans Google Maps ».
+- **Moteur OSRM** (routing.openstreetmap.de) : gratuit, fiable, durées et
+  distances réelles + géométrie de route. Timeout 8 s, repli propre.
+
+Vérifié navigateur : World Class Charles de Gaulle → Unirea, 🚗 9 min /
+5,55 km, 🚶 71 min, route dessinée, toggle OK, 0 erreur. 197/197 tests.
+
+---
+
 ## [v7.04-vectormap-off] — 2026-07-16
 
 ### 🐛 « Ça fait bugger le SaaS » au clic sur les filtres — RÉSOLU

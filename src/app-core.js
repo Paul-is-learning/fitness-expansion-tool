@@ -2123,9 +2123,136 @@ function showCompsOnMap(comps) {
       ${dist!==null?`<div class="ps"><span>Distance</span><span class="pv">${(dist/1000).toFixed(2)} km${c.driveMins!==undefined?' <span style="color:var(--blue);font-size:9px">🚗 '+c.driveMins+' min</span>':''}</span></div>`:''}
       ${ts!==null?`<div class="ps"><span>Menace</span><span class="pv" style="color:${ts>70?'var(--red)':ts>40?'var(--yellow)':'var(--green)'}">${ts}/100${c.driveMins!==undefined?' <span style="font-size:8px;color:var(--gray2)">(temps reel)</span>':''}</span></div>`:''}
       <div class="ps"><span>Prix</span><span class="pv">${c.price || (COMP_PRICES[c.segment] ? '~'+COMP_PRICES[c.segment] : '?')} EUR/mois</span></div>
+      <button onclick="openRouteTo(${c.lat},${c.lng},'${encodeURIComponent(c.name || 'Concurrent')}')" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#d4a017,#b8860b);color:#0a0d16;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font)">🧭 Itinéraire vers mon club</button>
     `);
     compCluster.addLayer(mk);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// v7.05 — ITINÉRAIRES : d'un concurrent vers MON club (OSRM, gratuit)
+// Bouton 🧭 dans le popup concurrent → trace la route (voiture + à pied)
+// vers le site FP le plus proche, avec durées/distances réelles.
+// ═══════════════════════════════════════════════════════════════════
+let fpRouteLayer = null;
+let _fpRouteData = null;
+
+function _decodePolyline(str, precision) {
+  let index = 0, lat = 0, lng = 0, coords = [], factor = Math.pow(10, precision || 5), b;
+  while (index < str.length) {
+    let result = 1, shift = 0;
+    do { b = str.charCodeAt(index++) - 63 - 1; result += b << shift; shift += 5; } while (b >= 0x1f);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    result = 1; shift = 0;
+    do { b = str.charCodeAt(index++) - 63 - 1; result += b << shift; shift += 5; } while (b >= 0x1f);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lat / factor, lng / factor]);
+  }
+  return coords;
+}
+
+// Mon club le plus proche du concurrent : TARGETS + sites custom + point sélectionné.
+function _nearestMySite(lat, lng) {
+  const sites = [];
+  try { if (typeof TARGETS !== 'undefined') TARGETS.forEach(t => sites.push({ name: t.name, lat: t.lat, lng: t.lng })); } catch {}
+  try { (window.customSites || []).filter(s => !s.deletedAt).forEach(s => sites.push({ name: s.name, lat: s.lat, lng: s.lng })); } catch {}
+  try { if (typeof selectedPt !== 'undefined' && selectedPt) sites.push({ name: 'Point sélectionné', lat: selectedPt.lat, lng: selectedPt.lng }); } catch {}
+  let best = null, bd = Infinity;
+  sites.forEach(s => { const d = haversine(lat, lng, s.lat, s.lng); if (d < bd) { bd = d; best = s; } });
+  return best;
+}
+
+async function _osrmRoute(profile, from, to) {
+  const path = profile === 'foot' ? 'routed-foot/route/v1/foot' : 'routed-car/route/v1/driving';
+  const url = `https://routing.openstreetmap.de/${path}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=polyline`;
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const t = ac ? setTimeout(() => ac.abort(), 8000) : null;
+  try {
+    const r = await fetch(url, { signal: ac ? ac.signal : undefined });
+    if (t) clearTimeout(t);
+    const j = await r.json();
+    const rt = j.routes && j.routes[0];
+    if (!rt) return null;
+    return { coords: _decodePolyline(rt.geometry, 5), min: Math.round(rt.duration / 60), km: +(rt.distance / 1000).toFixed(2) };
+  } catch { if (t) clearTimeout(t); return null; }
+}
+
+async function openRouteTo(compLat, compLng, compNameEnc) {
+  const compName = (() => { try { return decodeURIComponent(compNameEnc || ''); } catch { return String(compNameEnc || ''); } })();
+  const mine = _nearestMySite(compLat, compLng);
+  if (!mine) { try { window.showToast?.('Ajoute d’abord un de tes sites (onglet Mes Sites) pour tracer un itinéraire.', 'warn', { title: 'Itinéraire' }); } catch {} return; }
+  try { map.closePopup(); } catch {}
+  showLoad('Calcul de l’itinéraire…', `${compName} → ${mine.name}`);
+  const from = { lat: compLat, lng: compLng }, to = { lat: mine.lat, lng: mine.lng };
+  const [car, foot] = await Promise.all([_osrmRoute('car', from, to), _osrmRoute('foot', from, to)]);
+  hideLoad();
+  if (!car && !foot) { try { window.showToast?.('Service d’itinéraire momentanément indisponible — réessaie.', 'error', { title: 'Itinéraire' }); } catch {} return; }
+  _fpRouteData = { car, foot, from, to, compName, mineName: mine.name, mode: car ? 'car' : 'foot' };
+  _drawRoute(_fpRouteData.mode);
+  _renderRouteCard();
+}
+window.openRouteTo = openRouteTo;
+
+function _drawRoute(mode) {
+  const d = _fpRouteData; if (!d || !d[mode]) return;
+  d.mode = mode;
+  if (fpRouteLayer) { try { map.removeLayer(fpRouteLayer); } catch {} }
+  fpRouteLayer = L.layerGroup().addTo(map);
+  const route = d[mode];
+  const col = mode === 'car' ? '#d4a017' : '#06b6d4';
+  L.polyline(route.coords, { color: '#05070d', opacity: .45, weight: 10, lineCap: 'round' }).addTo(fpRouteLayer);      // ombre douce
+  L.polyline(route.coords, { color: col, weight: 5, opacity: .96, dashArray: mode === 'foot' ? '1,11' : null, lineCap: 'round', lineJoin: 'round' }).addTo(fpRouteLayer);
+  L.circleMarker([d.from.lat, d.from.lng], { radius: 7, color: '#fff', fillColor: '#ef4444', fillOpacity: 1, weight: 2 })
+    .bindTooltip('🏋 ' + d.compName, { direction: 'top', offset: [0, -6] }).addTo(fpRouteLayer);
+  L.circleMarker([d.to.lat, d.to.lng], { radius: 8, color: '#fff', fillColor: '#d4a017', fillOpacity: 1, weight: 2 })
+    .bindTooltip('📍 ' + d.mineName + ' (mon club)', { direction: 'top', offset: [0, -6] }).addTo(fpRouteLayer);
+  try { map.fitBounds(L.latLngBounds(route.coords), { paddingTopLeft: [560, 80], paddingBottomRight: [60, 120], maxZoom: 15 }); } catch {}
+}
+
+function setRouteMode(mode) { _drawRoute(mode); _renderRouteCard(); }
+window.setRouteMode = setRouteMode;
+
+function closeRoute() {
+  if (fpRouteLayer) { try { map.removeLayer(fpRouteLayer); } catch {} fpRouteLayer = null; }
+  _fpRouteData = null;
+  document.getElementById('fpRouteCard')?.remove();
+}
+window.closeRoute = closeRoute;
+
+function _renderRouteCard() {
+  const d = _fpRouteData; if (!d) return;
+  document.getElementById('fpRouteCard')?.remove();
+  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s || ''));
+  const gmaps = `https://www.google.com/maps/dir/${d.from.lat},${d.from.lng}/${d.to.lat},${d.to.lng}`;
+  const active = d.mode;
+  const chip = (m, ico, label) => {
+    const avail = !!d[m]; const on = active === m;
+    const col = m === 'car' ? '#d4a017' : '#06b6d4';
+    return `<button ${avail ? '' : 'disabled'} onclick="setRouteMode('${m}')" style="flex:1;padding:7px 4px;border-radius:9px;border:1px solid ${on ? col : 'rgba(71,85,115,.4)'};background:${on ? col + '22' : 'transparent'};color:${avail ? (on ? '#fff' : 'var(--gray)') : 'var(--gray2)'};font-size:11px;font-weight:700;cursor:${avail ? 'pointer' : 'not-allowed'};font-family:var(--font);transition:all .2s;opacity:${avail ? 1 : .4}">${ico} ${label}</button>`;
+  };
+  const cur = d[active];
+  const line = (m, ico) => d[m] ? `<span style="color:${m === 'car' ? '#d4a017' : '#06b6d4'};font-weight:700">${ico} ${d[m].min} min</span> <span style="color:var(--gray2)">· ${d[m].km} km</span>` : `<span style="color:var(--gray2)">${ico} —</span>`;
+  const card = document.createElement('div');
+  card.id = 'fpRouteCard';
+  card.style.cssText = 'position:fixed;right:18px;bottom:96px;z-index:1200;width:248px;background:linear-gradient(160deg,rgba(15,21,36,.96),rgba(9,13,24,.94));backdrop-filter:blur(16px);border:1px solid rgba(212,160,23,.4);border-radius:16px;padding:15px 16px;box-shadow:0 22px 60px rgba(0,0,0,.6);font-family:var(--font);animation:fpWowIn .4s cubic-bezier(.16,1,.3,1) both';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--accent)">🧭 ITINÉRAIRE</div>
+      <button onclick="closeRoute()" style="background:transparent;border:none;color:var(--gray);font-size:16px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--white);font-weight:600;line-height:1.4;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>${esc(d.compName)}</div>
+      <div style="color:var(--gray2);font-size:14px;margin:1px 0 1px 3px">↓</div>
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>${esc(d.mineName)} <span style="font-size:9px;color:var(--gray2)">(mon club)</span></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:11px">${chip('car', '🚗', 'Voiture')}${chip('foot', '🚶', 'À pied')}</div>
+    <div style="text-align:center;padding:8px 0;background:rgba(0,0,0,.25);border-radius:10px;margin-bottom:10px">
+      <div style="font-size:30px;font-weight:900;font-family:var(--font-display,var(--font));color:${active === 'car' ? '#d4a017' : '#06b6d4'};line-height:1">${cur ? cur.min : '—'}<span style="font-size:14px;font-weight:700"> min</span></div>
+      <div style="font-size:11px;color:var(--gray2);margin-top:2px">${cur ? cur.km + ' km' : ''} · ${active === 'car' ? 'en voiture' : 'à pied'}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:11px;padding:0 2px">${line('car', '🚗')}${line('foot', '🚶')}</div>
+    <a href="${gmaps}" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:10px;color:var(--gray);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px">Ouvrir dans Google Maps ↗</a>`;
+  document.body.appendChild(card);
 }
 
 function displayComps(comps,refLat,refLng) {
