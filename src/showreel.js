@@ -494,6 +494,12 @@
 
   function start() {
     if (running) return;
+    // v7.10 — si le tour d'onboarding (carte BIENVENUE) est ouvert, la démo
+    // tournerait DERRIÈRE sa modale (halos posés au bon endroit mais app
+    // masquée — vu en test headless profil vierge). On le ferme proprement
+    // (clic sur son ✕ = son propre cleanup), puis purge de tout reliquat.
+    try { document.querySelectorAll('.fp-onb-overlay .fp-onb-close').forEach(b => b.click()); } catch {}
+    setTimeout(() => { try { document.querySelectorAll('.fp-onb-overlay').forEach(o => o.remove()); } catch {} }, 400);
     scenes = buildScenes();
     if (!scenes.length) return;
     running = true; idx = 0; autoplay = false;

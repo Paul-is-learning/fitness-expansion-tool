@@ -1,6 +1,18 @@
 
 # Changelog
 
+## [v7.11-demo-hardening] · 2026-07-16
+
+### 🎬 Démo guidée : ferme le tour d'onboarding si ouvert
+
+Découvert en test headless profil vierge : si la carte BIENVENUE (onboarding)
+est ouverte, la démo tournait DERRIÈRE sa modale (halos bien placés, app
+masquée). Showreel.start() clique désormais son ✕ (cleanup officiel) puis
+purge tout reliquat. Vérifié headless : BIENVENUE ouvert → démo lancée →
+modale fermée, scène 4 halo 1312×96 centré sur les tuiles du verdict.
+
+---
+
 ## [v7.10-integrity] — 2026-07-16
 
 ### 🧹 Audit intégrité : 31 restes V17 traqués et corrigés + démo guidée refaite
