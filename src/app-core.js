@@ -7565,6 +7565,11 @@ async function googleDistanceMatrix(originLat, originLng, competitors) {
         routingPreference: 'TRAFFIC_AWARE'
       };
 
+      // v7.00 — timeout dur : sans ça, un appel Distance Matrix qui ne répond
+      // pas bloquait TOUT le rendu de l'analyse (SAZ/verdict venant après le
+      // await) → spinner « Calcul distances réelles » à l'infini.
+      const _ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const _to = _ctrl ? setTimeout(() => _ctrl.abort(), 6000) : null;
       const resp = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
         method: 'POST',
         headers: {
@@ -7572,8 +7577,10 @@ async function googleDistanceMatrix(originLat, originLng, competitors) {
           'X-Goog-Api-Key': GOOGLE_API_KEY,
           'X-Goog-FieldMask': 'originIndex,destinationIndex,duration,distanceMeters,status'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: _ctrl ? _ctrl.signal : undefined
       });
+      if (_to) clearTimeout(_to);
 
       const data = await resp.json();
       if (Array.isArray(data)) {
@@ -7604,8 +7611,12 @@ async function googleDistanceMatrix(originLat, originLng, competitors) {
 // ================================================================
 function el(id){return document.getElementById(id)}
 // fmt + haversine moved to src/utils.js
-function showLoad(t,s){el('loaderText').textContent=t||'Chargement...';el('loaderSub').textContent=s||'';el('loader').classList.add('on')}
-function hideLoad(){el('loader').classList.remove('on')}
+// v7.00 — garde-fou : un spinner ne reste jamais bloqué > 22 s, même si un
+// appel réseau ne rend jamais la main (sécurité par-dessus les timeouts).
+let _fpLoadWatchdog = null;
+function showLoad(t,s){el('loaderText').textContent=t||'Chargement...';el('loaderSub').textContent=s||'';el('loader').classList.add('on');
+  try { clearTimeout(_fpLoadWatchdog); _fpLoadWatchdog = setTimeout(() => { try { el('loader').classList.remove('on'); } catch {} }, 22000); } catch {}}
+function hideLoad(){try{clearTimeout(_fpLoadWatchdog);}catch{}el('loader').classList.remove('on')}
 function setStatus(s,t){el('statusDot').className='status-dot '+s;el('statusText').textContent=t}
 function updCache(){el('cacheInfo').textContent=`Cache: ${Object.keys(opCache).length} req`}
 function closePanel(){el('app').classList.remove('panel-open');el('rightPanel').style.display='none'}

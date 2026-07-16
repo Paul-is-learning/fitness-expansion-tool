@@ -1,6 +1,31 @@
 
 # Changelog
 
+## [v7.00-showreel-focus] — 2026-07-16
+
+### 🐛 Analyse qui moulinait à l'infini — corrigé
+
+L'appel Google Distance Matrix n'avait aucun timeout : s'il ne répondait
+pas, TOUT le rendu de l'analyse (SAZ, verdict) — qui vient après ce
+`await` — ne s'affichait jamais. Le spinner « Calcul distances réelles »
+tournait sans fin. Corrigé : timeout dur de 6 s sur l'appel (repli propre
+sur les distances à vol d'oiseau) + garde-fou 22 s sur tout spinner.
+
+### 🎬 Démo guidée : effet spotlight + zéro blocage
+
+- **Spotlight cinématique** : chaque scène assombrit tout SAUF l'élément
+  clé (verdict, tuiles KPI, comparatif de cash…) avec un halo doré animé
+  qui suit l'élément — l'œil de l'audience est guidé au bon endroit.
+- **Légende immédiate** : l'histoire s'affiche instantanément, le calcul
+  tourne en arrière-plan (plafonné) — plus jamais de scène figée sur un
+  chargement.
+- Habillage plus moderne : kicker doré animé, carte en verre, transitions
+  cinéma, barre de progression.
+
+197/197 tests. Mécaniques validées (légende immédiate, focus, spotlight).
+
+---
+
 ## [v6.99-showreel] — 2026-07-16
 
 ### 🎬 Démo guidée (showreel investisseur)

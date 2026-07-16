@@ -1,55 +1,49 @@
 // ─────────────────────────────────────────────────────────────────────
-// src/showreel.js — v6.99 « Démo guidée » (showreel investisseur)
+// src/showreel.js — v7.00 « Démo guidée » (showreel investisseur)
 //
-// Demande Paul : le mode présentation doit lancer un DIDACTICIEL qui
-// illustre les fonctionnalités en prenant exemple sur ses sites
-// sauvegardés — « effet wow, le mec maîtrise de ouf son sujet ».
+// Le mode présentation lance un DIDACTICIEL qui pilote l'outil tout seul,
+// scène par scène, sur les vrais sites sauvegardés — « effet wow, il
+// maîtrise son sujet ». v7.00 :
+//   • légende affichée IMMÉDIATEMENT (l'action tourne en arrière-plan,
+//     plafonnée en temps → plus jamais de blocage sur un calcul lent) ;
+//   • SPOTLIGHT cinématique : la scène assombrit tout SAUF l'élément clé
+//     (verdict, tuiles KPI, comparatif…) avec un halo doré animé, pour
+//     guider l'attention de l'audience ;
+//   • pilotage clavier → ← Espace Échap, barre de progression, points.
 //
-// PRINCIPE : l'outil se pilote TOUT SEUL, scène par scène — il analyse
-// un vrai site, ouvre le comparateur de cash, le portefeuille, le plan
-// de conquête — pendant qu'une légende storytelling raconte l'histoire.
-// Le présentateur ne touche qu'aux flèches : → avance, ← revient,
-// Espace = lecture auto, Échap = sortie. Zéro donnée inventée : tout
-// vient de _siteAnalyses / du moteur réel.
-//
-// Autonome (aucun module modifié) : window.Showreel = { start, stop }.
+// Autonome (window.Showreel = { start, stop }). Zéro donnée inventée.
 // ─────────────────────────────────────────────────────────────────────
 (function () {
   'use strict';
-  try { if (window !== window.top) return; } catch { return; } // pas dans les iframes de test
+  try { if (window !== window.top) return; } catch { return; }
 
   const $ = id => document.getElementById(id);
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  const fmtN = n => (n == null ? '—' : Math.round(n).toLocaleString('fr-FR').replace(/ |,/g, ' '));
+  const fmtN = n => (n == null ? '—' : Math.round(n).toLocaleString('fr-FR').replace(/[\s,]/g, ' '));
+  const val = v => (typeof v === 'function' ? v() : v);
+  const capRun = (fn, ms) => Promise.race([Promise.resolve().then(fn).catch(() => {}), wait(ms)]);
 
-  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false;
+  let scenes = [], idx = 0, running = false, autoplay = false, autoTimer = null, busy = false, spotRAF = null;
 
-  // ── Helpers pilotage (tous défensifs) ───────────────────────────────
-  const P = () => ({
-    Portfolio: window.Portfolio, Conquest: window.ConquestPlan,
-    Studio: window.FcfStudio, Intel: window.CompetitorIntel,
-  });
+  // ── Pilotage (défensif) ─────────────────────────────────────────────
   function closeAllPanels() {
-    const p = P();
-    try { p.Portfolio?.close?.(); } catch {}
-    try { p.Conquest?.close?.(); } catch {}
-    try { p.Studio?.close?.(); } catch {}
-    try { p.Intel?.close?.(); } catch {}
+    try { window.Portfolio?.close?.(); } catch {}
+    try { window.ConquestPlan?.close?.(); } catch {}
+    try { window.FcfStudio?.close?.(); } catch {}
+    try { window.CompetitorIntel?.close?.(); } catch {}
     ['fpPortfolio','fpConquest','fpFcfStudio','ciPanel'].forEach(id => { try { $(id)?.remove(); } catch {} });
   }
   function targetIndexFor(site) {
     if (typeof TARGETS === 'undefined') return -1;
     return TARGETS.findIndex(t => Math.abs(t.lat - site.lat) < 0.01 && Math.abs(t.lng - site.lng) < 0.01);
   }
-  // Analyse un site (par index TARGET si possible, sinon clic carte) et
-  // ATTEND que la fiche soit prête (verdict rendu) — max ~16 s.
   async function analyzeAndWait(site) {
     const ti = targetIndexFor(site);
     try {
       if (ti >= 0) window.analyzeTargetByIdx(ti);
       else if (typeof window.onMapClick === 'function') window.onMapClick({ latlng: { lat: site.lat, lng: site.lng } });
     } catch {}
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 30; i++) {           // ~15 s max (le fetch a son propre timeout)
       const t = $('captageContentSite')?.innerText || '';
       if (/EN CLAIR|GO|WATCH|NO GO/.test(t)) break;
       await wait(500);
@@ -58,10 +52,25 @@
   }
   const savedSites = () => (window._siteAnalyses || []).slice().sort((a, b) => (b.execScore || 0) - (a.execScore || 0));
 
-  // ── Construction des scènes (dynamique, sur les vrais sites) ────────
+  // Trouve l'élément le plus pertinent contenant un texte (pour le spotlight)
+  function findByText(root, re, maxLen = 400) {
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    let best = null;
+    while (walker.nextNode()) {
+      const el = walker.currentNode;
+      const t = (el.innerText || '').trim();
+      if (t && t.length < maxLen && re.test(t) && el.offsetHeight > 0) {
+        if (!best || (el.innerText.length < best.innerText.length)) best = el;
+      }
+    }
+    return best;
+  }
+
+  // ── Scènes (dynamiques, avec cible de focus) ────────────────────────
   function buildScenes() {
     const sites = savedSites();
-    const hero = sites[0] || (typeof TARGETS !== 'undefined' ? { name: TARGETS[0]?.name, lat: TARGETS[0]?.lat, lng: TARGETS[0]?.lng } : null);
+    const hero = sites[0] || (typeof TARGETS !== 'undefined' && TARGETS[0] ? { name: TARGETS[0].name, lat: TARGETS[0].lat, lng: TARGETS[0].lng } : null);
     const s = [];
 
     s.push({
@@ -74,50 +83,42 @@
       kicker: '01 · L’ANALYSE', title: `Je pose un site : ${hero.name}.`,
       body: 'L’outil croise en temps réel la population captable, les transports, les universités, les bureaux — et toute la concurrence géolocalisée.',
       run: async () => { closeAllPanels(); await analyzeAndWait(hero); },
-      hold: 12000,
+      focus: () => $('captageContentSite'),
     });
 
     if (hero) s.push({
-      kicker: '02 · LE VERDICT', title: () => {
-        const h = savedSites()[0] || hero;
-        return `${h.verdict || 'Décision'} · Score ${h.execScore ?? '—'}/100.`;
-      },
-      body: () => {
-        const h = savedSites()[0] || hero;
-        return `${fmtN(h.totalTheo)} adhérents potentiels · IRR projet ${h.irrBase ?? '—'}% · IRR equity ${h.irrEquity ?? '—'}%. La décision d’abord, la démonstration ensuite.`;
-      },
+      kicker: '02 · LE VERDICT', title: () => { const h = savedSites()[0] || hero; return `${h.verdict || 'Décision'} · Score ${h.execScore ?? '—'}/100.`; },
+      body: () => { const h = savedSites()[0] || hero; return `${fmtN(h.totalTheo)} adhérents potentiels · IRR projet ${h.irrBase ?? '—'} % · IRR equity ${h.irrEquity ?? '—'} %. La décision d’abord, la démonstration ensuite.`; },
       run: async () => { try { window.switchTab?.('site'); } catch {} const c = $('captageContentSite'); try { c?.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} },
+      focus: () => { const c = $('captageContentSite'); return c && (c.querySelector('.saz-hero') || c.querySelector('.reco-chip') || findByText(c, /sur 100|GO|WATCH|NO GO/)); },
     });
 
     s.push({
       kicker: '03 · LE TERRAIN', title: 'Chaque concurrent, géolocalisé — avec son logo.',
       body: 'World Class, Stay Fit, 18GYM, Downtown… je sais exactement qui m’entoure, à quelle distance, et quelle est leur menace.',
-      run: async () => {
-        try { window.switchTab?.('compete'); } catch {}
-        try { window.toggleAllBrands?.(true); } catch {}
-        try { window._fpMap?.flyTo([44.43, 26.10], 12, { duration: 1.2 }); } catch {}
-      },
+      run: async () => { try { window.switchTab?.('compete'); } catch {} try { window.toggleAllBrands?.(true); } catch {} try { window._fpMap?.flyTo([44.43, 26.10], 12, { duration: 1.2 }); } catch {} },
+      focus: () => document.getElementById('brandFilters') || document.querySelector('.map-container, #map'),
     });
 
     if (hero) s.push({
       kicker: '04 · LE CASH', title: 'Dette ou fonds propres ? Je compare sur le même site.',
-      body: 'Point mort en adhérents, IRR equity, payback — deux scénarios côte à côte, la Référence BP verrouillée comme garde-fou. Y compris le droit d’entrée master-franchise en un clic.',
-      run: async () => { closeAllPanels(); try { window.FcfStudio?.open?.(); } catch {} },
-      hold: 13000,
+      body: 'Point mort en adhérents, IRR equity, payback — deux scénarios côte à côte, la Référence BP verrouillée comme garde-fou. Même le droit d’entrée master-franchise, en un clic.',
+      run: async () => { closeAllPanels(); try { window.FcfStudio?.open?.(); } catch {} await wait(400); },
+      focus: () => { const p = $('fpFcfStudio'); return p && (findByText(p, /Point mort/) || p.querySelector('table')); },
     });
 
     if (savedSites().length >= 1) s.push({
       kicker: '05 · LA VUE D’ENSEMBLE', title: 'Tous mes sites, côte à côte.',
       body: 'FCFE cumulé, IRR equity, fonds propres à déployer, score moyen — le portefeuille d’expansion en une vue, exportable en un clic.',
-      run: async () => { closeAllPanels(); try { window.Portfolio?.open?.(); } catch {} },
-      hold: 12000,
+      run: async () => { closeAllPanels(); try { window.Portfolio?.open?.(); } catch {} await wait(400); },
+      focus: () => { const p = $('fpPortfolio'); return p && (findByText(p, /FCFE|EQUITY|MEMBRES/i) || p.firstElementChild); },
     });
 
     s.push({
       kicker: '06 · LA STRATÉGIE', title: 'Combien de clubs, dans quel ordre, avec quel financement.',
       body: 'Le plan de conquête séquence les ouvertures sous contrainte de cash : fonds propres d’abord, banque dès que je suis bancable. 3 stratégies comparées.',
-      run: async () => { closeAllPanels(); try { window.ConquestPlan?.open?.(); } catch {} },
-      hold: 13000,
+      run: async () => { closeAllPanels(); try { window.ConquestPlan?.open?.(); } catch {} await wait(400); },
+      focus: () => { const p = $('fpConquest'); return p && (findByText(p, /SCÉNARIO|clubs en/i) || p.querySelector('header')); },
     });
 
     s.push({
@@ -129,7 +130,7 @@
     return s;
   }
 
-  // ── Overlay cinématique ─────────────────────────────────────────────
+  // ── CSS ─────────────────────────────────────────────────────────────
   function injectCss() {
     if ($('fpShowreelCss')) return;
     const st = document.createElement('style');
@@ -137,27 +138,38 @@
     st.textContent = `
     #fpShowreel{position:fixed;inset:0;z-index:100060;pointer-events:none;font-family:var(--font,sans-serif);opacity:0;transition:opacity .5s ease}
     #fpShowreel.on{opacity:1}
-    .fpsr-bar{position:absolute;left:0;right:0;height:56px;background:linear-gradient(rgba(4,6,12,.92),rgba(4,6,12,0));pointer-events:none}
-    .fpsr-bar.bottom{bottom:0;top:auto;background:linear-gradient(rgba(4,6,12,0),rgba(4,6,12,.92));height:230px}
-    #fpsrCard{position:absolute;left:36px;bottom:46px;max-width:620px;pointer-events:auto;
-      background:linear-gradient(135deg,rgba(14,20,34,.9),rgba(10,14,26,.86));backdrop-filter:blur(14px);
-      border:1px solid rgba(212,160,23,.35);border-left:3px solid var(--accent,#d4a017);border-radius:16px;
-      padding:20px 24px;box-shadow:0 24px 70px rgba(0,0,0,.6);transform:translateY(14px);opacity:0;transition:all .55s cubic-bezier(.16,1,.3,1)}
+    /* SPOTLIGHT — assombrit tout sauf l'élément clé */
+    #fpsrSpot{position:fixed;border-radius:16px;pointer-events:none;z-index:100061;
+      box-shadow:0 0 0 4px rgba(212,160,23,.9), 0 0 0 9999px rgba(5,7,13,.74), 0 0 60px rgba(212,160,23,.55) inset;
+      transition:all .6s cubic-bezier(.16,1,.3,1);opacity:0}
+    #fpsrSpot.on{opacity:1}
+    #fpsrSpot::after{content:'';position:absolute;inset:-4px;border-radius:18px;border:2px solid rgba(244,214,126,.9);animation:fpsrRing 2.2s ease-in-out infinite}
+    @keyframes fpsrRing{0%,100%{box-shadow:0 0 12px rgba(212,160,23,.4);opacity:.65}50%{box-shadow:0 0 26px rgba(244,214,126,.85);opacity:1}}
+    /* letterbox léger quand pas de spotlight */
+    .fpsr-bar{position:absolute;left:0;right:0;height:60px;background:linear-gradient(rgba(4,6,12,.9),rgba(4,6,12,0));pointer-events:none;z-index:100062;transition:opacity .5s}
+    .fpsr-bar.bottom{bottom:0;top:auto;background:linear-gradient(rgba(4,6,12,0),rgba(4,6,12,.94));height:240px}
+    #fpShowreel.spot .fpsr-bar{opacity:0}
+    #fpsrCard{position:absolute;left:38px;bottom:48px;max-width:640px;pointer-events:auto;z-index:100064;
+      background:linear-gradient(135deg,rgba(15,21,36,.94),rgba(9,13,24,.9));backdrop-filter:blur(18px);
+      border:1px solid rgba(212,160,23,.4);border-left:3px solid var(--accent,#d4a017);border-radius:18px;
+      padding:22px 26px;box-shadow:0 30px 80px rgba(0,0,0,.66);transform:translateY(16px) scale(.98);opacity:0;transition:all .6s cubic-bezier(.16,1,.3,1)}
     #fpsrCard.show{transform:none;opacity:1}
-    #fpsrKicker{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--accent,#d4a017);text-transform:uppercase;margin-bottom:8px}
-    #fpsrTitle{font-family:var(--font-display,var(--font));font-size:26px;font-weight:900;line-height:1.15;color:#fff;letter-spacing:-.5px;margin-bottom:9px}
-    #fpsrBody{font-size:14.5px;line-height:1.55;color:#cbd5e1;font-weight:400}
-    #fpsrDots{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:flex;gap:7px;pointer-events:auto}
+    #fpsrKicker{font-size:11px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:9px;
+      background:linear-gradient(90deg,#d4a017,#f4d67e,#d4a017);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:fpsrSheen 4s linear infinite}
+    @keyframes fpsrSheen{to{background-position:200% center}}
+    #fpsrTitle{font-family:var(--font-display,var(--font));font-size:27px;font-weight:900;line-height:1.14;color:#fff;letter-spacing:-.5px;margin-bottom:10px}
+    #fpsrBody{font-size:15px;line-height:1.55;color:#cbd5e1;font-weight:400}
+    #fpsrDots{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;gap:7px;pointer-events:auto;z-index:100064}
     .fpsr-dot{width:8px;height:8px;border-radius:50%;background:rgba(148,163,184,.35);transition:all .35s ease;cursor:pointer}
-    .fpsr-dot.on{background:var(--accent,#d4a017);width:26px;border-radius:6px;box-shadow:0 0 12px rgba(212,160,23,.6)}
-    #fpsrCtrl{position:absolute;right:28px;bottom:52px;display:flex;align-items:center;gap:10px;pointer-events:auto}
-    .fpsr-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(212,160,23,.4);background:rgba(14,20,34,.85);
-      color:#fff;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);transition:all .2s}
-    .fpsr-btn:hover{background:var(--accent,#d4a017);color:#0a0d16;transform:translateY(-2px)}
-    #fpsrHint{position:absolute;right:28px;bottom:22px;font-size:10px;color:#64748b;pointer-events:none;letter-spacing:.3px}
-    #fpsrBadge{position:absolute;top:16px;right:24px;font-size:10px;font-weight:800;letter-spacing:1px;color:#64748b;pointer-events:none}
-    #fpsrProg{position:absolute;top:0;left:0;height:2px;background:linear-gradient(90deg,#d4a017,#f4d67e);width:0;transition:width .4s ease;box-shadow:0 0 10px rgba(212,160,23,.7)}
-    @media (prefers-reduced-motion:reduce){#fpShowreel,#fpsrCard{transition:none}}
+    .fpsr-dot.on{background:var(--accent,#d4a017);width:28px;border-radius:6px;box-shadow:0 0 14px rgba(212,160,23,.7)}
+    #fpsrCtrl{position:absolute;right:30px;bottom:54px;display:flex;align-items:center;gap:11px;pointer-events:auto;z-index:100064}
+    .fpsr-btn{width:46px;height:46px;border-radius:50%;border:1px solid rgba(212,160,23,.45);background:rgba(15,21,36,.9);
+      color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);transition:all .2s}
+    .fpsr-btn:hover{background:var(--accent,#d4a017);color:#0a0d16;transform:translateY(-2px) scale(1.06)}
+    #fpsrHint{position:absolute;right:30px;bottom:22px;font-size:10px;color:#64748b;pointer-events:none;letter-spacing:.4px;z-index:100064}
+    #fpsrBadge{position:absolute;top:18px;right:26px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#94a3b8;pointer-events:none;z-index:100064}
+    #fpsrProg{position:absolute;top:0;left:0;height:3px;background:linear-gradient(90deg,#d4a017,#f4d67e);width:0;transition:width .5s cubic-bezier(.16,1,.3,1);box-shadow:0 0 12px rgba(212,160,23,.8);z-index:100064}
+    @media (prefers-reduced-motion:reduce){#fpShowreel,#fpsrCard,#fpsrSpot{transition:none}#fpsrSpot::after,#fpsrKicker{animation:none}}
     `;
     document.head.appendChild(st);
   }
@@ -168,21 +180,15 @@
     const o = document.createElement('div');
     o.id = 'fpShowreel';
     o.innerHTML = `
-      <div class="fpsr-bar top"></div>
-      <div class="fpsr-bar bottom"></div>
-      <div id="fpsrProg"></div>
-      <div id="fpsrBadge">🎬 DÉMO GUIDÉE</div>
+      <div class="fpsr-bar top"></div><div class="fpsr-bar bottom"></div>
+      <div id="fpsrProg"></div><div id="fpsrBadge">🎬 DÉMO GUIDÉE</div>
       <div id="fpsrDots"></div>
-      <div id="fpsrCard">
-        <div id="fpsrKicker"></div>
-        <div id="fpsrTitle"></div>
-        <div id="fpsrBody"></div>
-      </div>
+      <div id="fpsrCard"><div id="fpsrKicker"></div><div id="fpsrTitle"></div><div id="fpsrBody"></div></div>
       <div id="fpsrCtrl">
         <button class="fpsr-btn" id="fpsrPrev" title="Précédent (←)">‹</button>
         <button class="fpsr-btn" id="fpsrPlay" title="Lecture auto (Espace)">▶</button>
         <button class="fpsr-btn" id="fpsrNext" title="Suivant (→)">›</button>
-        <button class="fpsr-btn" id="fpsrExit" title="Quitter (Échap)" style="border-color:rgba(239,68,68,.5)">✕</button>
+        <button class="fpsr-btn" id="fpsrExit" title="Quitter (Échap)" style="border-color:rgba(239,68,68,.55)">✕</button>
       </div>
       <div id="fpsrHint">← → naviguer · Espace lecture auto · Échap quitter</div>`;
     document.body.appendChild(o);
@@ -190,7 +196,43 @@
     $('fpsrNext').onclick = () => go(idx + 1);
     $('fpsrExit').onclick = () => stop();
     $('fpsrPlay').onclick = () => toggleAuto();
-    requestAnimationFrame(() => o.classList.add('on'));
+    // setTimeout plutôt que rAF : le rAF est suspendu si l'onglet est en
+    // arrière-plan → l'overlay resterait invisible. setTimeout tient bon.
+    setTimeout(() => o.classList.add('on'), 20);
+  }
+
+  // ── Spotlight ───────────────────────────────────────────────────────
+  function clearSpotlight() {
+    cancelAnimationFrame(spotRAF); spotRAF = null;
+    const s = $('fpsrSpot'); if (s) { s.classList.remove('on'); setTimeout(() => s.remove(), 350); }
+    $('fpShowreel')?.classList.remove('spot');
+    window.removeEventListener('scroll', trackSpot, true);
+    window.removeEventListener('resize', trackSpot);
+  }
+  let _spotTarget = null;
+  function trackSpot() {
+    const s = $('fpsrSpot'), t = _spotTarget;
+    if (!s || !t || !t.isConnected) return;
+    const r = t.getBoundingClientRect();
+    const pad = 12;
+    s.style.top = Math.max(6, r.top - pad) + 'px';
+    s.style.left = Math.max(6, r.left - pad) + 'px';
+    s.style.width = Math.min(window.innerWidth - 12, r.width + pad * 2) + 'px';
+    s.style.height = Math.min(window.innerHeight - 12, r.height + pad * 2) + 'px';
+  }
+  async function spotlight(target) {
+    clearSpotlight();
+    if (!target || !target.getBoundingClientRect) return;
+    try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+    await wait(420);
+    _spotTarget = target;
+    const s = document.createElement('div');
+    s.id = 'fpsrSpot';
+    ($('fpShowreel') || document.body).appendChild(s);
+    trackSpot();
+    setTimeout(() => { s.classList.add('on'); $('fpShowreel')?.classList.add('spot'); }, 20);
+    window.addEventListener('scroll', trackSpot, true);
+    window.addEventListener('resize', trackSpot);
   }
 
   function renderDots() {
@@ -198,41 +240,44 @@
     d.innerHTML = scenes.map((_, i) => `<div class="fpsr-dot${i === idx ? ' on' : ''}" data-i="${i}"></div>`).join('');
     d.querySelectorAll('.fpsr-dot').forEach(el => el.onclick = () => go(+el.dataset.i));
   }
-
-  const val = (v) => (typeof v === 'function' ? v() : v);
+  function renderLegend(sc) {
+    if ($('fpsrKicker')) $('fpsrKicker').textContent = val(sc.kicker) || '';
+    if ($('fpsrTitle')) $('fpsrTitle').textContent = val(sc.title) || '';
+    if ($('fpsrBody')) $('fpsrBody').innerHTML = val(sc.body) || '';
+  }
 
   async function go(i) {
     if (!running || busy) return;
     if (i < 0 || i >= scenes.length) return;
-    busy = true;
-    clearTimeout(autoTimer);
+    busy = true; clearTimeout(autoTimer); clearSpotlight();
     idx = i;
     const sc = scenes[i];
     const card = $('fpsrCard');
     card?.classList.remove('show');
-    $('fpsrProg').style.width = ((i) / (scenes.length - 1) * 100) + '%';
+    if ($('fpsrProg')) $('fpsrProg').style.width = (i / (scenes.length - 1) * 100) + '%';
     renderDots();
-    await wait(180);
-    try { await sc.run?.(); } catch (e) { console.warn('[showreel] scene', i, e); }
-    // légende (peut dépendre de données fraîchement calculées → lue après run)
-    if ($('fpsrKicker')) $('fpsrKicker').textContent = val(sc.kicker) || '';
-    if ($('fpsrTitle')) $('fpsrTitle').textContent = val(sc.title) || '';
-    if ($('fpsrBody')) $('fpsrBody').innerHTML = val(sc.body) || '';
-    // garde l'overlay au-dessus des panneaux qui viennent de s'ouvrir
-    const o = $('fpShowreel'); if (o) document.body.appendChild(o);
+    await wait(200);
+    // 1) légende IMMÉDIATE — l'histoire s'affiche sans attendre le calcul
+    renderLegend(sc);
     card?.classList.add('show');
     busy = false;
-    if (autoplay) autoTimer = setTimeout(() => go(idx + 1), sc.hold || 8500);
+    // 2) action en arrière-plan, plafonnée → jamais de blocage
+    capRun(sc.run, 16000).then(async () => {
+      if (!running || idx !== i) return;
+      renderLegend(sc);                        // rafraîchit avec les données calculées
+      const o = $('fpShowreel'); if (o) document.body.appendChild(o); // reste au-dessus des panneaux
+      let tgt = null; try { tgt = sc.focus && sc.focus(); } catch {}
+      if (tgt) await spotlight(tgt);           // 3) guide l'œil sur l'élément clé
+    });
+    if (autoplay) autoTimer = setTimeout(() => go(idx + 1), sc.hold || 9000);
   }
 
   function toggleAuto() {
     autoplay = !autoplay;
-    const b = $('fpsrPlay');
-    if (b) { b.textContent = autoplay ? '⏸' : '▶'; b.classList.toggle('on', autoplay); }
+    const b = $('fpsrPlay'); if (b) { b.textContent = autoplay ? '⏸' : '▶'; b.classList.toggle('on', autoplay); }
     clearTimeout(autoTimer);
-    if (autoplay && running) autoTimer = setTimeout(() => go(idx + 1), (scenes[idx]?.hold || 8500));
+    if (autoplay && running) autoTimer = setTimeout(() => go(idx + 1), scenes[idx]?.hold || 9000);
   }
-
   function onKey(e) {
     if (!running) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
@@ -241,13 +286,11 @@
     else if (e.key === 'Escape') { e.preventDefault(); stop(); }
   }
 
-  // ── API ─────────────────────────────────────────────────────────────
   function start() {
     if (running) return;
     scenes = buildScenes();
     if (!scenes.length) return;
     running = true; idx = 0; autoplay = false;
-    // active le mode présentation (typo agrandie, contrôles techniques masqués)
     try { window.PresentationMode?.toggle?.(true); } catch {}
     buildOverlay();
     document.addEventListener('keydown', onKey, true);
@@ -255,17 +298,15 @@
   }
   function stop() {
     running = false; autoplay = false;
-    clearTimeout(autoTimer);
+    clearTimeout(autoTimer); clearSpotlight();
     document.removeEventListener('keydown', onKey, true);
     closeAllPanels();
     try { window.PresentationMode?.toggle?.(false); } catch {}
-    const o = $('fpShowreel');
-    if (o) { o.classList.remove('on'); setTimeout(() => o.remove(), 500); }
+    const o = $('fpShowreel'); if (o) { o.classList.remove('on'); setTimeout(() => o.remove(), 500); }
   }
-
   window.Showreel = { start, stop };
 
-  // ── Bouton 🎬 dans le header, à côté du 🎥 (desktop) ────────────────
+  // ── Bouton 🎬 dans le header ────────────────────────────────────────
   function installButton(tries) {
     if (window.innerWidth <= 768) return;
     if ($('fpShowreelBtn')) return;
