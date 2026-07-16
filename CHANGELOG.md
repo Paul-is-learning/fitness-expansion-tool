@@ -1,6 +1,30 @@
 
 # Changelog
 
+## [v7.08-no-emdash] — 2026-07-16
+
+### ✒️ Plus de tirets longs dans le SaaS
+
+Demande Paul : « retire les tirets longs (— –) de tout le SaaS, je n'aime
+pas. » Choix du remplacement : le **point médian « · »**, déjà le séparateur
+maison partout dans l'app.
+
+- Nouveau module `src/no-emdash.js` : balayage au chargement + `MutationObserver`
+  qui nettoie tout texte rendu ensuite (fiche d'analyse, réponses IA, Intel
+  concurrence, popups carte, i18n…). Nettoie aussi les infobulles (`title`,
+  `placeholder`, `aria-label`, `alt`) et le titre d'onglet.
+- N'agit que sur le **texte affiché** — jamais le code ni les commentaires.
+  Les fourchettes chiffrées (« 46–90 ») deviennent « 46-90 » (tiret court),
+  pas un point médian, pour rester lisibles. Champs de saisie / zones éditables
+  laissés intacts.
+- `api/analyst.js` : le prompt interdit désormais à l'IA de produire des tirets
+  longs (virgule, point médian ou deux-points à la place).
+
+Vérifié navigateur : 0 tiret long dans le texte ET les attributs, y compris sur
+contenu dynamique (test « alpha — beta » → « alpha · beta »).
+
+---
+
 ## [v7.07-tour-fix] — 2026-07-16
 
 ### 🎯 Démo guidée — surlignage « mal calibré » corrigé (scènes fiche)

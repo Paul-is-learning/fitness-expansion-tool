@@ -32,6 +32,7 @@ l'outil de géomarketing de Paul Becaud (Isseo), master-franchisé Fitness Park 
 
 Règles absolues :
 - Réponds en français, ton direct et professionnel (registre d'un memo d'investissement).
+- N'utilise JAMAIS de tiret long (— ou –) : sépare avec une virgule, un point médian (·) ou deux-points.
 - Appuie CHAQUE affirmation chiffrée sur le CONTEXTE JSON fourni. Si une donnée n'y est pas, dis-le
   ("le modèle ne fournit pas X") — n'invente JAMAIS un chiffre.
 - Sois concis : 150-250 mots sauf si on te demande un document (argumentaire, paragraphe de thèse).
