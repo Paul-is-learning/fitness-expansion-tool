@@ -52,6 +52,19 @@
   }
   const savedSites = () => (window._siteAnalyses || []).slice().sort((a, b) => (b.execScore || 0) - (a.execScore || 0));
 
+  // Remonte jusqu'à un ancêtre d'une taille « bloc » — pour ne pas surligner
+  // un minuscule label (« 🟢 Saine ») mais la carte entière qui le contient.
+  function blockOf(el, minW, minH) {
+    minW = minW || 200; minH = minH || 48;
+    let e = el;
+    for (let i = 0; i < 6 && e && e.getBoundingClientRect; i++) {
+      const r = e.getBoundingClientRect();
+      if (r.width >= minW && r.height >= minH) return e;
+      e = e.parentElement;
+    }
+    return el;
+  }
+
   // Trouve l'élément le plus pertinent contenant un texte (pour le spotlight)
   function findByText(root, re, maxLen = 400) {
     if (!root) return null;
@@ -67,64 +80,124 @@
     return best;
   }
 
-  // ── Scènes (dynamiques, avec cible de focus) ────────────────────────
+  // ── Site HÉROS unique + données cohérentes ──────────────────────────
+  // v7.06 : le tour choisit UN site au départ, l'analyse UNE fois, et TOUTES
+  // les scènes « site » lisent SES chiffres (via son entrée _siteAnalyses,
+  // matchée par coordonnées) — plus jamais les chiffres d'un autre site.
+  const T = { hero: null };
+  function pickHero() {
+    const saved = savedSites();
+    // 1er choix : un site sauvegardé qui correspond à un TARGET (analysable
+    // proprement) ; sinon le meilleur sauvegardé ; sinon le flagship TARGETS[0].
+    const isTarget = s => typeof TARGETS !== 'undefined' && TARGETS.some(t => Math.abs(t.lat - s.lat) < 0.01 && Math.abs(t.lng - s.lng) < 0.01);
+    const h = saved.find(isTarget) || saved[0] || (typeof TARGETS !== 'undefined' && TARGETS[0]) || null;
+    return h ? { name: h.name, lat: h.lat, lng: h.lng } : null;
+  }
+  // Chiffres du héros lus dans _siteAnalyses (rempli à l'analyse) — cohérents
+  // avec ce qui est à l'écran, car c'est LE site qu'on vient d'analyser.
+  function heroData() {
+    const h = T.hero; if (!h) return {};
+    const e = (window._siteAnalyses || []).find(s => Math.abs(s.lat - h.lat) < 0.006 && Math.abs(s.lng - h.lng) < 0.006);
+    return e || {};
+  }
+  const vlabel = v => (typeof v === 'object' && v ? (v.label || v.text || 'Décision') : (v || 'Décision'));
+  // Le bloc point mort a un ID dupliqué (2 onglets) : renvoie le VISIBLE.
+  function visibleBreakeven() {
+    return [...document.querySelectorAll('[id="pnl-breakeven-block"]')].find(b => b.getBoundingClientRect().height > 20) || null;
+  }
+
+  // ── Scènes : narration logique, spotlight = ce que dit la légende ──
   function buildScenes() {
-    const sites = savedSites();
-    const hero = sites[0] || (typeof TARGETS !== 'undefined' && TARGETS[0] ? { name: TARGETS[0].name, lat: TARGETS[0].lat, lng: TARGETS[0].lng } : null);
+    T.hero = pickHero();
+    const hero = T.hero;
     const s = [];
 
+    // 00 — Intro : vue marché
     s.push({
-      kicker: 'EXPANSION INTELLIGENCE', title: 'De l’adresse au business plan, en direct.',
-      body: 'Un outil qui transforme un point sur la carte en décision d’investissement chiffrée. Laisse-moi te montrer — je ne touche qu’aux flèches.',
-      run: async () => { closeAllPanels(); try { window.setAnalyzingLayout?.(false); } catch {} try { window._fpMap?.flyTo([44.43, 26.10], 11, { duration: 1.2 }); } catch {} },
+      kicker: 'EXPANSION INTELLIGENCE', title: 'Le cockpit d’expansion de Fitness Park Romania.',
+      body: 'Géomarketing, modélisation financière et stratégie multi-sites dans un seul outil. En 2 minutes, du marché brut à la décision d’investissement. Je ne touche qu’aux flèches.',
+      run: async () => { closeAllPanels(); try { window.setAnalyzingLayout?.(false); } catch {} try { window._fpMap?.setView?.([44.43, 26.10], 11); } catch {} },
     });
 
+    // 01 — Le marché : Intel concurrence (bilans officiels + santé)
+    s.push({
+      kicker: '01 · LE MARCHÉ', title: 'Je connais mes concurrents mieux qu’eux-mêmes.',
+      body: 'Bilans officiels ANAF, chiffre d’affaires, santé financière de chaque enseigne — 100 % public et légal. World Class, Stay Fit, 18GYM : je vois qui est solide et qui est fragile.',
+      run: async () => { closeAllPanels(); try { window.CompetitorIntel?.open?.(); } catch {} await wait(500); try { window.CompetitorIntel?.tab?.('marche'); } catch {} await wait(300); },
+      focus: () => { const p = $('ciPanel'); if (!p) return null; const t = findByText(p, /World Class/) || findByText(p, /Saine|À risque|Sous pression|Fragile/); return t ? blockOf(t, 230, 70) : p.querySelector('div'); },
+    });
+
+    // 02 — La concurrence géolocalisée : carte + filtre par enseigne
+    s.push({
+      kicker: '02 · LE TERRAIN', title: 'Chaque salle concurrente, géolocalisée et filtrable.',
+      body: 'Toute la concurrence de Bucarest sur la carte, avec les logos des enseignes. Je filtre par marque, je vois les zones saturées et les trous à conquérir.',
+      run: async () => {
+        closeAllPanels();
+        try { window.switchTab?.('explore'); } catch {}
+        try { window._fpMap?.invalidateSize?.(false); } catch {}
+        try { window.toggleAllBrands?.(true); } catch {}
+        try { window._fpMap?.setView?.([44.43, 26.10], 12); } catch {}
+        await wait(400);
+      },
+      focus: () => document.getElementById('brandFilterExplorer') || document.getElementById('brandFilters'),
+    });
+
+    // 03 — Je choisis un site : analyse temps réel
     if (hero) s.push({
-      kicker: '01 · L’ANALYSE', title: `Je pose un site : ${hero.name}.`,
-      body: 'L’outil croise en temps réel la population captable, les transports, les universités, les bureaux — et toute la concurrence géolocalisée.',
+      kicker: '03 · L’ANALYSE', title: `Je pose un site : ${hero.name}.`,
+      body: 'Population captable, transports, universités, pôles bureaux, concurrence — l’outil croise tout en temps réel et sort un score d’attractivité en quelques secondes.',
       run: async () => { closeAllPanels(); await analyzeAndWait(hero); },
-      focus: () => $('captageContentSite'),
+      focus: () => { const c = $('captageContentSite'); return c && (c.querySelector('.saz-hero') || c.querySelector('.saz-number') || findByText(c, /sur 100/)); },
     });
 
+    // 04 — Le verdict : chiffres du MÊME site
     if (hero) s.push({
-      kicker: '02 · LE VERDICT', title: () => { const h = savedSites()[0] || hero; return `${h.verdict || 'Décision'} · Score ${h.execScore ?? '—'}/100.`; },
-      body: () => { const h = savedSites()[0] || hero; return `${fmtN(h.totalTheo)} adhérents potentiels · IRR projet ${h.irrBase ?? '—'} % · IRR equity ${h.irrEquity ?? '—'} %. La décision d’abord, la démonstration ensuite.`; },
-      run: async () => { try { window.switchTab?.('site'); } catch {} const c = $('captageContentSite'); try { c?.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} },
-      focus: () => { const c = $('captageContentSite'); return c && (c.querySelector('.saz-hero') || c.querySelector('.reco-chip') || findByText(c, /sur 100|GO|WATCH|NO GO/)); },
+      kicker: '04 · LE VERDICT', title: () => { const d = heroData(); return `${vlabel(d.verdict)} · ${fmtN(d.totalTheo)} adhérents potentiels.`; },
+      // NB : pas de « score /100 » ici — le gros chiffre à l'écran est le SAZ
+      // (attractivité), distinct du verdict. On cite le verdict + les chiffres
+      // financiers (identiques aux tuiles surlignées) pour rester cohérent.
+      body: () => { const d = heroData(); return `La décision d’abord : IRR equity ${d.irrEquity != null ? Math.round(d.irrEquity) + ' %' : '—'}, FCFE 5 ans ${d.fcfe5y != null ? fmtN(Math.round(d.fcfe5y / 1000)) + ' k€' : '—'}, apport revenu en ${d.paybackEquity ? 'M' + d.paybackEquity : '—'}. Puis la démonstration chiffrée derrière.`; },
+      run: async () => { try { window.switchTab?.('site'); } catch {} await wait(200); const c = $('captageContentSite'); try { c && c.scrollTo({ top: 0, behavior: 'smooth' }); } catch {} },
+      focus: () => { const c = $('captageContentSite'); if (!c) return null; const t = findByText(c, /MEMBRES À MATURITÉ|IRR EQUITY|RETOUR DE L/); return t ? blockOf(t, 300, 60) : findByText(c, /EN CLAIR/); },
     });
 
-    s.push({
-      kicker: '03 · LE TERRAIN', title: 'Chaque concurrent, géolocalisé — avec son logo.',
-      body: 'World Class, Stay Fit, 18GYM, Downtown… je sais exactement qui m’entoure, à quelle distance, et quelle est leur menace.',
-      run: async () => { try { window.switchTab?.('compete'); } catch {} try { window.toggleAllBrands?.(true); } catch {} try { window._fpMap?.flyTo([44.43, 26.10], 12, { duration: 1.2 }); } catch {} },
-      focus: () => document.getElementById('brandFilters') || document.querySelector('.map-container, #map'),
-    });
-
+    // 05 — Forces / faiblesses en langage décideur (bloc Risques & Opportunités)
     if (hero) s.push({
-      kicker: '04 · LE CASH', title: 'Dette ou fonds propres ? Je compare sur le même site.',
-      body: 'Point mort en adhérents, IRR equity, payback — deux scénarios côte à côte, la Référence BP verrouillée comme garde-fou. Même le droit d’entrée master-franchise, en un clic.',
-      run: async () => { closeAllPanels(); try { window.FcfStudio?.open?.(); } catch {} await wait(400); },
-      focus: () => { const p = $('fpFcfStudio'); return p && (findByText(p, /Point mort/) || p.querySelector('table')); },
+      kicker: '05 · EN CLAIR', title: 'Forces, faiblesses et synthèse — en langage décideur.',
+      body: 'Pas de jargon : l’outil liste les risques et les opportunités du site, et résume le potentiel en une phrase. La lecture qu’un dirigeant fait en 5 secondes avant de trancher.',
+      run: async () => { try { window.switchTab?.('site'); } catch {} await wait(250); const c = $('captageContentSite'); const t = c && (findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/)); try { t && t.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {} },
+      focus: () => { const c = $('captageContentSite'); const t = c && (findByText(c, /Opportunités/) || findByText(c, /EN CLAIR/)); return t ? blockOf(t, 320, 60) : (c && (findByText(c, /MEMBRES À MATURITÉ/) || c.firstElementChild)); },
     });
 
-    if (savedSites().length >= 1) s.push({
-      kicker: '05 · LA VUE D’ENSEMBLE', title: 'Tous mes sites, côte à côte.',
-      body: 'FCFE cumulé, IRR equity, fonds propres à déployer, score moyen — le portefeuille d’expansion en une vue, exportable en un clic.',
-      run: async () => { closeAllPanels(); try { window.Portfolio?.open?.(); } catch {} await wait(400); },
-      focus: () => { const p = $('fpPortfolio'); return p && (findByText(p, /FCFE|EQUITY|MEMBRES/i) || p.firstElementChild); },
+    // 06 — Point mort + modularité financière : Studio FCF (fiable, complet)
+    if (hero) s.push({
+      kicker: '06 · LE POINT MORT & LA MODULARITÉ', title: 'Combien d’adhérents pour être rentable — et je change tout en direct.',
+      body: 'Point mort en adhérents, dette ou 100 % fonds propres, CAPEX, loyer, multiple de sortie, droit d’entrée master-franchise (+400 k€) : je coche, je décoche, je compare deux scénarios côte à côte. La Référence BP reste verrouillée comme garde-fou.',
+      run: async () => { closeAllPanels(); try { window.FcfStudio?.open?.(); } catch {} await wait(500); },
+      focus: () => { const p = $('fpFcfStudio'); return p && (findByText(p, /Point mort FCFE/) || findByText(p, /Master-franchise/) || p.querySelector('table')); },
     });
 
+    // 07 — Le portefeuille : consolidation
     s.push({
-      kicker: '06 · LA STRATÉGIE', title: 'Combien de clubs, dans quel ordre, avec quel financement.',
-      body: 'Le plan de conquête séquence les ouvertures sous contrainte de cash : fonds propres d’abord, banque dès que je suis bancable. 3 stratégies comparées.',
-      run: async () => { closeAllPanels(); try { window.ConquestPlan?.open?.(); } catch {} await wait(400); },
-      focus: () => { const p = $('fpConquest'); return p && (findByText(p, /SCÉNARIO|clubs en/i) || p.querySelector('header')); },
+      kicker: '07 · LE PORTEFEUILLE', title: 'Tous mes sites consolidés, en une vue.',
+      body: 'Membres cumulés, FCFE 5 ans du portefeuille, fonds propres à déployer, score moyen — triable, exportable en Excel. La vision d’ensemble pour arbitrer.',
+      run: async () => { closeAllPanels(); try { window.Portfolio?.open?.(); } catch {} await wait(500); },
+      focus: () => { const p = $('fpPortfolio'); if (!p) return null; const t = findByText(p, /FCFE 5 ANS|MEMBRES CUMULÉS|SITES GO/); return t ? blockOf(t, 320, 60) : p.firstElementChild; },
     });
 
+    // 08 — La stratégie : plan de conquête
     s.push({
-      kicker: 'EXPANSION INTELLIGENCE', title: 'De la donnée brute à la décision d’investissement.',
-      body: 'Géomarketing, modélisation financière, plan de conquête — un seul outil, du site au business plan. Des questions ?',
-      run: async () => { closeAllPanels(); try { window.setAnalyzingLayout?.(false); } catch {} try { window._fpMap?.flyTo([44.43, 26.10], 11, { duration: 1.4 }); } catch {} },
+      kicker: '08 · LA STRATÉGIE', title: 'Combien de clubs, dans quel ordre, avec quel financement.',
+      body: 'Le plan de conquête séquence les ouvertures sous contrainte de cash : fonds propres d’abord, banque dès que je suis bancable. Cannibalisation modélisée, 3 stratégies de financement comparées.',
+      run: async () => { closeAllPanels(); try { window.ConquestPlan?.open?.(); } catch {} await wait(500); },
+      focus: () => { const p = $('fpConquest'); return p && (findByText(p, /Tu ouvres|SCÉNARIO/) || p.querySelector('header')); },
+    });
+
+    // 09 — Clôture
+    s.push({
+      kicker: 'EXPANSION INTELLIGENCE', title: 'Un seul outil, du marché à la décision.',
+      body: 'Géomarketing, modélisation financière modulable, portefeuille consolidé, plan de conquête. Modulable, chiffré, sourcé. Des questions ?',
+      run: async () => { closeAllPanels(); try { window.setAnalyzingLayout?.(false); } catch {} try { window._fpMap?.setView?.([44.43, 26.10], 11); } catch {} },
     });
 
     return s;
@@ -223,8 +296,10 @@
   async function spotlight(target) {
     clearSpotlight();
     if (!target || !target.getBoundingClientRect) return;
-    try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
-    await wait(420);
+    // v7.06 — scroll INSTANTANÉ (pas 'smooth') : un scroll fluide n'était pas
+    // terminé quand on positionnait le halo → cible profonde ratée (hors écran).
+    try { target.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
+    await wait(260);
     _spotTarget = target;
     const s = document.createElement('div');
     s.id = 'fpsrSpot';

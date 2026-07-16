@@ -1,6 +1,42 @@
 
 # Changelog
 
+## [v7.06-tour] — 2026-07-16
+
+### 🎬 Démo guidée refondue — 10 scènes, cohérente et complète
+
+La visite guidée était incohérente (surlignages à côté, données qui
+changeaient d'une scène à l'autre). Réécrite de fond en comble en un récit
+logique de 10 scènes, **du marché brut à la décision d'investissement**,
+sur un seul et même site fil-rouge (Hala Laminor) — les chiffres restent
+identiques d'une scène à l'autre.
+
+- **Cohérence des données** : un site « héros » est choisi une fois
+  (site sauvegardé ↔ cible ↔ 1re analyse), puis relu par coordonnées dans
+  `_siteAnalyses` à chaque scène. Le verdict cité (7 093 membres, IRR
+  equity 106 %, FCFE 5 ans 2 192 k€, retour M30) colle exactement aux
+  tuiles affichées.
+- **Récit en 10 temps** : 00 intro cockpit · 01 le marché (bilans ANAF,
+  santé concurrents) · 02 le terrain (concurrence géolocalisée, filtres
+  par marque) · 03 l'analyse (SAZ, population captable) · 04 le verdict
+  (GO conditionnel, 4 tuiles décision) · 05 en clair (risques /
+  opportunités en langage décideur) · 06 le point mort & la modularité
+  (Studio FCF, 2 scénarios, +400 k€ master-franchise) · 07 le portefeuille
+  (5 sites consolidés) · 08 la stratégie (Plan de Conquête, 3 financements)
+  · 09 clôture (« un seul outil, du marché à la décision »).
+- **Surlignages précis** : nouveau `blockOf()` qui remonte au vrai bloc
+  visible (≥ 320×60) au lieu d'un mini-label, scroll instantané
+  (`block:'center'`) pour que la zone soit toujours à l'écran.
+- **Sortie propre** : `invalidateSize` de la carte au `stop()` — plus de
+  carte à 0 de hauteur après la démo.
+
+Vérifié navigateur, scènes 00→09 : données identiques Hala Laminor
+(70.4/100, 7 093, 106 %, 2 192 k€, M30) sur fiche, matrice et portefeuille,
+surlignages bien cadrés, sortie qui restaure la carte. Nettoyage : suppression
+du stub mort `src/route-view.js` (le moteur d'itinéraires vit dans app-core).
+
+---
+
 ## [v7.05-routes] — 2026-07-16
 
 ### 🧭 Itinéraires concurrent → mon club (voiture & à pied)
