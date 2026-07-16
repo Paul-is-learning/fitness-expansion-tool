@@ -53,7 +53,13 @@
   }
 
   // ─── P&L d'un site (sandbox) ──────────────────────────────────────
-  // financingMode: 'ref' (financement global actuel) | 'equity' (0 dette)
+  // financingMode définit une structure de financement FIXE pour comparer
+  // les scénarios, INDÉPENDANTE du réglage P&L global de l'app :
+  //   'ref'    → structure BP de référence verrouillée (30% FP / 70% dette)
+  //              = _financingOverride null → buildPnL retombe sur PNL_DEFAULTS
+  //   'equity' → 100% fonds propres, zéro dette
+  // (Avant v6.89 : 'ref' héritait du toggle global — si Paul avait mis le
+  //  P&L en 100% FP, le scénario « Dette » était identique à « Fonds propres ».)
   function sitePnl(site, cannibFactor, financingMode) {
     const saves = {
       rent: window._rentOverride, charge: window._chargeOverride,
@@ -64,7 +70,9 @@
       window._rentOverride    = window._rentOverrides?.[key]    ? { y1: window._rentOverrides[key] } : null;
       window._chargeOverride  = window._chargeOverrides?.[key]  ? { chargeTotal: window._chargeOverrides[key] } : null;
       window._surfaceOverride = window._surfaceOverrides?.[key] ? { surface: window._surfaceOverrides[key] } : null;
-      if (financingMode === 'equity') window._financingOverride = { enabled: false };
+      window._financingOverride = financingMode === 'equity'
+        ? { enabled: false }         // 100% fonds propres
+        : null;                      // 'ref' → BP 30/70 verrouillé (ignore le toggle global)
       const radius = window._radiusOverrides?.[key] || 3000;
       const r = runCaptageAnalysis(site.lat, site.lng, radius);
       let cohort = r.scenarios.base.cohort;

@@ -1,6 +1,20 @@
 
 # Changelog
 
+## [v6.89.1-conquest-fix] — 2026-07-16
+
+### 🔧 Plan de Conquête : les 3 scénarios sont enfin vraiment distincts
+
+Correctif : quand le P&L global était réglé en 100% fonds propres, le
+scénario « Dette dès le départ » héritait de ce réglage → les 3 scénarios
+affichaient des chiffres identiques. Désormais chaque scénario force sa
+propre structure de financement, **indépendamment du toggle P&L global** :
+« Dette » = BP 30/70 de référence (verrouillé), « Fonds propres » = zéro
+dette, « Hybride » = FP puis dette. Vérifié : pic 2,14 M€ (dette) vs
+3,75 M€ (fonds propres) vs 3,15 M€ (hybride) sur le même projet.
+
+---
+
 ## [v6.89-conquest-ux] — 2026-07-16
 
 ### 🗺️ Plan de Conquête refondu — clair, visuel, comparateur de scénarios
