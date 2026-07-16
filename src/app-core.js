@@ -6714,52 +6714,121 @@ function initSearch() {
   let timeout;
   const inp=el('searchInput'),res=el('searchResults');
   inp.addEventListener('input',()=>{clearTimeout(timeout);const q=inp.value.trim();if(q.length<3){res.classList.remove('active');return}timeout=setTimeout(()=>searchAddr(q),400)});
+  // v6.95 — Entrée = ÉTUDE IMMÉDIATE sur la meilleure adresse, sans avoir à
+  // cliquer un résultat du menu. "Je pointe l'adresse → l'étude se lance."
+  inp.addEventListener('keydown',(e)=>{
+    if(e.key!=='Enter') return;
+    e.preventDefault(); clearTimeout(timeout);
+    runSearchStudy(inp.value.trim());
+  });
   document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))res.classList.remove('active')});
 }
 
-async function searchAddr(q) {
-  try{
-    // Try Google Places Autocomplete if key available
-    if (_googleHasKey()) {
+// v6.95 — géocodage robuste, partagé par le menu déroulant ET la touche
+// Entrée. Corrige le bug : l'ancienne requête ajoutait « , Bucharest,
+// Romania » à une adresse déjà complète (avec code postal) → 0 résultat.
+// Ici : requête BRUTE + countrycodes=ro + biais viewbox Bucarest (pas
+// borné, pour ne pas exclure la métropole). Google d'abord si la clé
+// marche (souvent bloquée en prod → try/catch → repli OSM propre).
+async function geocodeAddr(q) {
+  q = (q || '').trim();
+  if (!q) return [];
+  if (_googleHasKey()) {
+    try {
       const gData = await googleFetch(`${GOOGLE_PLACES_URL}:searchText`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': GOOGLE_API_KEY,
-          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location'
-        },
-        body: JSON.stringify({
-          textQuery: q + ' Bucharest',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY,
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location' },
+        body: JSON.stringify({ textQuery: q, regionCode: 'RO',
           locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 30000 } },
-          maxResultCount: 5
-        })
+          maxResultCount: 5 })
       });
-      if (gData && gData.places && gData.places.length > 0) {
-        const res = el('searchResults');
-        res.innerHTML = gData.places.map(p => {
-          const lat = p.location?.latitude;
-          const lng = p.location?.longitude;
-          const label = (p.displayName?.text || '') + ' — ' + (p.formattedAddress || '').substring(0, 60);
-          return `<div class="search-result-item" onclick="pickSearch(${lat},${lng})">${label} <span style="color:var(--accent);font-size:8px">Google</span></div>`;
-        }).join('');
-        res.classList.add('active');
-        return;
-      }
-    }
-    // Fallback: Nominatim
-    const r=await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(q+', Bucharest, Romania')}&limit=5&addressdetails=1`);
-    const data=await r.json();
-    const res=el('searchResults');
-    res.innerHTML=data.length===0?'<div class="search-result-item">Aucun resultat</div>':data.map(d=>`<div class="search-result-item" onclick="pickSearch(${d.lat},${d.lon})">${d.display_name.substring(0,80)}</div>`).join('');
-    res.classList.add('active');
-  }catch(e){console.error('Search:',e)}
+      const hits = (gData?.places || []).map(p => ({
+        lat: p.location?.latitude, lng: p.location?.longitude,
+        label: ((p.displayName?.text || '') + ' — ' + (p.formattedAddress || '')).replace(/ — $/,'').slice(0, 80), src: 'Google'
+      })).filter(h => h.lat != null && h.lng != null);
+      if (hits.length) return hits;
+    } catch (e) { /* clé bloquée / quota → repli OSM */ }
+  }
+  // Nominatim RO, biais Bucarest (viewbox = lon_min,lat_max,lon_max,lat_min)
+  const vb = '25.90,44.60,26.35,44.30';
+  const url = `${NOMINATIM}/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=6&countrycodes=ro&addressdetails=1&viewbox=${vb}&bounded=0`;
+  const r = await fetch(url, { headers: { 'Accept-Language': 'fr,ro,en' } });
+  const data = await r.json();
+  return (Array.isArray(data) ? data : []).map(d => ({
+    lat: +d.lat, lng: +d.lon, label: (d.display_name || '').slice(0, 80), src: 'OSM'
+  })).filter(h => isFinite(h.lat) && isFinite(h.lng));
 }
 
-function pickSearch(lat,lng) {
-  el('searchResults').classList.remove('active');
-  map.flyTo([lat,lng],15);
-  setTimeout(()=>onMapClick({latlng:{lat:parseFloat(lat),lng:parseFloat(lng)}}),500);
+const _searchMsg = (html, color) => {
+  const res = el('searchResults');
+  if (!res) return;
+  res.innerHTML = `<div class="search-result-item" style="color:${color || 'var(--gray2)'};cursor:default">${html}</div>`;
+  res.classList.add('active');
+};
+
+async function searchAddr(q) {
+  _searchMsg('Recherche d’adresse…');
+  try {
+    const hits = await geocodeAddr(q);
+    window._searchHits = { q, hits };
+    const res = el('searchResults');
+    if (!hits.length) { _searchMsg('Aucune adresse trouvée — précise la rue et le numéro'); return; }
+    res.innerHTML = hits.map(h =>
+      `<div class="search-result-item" onclick="pickSearch(${h.lat},${h.lng},decodeURIComponent('${encodeURIComponent(h.label)}'))">📍 ${h.label} <span style="color:var(--accent);font-size:8px">${h.src}</span></div>`
+    ).join('') + `<div style="padding:6px 10px;font-size:9px;color:var(--gray2);border-top:1px solid var(--border)">↵ Entrée = étudier directement la 1ʳᵉ adresse</div>`;
+    res.classList.add('active');
+  } catch (e) { console.error('Search:', e); _searchMsg('Service d’adresses momentanément indisponible — réessaie', 'var(--red)'); }
 }
+
+// Entrée : géocode (ou réutilise le dernier résultat) puis lance l'étude
+// immédiate sur la meilleure adresse.
+async function runSearchStudy(q) {
+  if (!q || q.length < 3) return;
+  _searchMsg('📍 Localisation & étude de potentiel en cours…', 'var(--accent)');
+  try {
+    const cache = window._searchHits;
+    const hits = (cache && cache.q === q && cache.hits.length) ? cache.hits : await geocodeAddr(q);
+    if (!hits.length) { _searchMsg('Aucune adresse trouvée — précise la rue et le numéro'); return; }
+    pickSearch(hits[0].lat, hits[0].lng, hits[0].label);
+  } catch (e) { console.error('Search study:', e); _searchMsg('Service d’adresses momentanément indisponible — réessaie', 'var(--red)'); }
+}
+
+function pickSearch(lat, lng, label) {
+  el('searchResults').classList.remove('active');
+  lat = parseFloat(lat); lng = parseFloat(lng);
+  if (label) {
+    const short = label.length > 52 ? label.slice(0, 52) + '…' : label;
+    const inp = el('searchInput'); if (inp) inp.value = short;
+    window._searchSiteName = label;
+  }
+  map.flyTo([lat, lng], 15);
+  setTimeout(async () => {
+    try { await onMapClick({ latlng: { lat, lng } }); } catch (e) { console.error('pickSearch analyse:', e); }
+    // v6.95 — l'étude est prête dans la Fiche : on y amène l'utilisateur et
+    // on le guide vers la seule saisie restante pour le BP : loyer + charges.
+    if (label && window._lastCaptageLocation) window._lastCaptageLocation.siteName = label;
+    try { switchTab('site'); } catch {}
+    setTimeout(guideToRentStep, 500);
+  }, 550);
+}
+
+// Amène le bloc "conditions locatives" (loyer/charges) dans le champ de
+// vision + flash doré + bulle "→ ajuste puis Éditer BP".
+function guideToRentStep() {
+  const anchor = document.getElementById('rentSlider') || document.getElementById('rent-slider-label');
+  const block = anchor ? anchor.closest('.card, [id^="financing"], div') : null;
+  const target = block || anchor;
+  if (!target) return;
+  try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+  target.style.transition = 'box-shadow .4s ease';
+  const prev = target.style.boxShadow;
+  target.style.boxShadow = '0 0 0 2px var(--accent), 0 0 24px rgba(212,160,23,.4)';
+  setTimeout(() => { target.style.boxShadow = prev; }, 2200);
+  try { window.showToast?.('Site étudié — ajuste loyer & charges, puis « Éditer BP » pour le business plan.', 'success', { title: '📝 Dernière étape' }); } catch {}
+}
+window.pickSearch = pickSearch;
+window.runSearchStudy = runSearchStudy;
 
 // ================================================================
 // TABS

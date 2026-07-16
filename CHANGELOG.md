@@ -1,6 +1,33 @@
 
 # Changelog
 
+## [v6.95-search-study] — 2026-07-16
+
+### 🔎 Barre d'adresse : étude de potentiel immédiate
+
+Avant, taper une adresse pouvait ne rien donner (0 résultat) et il
+fallait deviner qu'il fallait cliquer un menu puis aller dans l'onglet
+Fiche. Désormais c'est direct.
+
+- **Bug géocodage corrigé** : la requête ajoutait « , Bucharest, Romania »
+  à une adresse déjà complète (avec code postal) → Nominatim renvoyait
+  0 résultat. Nouvelle requête : brute + `countrycodes=ro` + biais
+  viewbox Bucarest (jsonv2). L'adresse pleine de ton exemple retrouve
+  bien 6 résultats.
+- **⏎ Entrée = étude immédiate** : tape l'adresse, appuie sur Entrée →
+  géocodage + zoom carte + étude de potentiel (SAZ, démographie,
+  concurrence) sur la meilleure adresse, sans cliquer de menu.
+- **Bascule auto sur la Fiche** + le nom du site = l'adresse.
+- **Guidage BP** : après l'étude, le bloc loyer/charges est mis en
+  évidence (scroll + halo) avec un rappel « ajuste loyer & charges puis
+  Éditer BP » — la seule saisie restante pour le business plan.
+- Google Places d'abord si la clé fonctionne, repli OSM propre sinon ;
+  états « Recherche… / Aucune adresse / indisponible » explicites.
+
+197/197 tests.
+
+---
+
 ## [v6.94-wow] — 2026-07-16
 
 ### ✨ Couche wow — l'outil prend vie
