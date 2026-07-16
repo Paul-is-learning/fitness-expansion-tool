@@ -1,0 +1,1263 @@
+{
+  "meta": {
+    "sourceYear": 2025,
+    "generatedAt": "2026-07-16",
+    "source": "data.gov.ro — Situații financiare anuale (ANAF)",
+    "datasetUrl": "https://data.gov.ro/dataset/situatii_financiare_2025",
+    "caen": 9313,
+    "note": "CA neta / résultat net / fonds propres / effectifs, en RON. Les enseignes consolident leurs clubs dans une entité unique : CA par club = CA entité ÷ nb de clubs. Stats secteur : opérateurs seuls (agrégateurs exclus).",
+    "currency": "RON"
+  },
+  "sector": {
+    "operators": 62,
+    "totalFilings": 63,
+    "totalCA": 570915032,
+    "top3Share": 77.2
+  },
+  "chains": [
+    {
+      "enseigne": "World Class",
+      "cui": "16128511",
+      "name": "WORLD CLASS ROMANIA S.A.",
+      "segment": "premium",
+      "ca": 242582388,
+      "netResult": -50027731,
+      "netMargin": -20.6,
+      "equity": -152274160,
+      "employees": 379,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "enseigne": "Stay Fit Gym",
+      "cui": "41700478",
+      "name": "STAY FIT IRIDE S.A.",
+      "segment": "mid",
+      "ca": 109950119,
+      "netResult": 3124064,
+      "netMargin": 2.8,
+      "equity": 45681254,
+      "employees": 285,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "enseigne": "18GYM",
+      "cui": "9829933",
+      "name": "EIGHTEENGYM S.R.L.",
+      "segment": "low-cost",
+      "ca": 87970459,
+      "netResult": 9678081,
+      "netMargin": 11,
+      "equity": 26529395,
+      "employees": 191,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "enseigne": "Downtown Fitness",
+      "cui": "33347821",
+      "name": "DOWNTOWN FITNESS SRL",
+      "segment": "mid",
+      "ca": 14161875,
+      "netResult": 3381744,
+      "netMargin": 23.9,
+      "equity": 3485126,
+      "employees": 17,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    }
+  ],
+  "operators": [
+    {
+      "cui": "16128511",
+      "name": "WORLD CLASS ROMANIA S.A.",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": "World Class",
+      "ca": 242582388,
+      "netResult": -50027731,
+      "netMargin": -20.6,
+      "equity": -152274160,
+      "employees": 379,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "41700478",
+      "name": "STAY FIT IRIDE S.A.",
+      "city": "Bucureşti",
+      "sector": "2",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": "Stay Fit Gym",
+      "ca": 109950119,
+      "netResult": 3124064,
+      "netMargin": 2.8,
+      "equity": 45681254,
+      "employees": 285,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "9829933",
+      "name": "EIGHTEENGYM S.R.L.",
+      "city": "Târgu Mureş",
+      "sector": "",
+      "judet": "MUREŞ",
+      "bucharest": false,
+      "enseigne": "18GYM",
+      "ca": 87970459,
+      "netResult": 9678081,
+      "netMargin": 11,
+      "equity": 26529395,
+      "employees": 191,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "32111864",
+      "name": "CYBEX FITNESS S.R.L.",
+      "city": "Timişoara",
+      "sector": "",
+      "judet": "TIMIŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 14742529,
+      "netResult": 2676049,
+      "netMargin": 18.2,
+      "equity": 2736080,
+      "employees": 28,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "33347821",
+      "name": "DOWNTOWN FITNESS SRL",
+      "city": "Bucureşti",
+      "sector": "3",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": "Downtown Fitness",
+      "ca": 14161875,
+      "netResult": 3381744,
+      "netMargin": 23.9,
+      "equity": 3485126,
+      "employees": 17,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "40923692",
+      "name": "SWEAT CONCEPT ONE S.A.",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 13838031,
+      "netResult": -7828291,
+      "netMargin": -56.6,
+      "equity": -3588244,
+      "employees": 13,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "30973537",
+      "name": "VECTR GYMS S.R.L.",
+      "city": "Timişoara",
+      "sector": "",
+      "judet": "TIMIŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 10314542,
+      "netResult": -494616,
+      "netMargin": -4.8,
+      "equity": -2970667,
+      "employees": 12,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "35719301",
+      "name": "REVIVE CLUB SRL",
+      "city": "Iaşi",
+      "sector": "",
+      "judet": "IAŞI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 8335498,
+      "netResult": -476193,
+      "netMargin": -5.7,
+      "equity": -1393273,
+      "employees": 20,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "29575040",
+      "name": "GYMONE SRL",
+      "city": "Timişoara",
+      "sector": "",
+      "judet": "TIMIŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 7626757,
+      "netResult": 1760089,
+      "netMargin": 23.1,
+      "equity": 1760329,
+      "employees": 20,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "38569357",
+      "name": "NEXTFITNESS & WELLNESS S.R.L.",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 7422300,
+      "netResult": -806213,
+      "netMargin": -10.9,
+      "equity": -7827099,
+      "employees": 7,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "30828286",
+      "name": "OXYGEN SPORT IAŞI SRL",
+      "city": "Iaşi",
+      "sector": "",
+      "judet": "IAŞI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 7028397,
+      "netResult": 229306,
+      "netMargin": 3.3,
+      "equity": 2037710,
+      "employees": 20,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "35246190",
+      "name": "KOMFITT EXPERT SRL",
+      "city": "Bucureşti",
+      "sector": "4",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 6870694,
+      "netResult": 160975,
+      "netMargin": 2.3,
+      "equity": 818214,
+      "employees": 17,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "28474845",
+      "name": "HEALTH CONSTRUCT SRL",
+      "city": "Craiova",
+      "sector": "",
+      "judet": "DOLJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 6529043,
+      "netResult": 583622,
+      "netMargin": 8.9,
+      "equity": 1373208,
+      "employees": 24,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "36998980",
+      "name": "VITRUVIAN FIT CLUB SRL",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 5629484,
+      "netResult": 949564,
+      "netMargin": 16.9,
+      "equity": 2255275,
+      "employees": 12,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "25265844",
+      "name": "BRICK SERVICII SRL",
+      "city": "Ostratu",
+      "sector": "",
+      "judet": "ILFOV",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 4818128,
+      "netResult": -462468,
+      "netMargin": -9.6,
+      "equity": -408468,
+      "employees": 25,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "25081914",
+      "name": "SME SPORE SRL",
+      "city": "Constanţa",
+      "sector": "",
+      "judet": "CONSTANŢA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 4669981,
+      "netResult": -1095931,
+      "netMargin": -23.5,
+      "equity": 2616466,
+      "employees": 28,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "30731266",
+      "name": "FIT 4U FITNESS CENTER SRL",
+      "city": "Oradea",
+      "sector": "",
+      "judet": "BIHOR",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 4433791,
+      "netResult": 254890,
+      "netMargin": 5.7,
+      "equity": 2719177,
+      "employees": 17,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "39930530",
+      "name": "CLUB GO 700 S.R.L.",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 4275813,
+      "netResult": -166693,
+      "netMargin": -3.9,
+      "equity": 1507958,
+      "employees": 11,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "34656493",
+      "name": "CROSSFIT G.F. SRL",
+      "city": "Braşov",
+      "sector": "",
+      "judet": "BRAŞOV",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 2585278,
+      "netResult": -136046,
+      "netMargin": -5.3,
+      "equity": -2666585,
+      "employees": 10,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "37810189",
+      "name": "VLAXIFIT SRL",
+      "city": "Târgu Mureş",
+      "sector": "",
+      "judet": "MUREŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 2196534,
+      "netResult": 616405,
+      "netMargin": 28.1,
+      "equity": 3182250,
+      "employees": 1,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "38567003",
+      "name": "MOROSERVICE CONSTRUCT S.R.L.",
+      "city": "Valea Lupului",
+      "sector": "",
+      "judet": "IAŞI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 1689324,
+      "netResult": 240018,
+      "netMargin": 14.2,
+      "equity": 343896,
+      "employees": 15,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "4725630",
+      "name": "PATMADAN IMPEX SRL",
+      "city": "Bacău",
+      "sector": "",
+      "judet": "BACĂU",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 1280327,
+      "netResult": -241224,
+      "netMargin": -18.8,
+      "equity": 2403180,
+      "employees": 8,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "17084073",
+      "name": "VITROX SRL",
+      "city": "Vaslui",
+      "sector": "",
+      "judet": "VASLUI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 365821,
+      "netResult": 170143,
+      "netMargin": 46.5,
+      "equity": 611862,
+      "employees": 1,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "14613323",
+      "name": "SPORTIV NOVA GYM S.R.L.",
+      "city": "Focşani",
+      "sector": "",
+      "judet": "VRANCEA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 291220,
+      "netResult": 179077,
+      "netMargin": 61.5,
+      "equity": 189088,
+      "employees": 1,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "49215355",
+      "name": "GIO SMART FIT S.R.L.",
+      "city": "Horpaz",
+      "sector": "",
+      "judet": "IAŞI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 216299,
+      "netResult": -64473,
+      "netMargin": -29.8,
+      "equity": -64273,
+      "employees": 1,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "40257934",
+      "name": "NOVAUTO EXCLUSIVE S.R.L.",
+      "city": "Focşani",
+      "sector": "",
+      "judet": "VRANCEA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 209810,
+      "netResult": 132498,
+      "netMargin": 63.2,
+      "equity": 137884,
+      "employees": 1,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "46160336",
+      "name": "FIT DISTRICT S.R.L.",
+      "city": "Bucureşti",
+      "sector": "4",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 208965,
+      "netResult": 12303,
+      "netMargin": 5.9,
+      "equity": 9351,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "46188060",
+      "name": "FITBYDIMA S.R.L.",
+      "city": "Iaşi",
+      "sector": "",
+      "judet": "IAŞI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 164409,
+      "netResult": 61702,
+      "netMargin": 37.5,
+      "equity": 74472,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "37691940",
+      "name": "FITBODY KINSPORT SRL",
+      "city": "Cluj-Napoca",
+      "sector": "",
+      "judet": "CLUJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 127600,
+      "netResult": 14520,
+      "netMargin": 11.4,
+      "equity": -39582,
+      "employees": 0,
+      "health": {
+        "label": "Fragile",
+        "level": "warn",
+        "why": "Bénéficiaire mais fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "51199634",
+      "name": "TTT FITNESS S.R.L.",
+      "city": "Chirpăr",
+      "sector": "",
+      "judet": "SIBIU",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 80059,
+      "netResult": 49887,
+      "netMargin": 62.3,
+      "equity": 50087,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "40483370",
+      "name": "IRON SPORT CONSULT S.R.L.",
+      "city": "Măgura",
+      "sector": "",
+      "judet": "BACĂU",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 61500,
+      "netResult": -96530,
+      "netMargin": -157,
+      "equity": -328505,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "36545319",
+      "name": "SIGHETGYM S.R.L.",
+      "city": "Ocna Şugatag",
+      "sector": "",
+      "judet": "MARAMUREŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 53017,
+      "netResult": 12993,
+      "netMargin": 24.5,
+      "equity": -40482,
+      "employees": 0,
+      "health": {
+        "label": "Fragile",
+        "level": "warn",
+        "why": "Bénéficiaire mais fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "41099557",
+      "name": "GYM 4 YOU - KANGOO STUDIO S.R.L.",
+      "city": "Drobeta-Turnu Severin",
+      "sector": "",
+      "judet": "MEHEDINŢI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 50854,
+      "netResult": 1734,
+      "netMargin": 3.4,
+      "equity": -8066,
+      "employees": 0,
+      "health": {
+        "label": "Fragile",
+        "level": "warn",
+        "why": "Bénéficiaire mais fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "50697541",
+      "name": "NUTRI-FIT-CURS S.R.L.",
+      "city": "Bârlad",
+      "sector": "",
+      "judet": "VASLUI",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 42540,
+      "netResult": 124,
+      "netMargin": 0.3,
+      "equity": 541,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "42041910",
+      "name": "ALEX CBR FITNESS S.R.L.",
+      "city": "Bucureşti",
+      "sector": "6",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 37709,
+      "netResult": -7034,
+      "netMargin": -18.7,
+      "equity": 38643,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "41792250",
+      "name": "BABOSFIT S.R.L.",
+      "city": "Cluj-Napoca",
+      "sector": "",
+      "judet": "CLUJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 18810,
+      "netResult": 8494,
+      "netMargin": 45.2,
+      "equity": 32903,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "47423511",
+      "name": "UNDERGROUND-FITNESS CLUB S.R.L.",
+      "city": "Marginea",
+      "sector": "",
+      "judet": "SUCEAVA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 18094,
+      "netResult": -30146,
+      "netMargin": -166.6,
+      "equity": -70749,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "43910077",
+      "name": "SISESTI HOME STUDIO S.R.L.",
+      "city": "Bucureşti",
+      "sector": "1",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 8325,
+      "netResult": 4349,
+      "netMargin": 52.2,
+      "equity": 12367,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "50097466",
+      "name": "BODFYT S.R.L.",
+      "city": "Sărbătoarea",
+      "sector": "",
+      "judet": "DOLJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 3280,
+      "netResult": -2785,
+      "netMargin": -84.9,
+      "equity": -4085,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "47108557",
+      "name": "BETA DIMA S.R.L.",
+      "city": "Topoloveni",
+      "sector": "",
+      "judet": "ARGEŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 2491,
+      "netResult": 1794,
+      "netMargin": 72,
+      "equity": 23662,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "52311000",
+      "name": "STUDIO ANAHATA S.R.L.",
+      "city": "Slatina",
+      "sector": "",
+      "judet": "OLT",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 2000,
+      "netResult": 551,
+      "netMargin": 27.6,
+      "equity": 751,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "43188928",
+      "name": "CUI 43188928",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 700,
+      "netResult": 451,
+      "netMargin": 64.4,
+      "equity": 1913,
+      "employees": 0,
+      "health": {
+        "label": "Saine",
+        "level": "ok",
+        "why": "Fonds propres positifs et bénéficiaire"
+      }
+    },
+    {
+      "cui": "34975212",
+      "name": "GARANTAT AUTOPARTS S.R.L.",
+      "city": "Focşani",
+      "sector": "",
+      "judet": "VRANCEA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 237,
+      "netResult": -64856,
+      "netMargin": -27365.4,
+      "equity": -81359,
+      "employees": 1,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "34139454",
+      "name": "CAMI AEROBIC STIL SRL",
+      "city": "Bascov",
+      "sector": "",
+      "judet": "ARGEŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -554,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "20313940",
+      "name": "CUI 20313940",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 0,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "38677820",
+      "name": "PROKAIZEN S.R.L.",
+      "city": "Brăila",
+      "sector": "",
+      "judet": "BRĂILA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 39166,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "51798366",
+      "name": "BLAST FITNESS & SWIM S.R.L.",
+      "city": "Cluj-Napoca",
+      "sector": "",
+      "judet": "CLUJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": -12683,
+      "netMargin": null,
+      "equity": -12483,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "46142526",
+      "name": "LA MAISON DU SALAMEH S.R.L.",
+      "city": "Craiova",
+      "sector": "",
+      "judet": "DOLJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -7382,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "22285650",
+      "name": "NEW TRADE CONSULTING S.R.L.",
+      "city": "CRAIOVA",
+      "sector": "",
+      "judet": "DOLJ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 200,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "39423367",
+      "name": "MÁTYÁS MIHALY BIG BOSS IN THE MIX S.R.L.",
+      "city": "Mânău",
+      "sector": "",
+      "judet": "MARAMUREŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -141,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "52401943",
+      "name": "MOON PILATES S.R.L.",
+      "city": "Sighetu Marmaţiei",
+      "sector": "",
+      "judet": "MARAMUREŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 200,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "52709456",
+      "name": "FAIR PLAY FRIENDS S.R.L.",
+      "city": "Baia Mare",
+      "sector": "",
+      "judet": "MARAMUREŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": -33,
+      "netMargin": null,
+      "equity": 167,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "39570155",
+      "name": "HEALTH & MOJOES S.R.L.",
+      "city": "Valea Dulce",
+      "sector": "",
+      "judet": "PRAHOVA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 8765,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "34549403",
+      "name": "CIFIS RELAX SRL",
+      "city": "Gornet",
+      "sector": "",
+      "judet": "PRAHOVA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 0,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "46663575",
+      "name": "CRIS SPORT PERFORM S.R.L.",
+      "city": "Ghiroda",
+      "sector": "",
+      "judet": "TIMIŞ",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -4154,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "37330989",
+      "name": "AVMFITNESS S.R.L.",
+      "city": "Volovăţ",
+      "sector": "",
+      "judet": "SUCEAVA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 200,
+      "employees": 0,
+      "health": {
+        "label": "Sous pression",
+        "level": "warn",
+        "why": "En perte mais fonds propres positifs"
+      }
+    },
+    {
+      "cui": "16447839",
+      "name": "BIO DINAMIC S.R.L.",
+      "city": "BUCUREŞTI",
+      "sector": "2",
+      "judet": "MUNICIPIUL BUCUREŞTI",
+      "bucharest": true,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -12380,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "41694090",
+      "name": "CUI 41694090",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": -44916,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "39658290",
+      "name": "CUI 39658290",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": -3400,
+      "netMargin": null,
+      "equity": -7732,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "40142438",
+      "name": "CUI 40142438",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 0,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "26721329",
+      "name": "ATMOSPHERE WELLNESS SRL",
+      "city": "Constanţa",
+      "sector": "",
+      "judet": "CONSTANŢA",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 87136,
+      "netMargin": null,
+      "equity": -1662735,
+      "employees": 0,
+      "health": {
+        "label": "Fragile",
+        "level": "warn",
+        "why": "Bénéficiaire mais fonds propres négatifs"
+      }
+    },
+    {
+      "cui": "39062378",
+      "name": "CUI 39062378",
+      "city": "",
+      "sector": "",
+      "judet": "",
+      "bucharest": false,
+      "enseigne": null,
+      "ca": 0,
+      "netResult": 0,
+      "netMargin": null,
+      "equity": 0,
+      "employees": 0,
+      "health": {
+        "label": "À risque",
+        "level": "risk",
+        "why": "En perte et fonds propres négatifs"
+      }
+    }
+  ]
+}

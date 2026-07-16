@@ -143,8 +143,20 @@ try {
   check('Mémo IC: 4 sections clés présentes', memo.sections);
 
   // ── 8. modules exposés ──
-  const mods = await page.evaluate(() => ['FcfStudio', 'ConquestPlan', 'ICMemo', 'AiAnalyst', 'ShareLink', 'UserDataSync', 'ReviewsHistory', 'Portfolio', 'AdminUsers'].every(m => typeof window[m] === 'object' && window[m]));
+  const mods = await page.evaluate(() => ['FcfStudio', 'ConquestPlan', 'ICMemo', 'AiAnalyst', 'ShareLink', 'UserDataSync', 'ReviewsHistory', 'Portfolio', 'AdminUsers', 'CompetitorIntel'].every(m => typeof window[m] === 'object' && window[m]));
   check('tous les modules SaaS exposés', mods);
+
+  // ── 8c. v6.88 — Intel Concurrence : onglet Marché lit les bilans ANAF ──
+  await page.evaluate(() => window.CompetitorIntel.open('marche'));
+  await page.waitForFunction(() => /World Class|data\.gov\.ro/.test(document.getElementById('ciBody')?.innerText || ''), null, { timeout: 8000 }).catch(() => {});
+  const intel = await page.evaluate(() => {
+    const t = document.getElementById('ciBody')?.innerText || '';
+    return { financials: /World Class/.test(t) && /Radar march/.test(t), health: /À risque|Saine/.test(t), source: t.includes('data.gov.ro') };
+  });
+  check('intel: bilans ANAF rendus', intel.financials);
+  check('intel: badges santé financière', intel.health);
+  check('intel: source citée', intel.source);
+  await page.evaluate(() => window.CompetitorIntel.close());
 
   // ── 8b. v6.87 — login mot de passe seul (magic link retiré) ──
   const authUi = await page.evaluate(() => ({ magicGone: !document.getElementById('magicBlock'), form: !!document.getElementById('loginForm') }));

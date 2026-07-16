@@ -1,6 +1,37 @@
 
 # Changelog
 
+## [v6.88-intel] — 2026-07-16
+
+### 🎯 Intel Concurrence — 3 sources publiques & légales de données concurrent
+
+Nouveau bouton **🎯 Intel Concurrence** (3 onglets), tout sourcé public/légal :
+
+- **📊 Marché & santé** — bilans officiels déposés à l'ANAF
+  (data.gov.ro, exercice 2025) : CA, résultat net, fonds propres, marge,
+  effectifs par société. Badge **santé financière** (🟢/🟡/🔴) et **radar
+  du secteur** (opérateurs de Bucarest classés). Révélation : World Class
+  perd 50 M RON avec des fonds propres à −152 M ; Stay Fit (+55 % de CA)
+  et 18GYM (marge 11 %) sont sains. Généré par `ci/etl-financials.mjs`
+  (re-jouable chaque juin, résout les URLs CKAN dynamiquement).
+- **💶 Prix & ARPU** — grilles catalogue publiques récupérées en direct
+  (18GYM, Stay Fit) + fourchette World Class : prix d'entrée, premium,
+  ladder par plan, conversion €. Cale l'hypothèse de prix de tes sites.
+- **🚧 Ouvertures** — clubs concurrents en **pré-ouverture** (Stay Fit
+  « pré-vente ») détectés et **géolocalisés sur la carte** : alerte
+  d'implantation imminente à croiser avec tes sites cibles.
+
+Technique : nouvelle fonction serverless `api/intel.js` (cache KV,
+rafraîchissement paresseux 7 j, révocation immédiate comme le reste,
+géocodage Nominatim borné). Données financières = JSON statique du repo
+(zéro dépendance runtime). 9 fonctions Vercel / 12.
+
+Vérifié : ETL contre le vrai fichier ANAF (63 sociétés, chiffres = presse),
+parseurs prix + ouvertures en direct (4 pré-ouvertures géocodées), 3 onglets
+rendus, 197/197, E2E +3, revue adversariale multi-agents.
+
+---
+
 ## [v6.87-authpro] — 2026-07-15
 
 ### 🔐 Login serveur + gestion des utilisateurs (exit le magic link)
