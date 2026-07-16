@@ -1,6 +1,32 @@
 
 # Changelog
 
+## [v6.90-polish] — 2026-07-16
+
+### ✨ Polish visuel premium (Apple × Louis Vuitton)
+
+Passe de raffinement sur tout le SaaS — luxe sobre, pas clinquant :
+
+- **Motion premium** : courbes d'animation raffinées (out-expo, spring),
+  boutons qui se soulèvent au survol avec balayage doré, cartes en
+  légère lévitation, panneaux (Conquête, Intel, Portefeuille, Studio,
+  Utilisateurs) avec **entrée fluide + effet verre** (backdrop-blur).
+- **Profondeur** : système d'ombres douces multi-couches (élévation 1→3),
+  filets lumineux en tête de modale.
+- **Or vivant** : le logo « Fitness Park » a un dégradé doré animé subtil ;
+  CTA de connexion et boutons primaires avec sheen métallique.
+- **Lisibilité** : police **Inter chargée proprement** (l'ancien @import
+  était invalide → police système seulement), Inter Tight pour les gros
+  chiffres, chiffres tabulaires alignés partout, rendu antialiasé.
+- **Détails** : scrollbars raffinées, sélection dorée, anneaux de focus
+  accessibles, transition douce au changement d'onglet, avatar animé,
+  surbrillance dorée fluide des lignes de tableau.
+- **Accessibilité** : respect de `prefers-reduced-motion`.
+
+Additif pur : zéro changement de structure/layout. 197/197 tests OK.
+
+---
+
 ## [v6.89.1-conquest-fix] — 2026-07-16
 
 ### 🔧 Plan de Conquête : les 3 scénarios sont enfin vraiment distincts

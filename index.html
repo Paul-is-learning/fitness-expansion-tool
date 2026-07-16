@@ -10,6 +10,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
+<!-- v6.90 — police Inter chargée proprement (l'ancien @import après :root était invalide) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap">
 <meta name="theme-color" content="#d4a017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -84,9 +88,9 @@
   --red:#ef4444;--cyan:#06b6d4;
   --radius:10px;--shadow:0 4px 24px rgba(0,0,0,.45);
   --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Inter Tight','Inter',system-ui,-apple-system,sans-serif;
   --mono:'JetBrains Mono','Fira Code',monospace;
 }
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 html,body{height:100%;margin:0}
 body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hidden;-webkit-font-smoothing:antialiased}
 
@@ -348,6 +352,117 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);overflow:hi
 /* Animations */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .animate-in{animation:fadeUp .3s ease-out}
+</style>
+<!-- ════════════════════════════════════════════════════════════════════
+     v6.90 — POLISH PREMIUM (Apple × Louis Vuitton)
+     Motion raffiné, profondeur douce, or subtil, verre, lisibilité.
+     Additif : n'altère jamais la structure/le layout, seulement le grain.
+     ════════════════════════════════════════════════════════════════════ -->
+<style id="fp-polish-690">
+:root{
+  /* Courbes de motion premium */
+  --ease-lv:cubic-bezier(.16,1,.3,1);          /* out-expo raffiné */
+  --ease-inout:cubic-bezier(.76,0,.24,1);
+  --spring:cubic-bezier(.34,1.4,.5,1);
+  --d1:.16s; --d2:.32s; --d3:.5s;
+  /* Élévation — ombres douces multi-couches */
+  --elev-1:0 1px 2px rgba(0,0,0,.30), 0 2px 8px rgba(0,0,0,.20);
+  --elev-2:0 6px 16px rgba(0,0,0,.34), 0 14px 40px rgba(0,0,0,.30);
+  --elev-3:0 12px 32px rgba(0,0,0,.44), 0 40px 80px rgba(0,0,0,.42);
+  --gold-sheen:linear-gradient(135deg,#f4d67e 0%,#d4a017 46%,#b8860b 100%);
+  --hairline:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 40%);
+}
+
+/* ── Rendu typographique ─────────────────────────────────────────── */
+body{ text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; letter-spacing:.003em; }
+.logo-title,.saz-number,.saz-sublabel{ font-family:var(--font-display); }
+.logo-title{ letter-spacing:-.01em; }
+.saz-number{ font-family:var(--font-display); letter-spacing:-.03em; }
+.metric-value,.dash-table td,.comp-threat,.sector-saz{ font-variant-numeric:tabular-nums; }
+
+/* ── Sélection & focus ───────────────────────────────────────────── */
+::selection{ background:rgba(212,160,23,.30); color:#fff; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:8px; }
+button:focus:not(:focus-visible),a:focus:not(:focus-visible){ outline:none; }
+
+/* ── Scrollbars raffinées ────────────────────────────────────────── */
+*{ scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.26) transparent; }
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:rgba(148,163,184,.24); border-radius:20px; border:3px solid transparent; background-clip:padding-box; transition:background .2s; }
+::-webkit-scrollbar-thumb:hover{ background:rgba(212,160,23,.5); background-clip:padding-box; }
+
+/* ── Boutons : lift + press + balayage doré ──────────────────────── */
+.btn{ transition:transform var(--d1) var(--ease-lv), background var(--d1) ease, border-color var(--d1) ease, box-shadow var(--d2) var(--ease-lv); }
+.btn:hover{ transform:translateY(-1px); box-shadow:var(--elev-1); }
+.btn:active{ transform:translateY(0) scale(.98); transition-duration:.05s; }
+.btn-primary{ position:relative; overflow:hidden; background:var(--gold-sheen)!important; color:#0a0d16!important; border:none!important; font-weight:700; }
+.btn-primary::after{ content:''; position:absolute; inset:0; background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.4) 50%,transparent 68%); transform:translateX(-130%); transition:transform .75s var(--ease-lv); pointer-events:none; }
+.btn-primary:hover::after{ transform:translateX(130%); }
+
+/* ── Cartes : profondeur + lift délicat ──────────────────────────── */
+.card{ transition:transform var(--d2) var(--ease-lv), border-color var(--d2) ease, box-shadow var(--d2) var(--ease-lv); box-shadow:var(--elev-1); }
+.card:hover{ transform:translateY(-2px); border-color:rgba(212,160,23,.30); box-shadow:var(--elev-2); }
+
+/* ── Pills / toggles / tabs : fluidité ───────────────────────────── */
+.radius-pill{ transition:all var(--d2) var(--ease-lv); }
+.radius-pill:hover:not(.active){ border-color:rgba(212,160,23,.4); color:var(--white); transform:translateY(-1px); }
+.toggle{ transition:background var(--d2) var(--ease-lv), border-color var(--d2); }
+.toggle::after{ transition:left var(--d2) var(--spring), box-shadow var(--d2); }
+.tab{ transition:color var(--d2) var(--ease-lv); }
+.tab.active::after{ transition:opacity var(--d2); }
+
+/* ── Champs de saisie : focus doux ───────────────────────────────── */
+input,select,textarea{ transition:border-color var(--d1) ease, box-shadow var(--d2) var(--ease-lv), background var(--d1); }
+input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px var(--accent-glow); }
+
+/* ── Listes cliquables : lift + ombre ────────────────────────────── */
+.comp-card,.sector-row,.target-card,.search-result-item{ transition:transform var(--d2) var(--ease-lv), background var(--d1), border-color var(--d1), box-shadow var(--d2); }
+.comp-card:hover,.target-card:hover{ transform:translateY(-1px); box-shadow:var(--elev-1); }
+.sector-row:hover{ transform:translateX(2px); }
+
+/* ── Chip verdict : léger halo ───────────────────────────────────── */
+.reco-go{ box-shadow:0 0 0 1px rgba(16,185,129,.15), 0 2px 12px rgba(16,185,129,.12); }
+.reco-caution{ box-shadow:0 0 0 1px rgba(245,158,11,.15), 0 2px 12px rgba(245,158,11,.12); }
+.reco-nogo{ box-shadow:0 0 0 1px rgba(239,68,68,.15), 0 2px 12px rgba(239,68,68,.12); }
+
+/* ── Panneaux plein écran (modales) : verre + entrée fluide ──────── */
+#fpConquest,#ciPanel,#fpPortfolio,#fpFcfStudio,#userPanel{
+  animation:fpModalIn var(--d3) var(--ease-lv) both;
+  -webkit-backdrop-filter:blur(20px) saturate(1.25); backdrop-filter:blur(20px) saturate(1.25);
+}
+@keyframes fpModalIn{ from{ opacity:0; transform:scale(.99) translateY(10px); } to{ opacity:1; transform:none; } }
+/* filet lumineux en haut des modales */
+#fpConquest > header,#ciPanel > div:first-child{ position:relative; }
+#fpConquest > header::before,#ciPanel > div:first-child::before{ content:''; position:absolute; top:0; left:0; right:0; height:1px; background:var(--hairline); }
+
+/* ── Sidebar : liseré doré vivant + header ───────────────────────── */
+.sidebar-header{ box-shadow:0 1px 0 rgba(255,255,255,.03) inset; }
+.logo-title{ background:linear-gradient(120deg,#fff 20%,#f4d67e 50%,#fff 80%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:goldShimmer 9s var(--ease-inout) infinite; }
+@keyframes goldShimmer{ 0%,100%{ background-position:150% 0; } 50%{ background-position:-50% 0; } }
+
+/* ── Bouton restaurer carte + CTA login : grain premium ──────────── */
+#loginBtn{ background:var(--gold-sheen)!important; color:#0a0d16!important; border:none!important; font-weight:800!important; letter-spacing:.4px; position:relative; overflow:hidden; box-shadow:0 8px 24px rgba(212,160,23,.28); transition:transform var(--d2) var(--ease-lv), box-shadow var(--d2) var(--ease-lv); }
+#loginBtn:hover{ transform:translateY(-2px); box-shadow:0 14px 36px rgba(212,160,23,.42); }
+#loginBtn::after{ content:''; position:absolute; inset:0; background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.45) 50%,transparent 68%); transform:translateX(-130%); transition:transform .8s var(--ease-lv); }
+#loginBtn:hover::after{ transform:translateX(130%); }
+
+/* ── Transition de contenu au changement d'onglet ───────────────── */
+.tab-panel.active{ animation:fpFadeUp .42s var(--ease-lv) both; }
+@keyframes fpFadeUp{ from{ opacity:0; transform:translateY(9px); } to{ opacity:1; transform:none; } }
+
+/* ── Lignes de tableau : surbrillance dorée fluide ───────────────── */
+.dash-table tbody tr{ transition:background var(--d1) ease, box-shadow var(--d1) ease; }
+.dash-table tbody tr:hover td{ background:rgba(212,160,23,.06); }
+
+/* ── Avatar utilisateur : anneau doré au survol ─────────────────── */
+#userAvatar{ transition:transform var(--d2) var(--spring), box-shadow var(--d2) var(--ease-lv); }
+#userAvatar:hover{ transform:scale(1.08); box-shadow:0 0 0 3px var(--accent-glow); }
+
+/* ── Réduire le mouvement si l'utilisateur le demande ────────────── */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001s!important; transition-duration:.06s!important; }
+}
 </style>
 </head>
 <body>
