@@ -21,6 +21,15 @@
 (function () {
   'use strict';
 
+  // ═══ v7.04 — FOND VECTORIEL DÉSACTIVÉ ══════════════════════════════
+  // Le rendu MapLibre GL gelait l'onglet quand beaucoup de marqueurs
+  // concurrents s'affichaient par-dessus le canvas (« ça fait bugger le
+  // SaaS » au clic sur les filtres). On revient au fond CARTO sombre
+  // RASTER (rapide, stable, visuellement quasi identique) : le filtre
+  // concurrents fonctionne parfaitement dessus. Le module reste en place
+  // pour une éventuelle réactivation future, mais ne fait plus rien.
+  return;
+
   // Pas d'upgrade dans une IFRAME (suite de tests, embeds) : le rendu GL y
   // est inutile et peut monopoliser le thread d'un contexte caché.
   try { if (window !== window.top) return; } catch { return; }

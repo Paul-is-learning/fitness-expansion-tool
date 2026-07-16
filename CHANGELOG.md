@@ -1,6 +1,28 @@
 
 # Changelog
 
+## [v7.04-vectormap-off] — 2026-07-16
+
+### 🐛 « Ça fait bugger le SaaS » au clic sur les filtres — RÉSOLU
+
+Cause enfin isolée en conditions réelles : le fond de carte VECTORIEL
+(MapLibre GL, v6.96) gelait l'onglet quand les ~90 marqueurs concurrents
+se rendaient par-dessus le canvas GL. Au clic sur « Tout » / une marque,
+l'app se figeait. Sur le fond raster, le même clic marche en 1-2 s.
+
+- **Fond vectoriel désactivé** : retour au fond CARTO sombre RASTER,
+  rapide et stable (visuellement quasi identique). Le module reste en
+  place, désactivé, pour une réactivation future si le problème de perf
+  est résolu.
+- Conséquence : le filtre concurrents fonctionne à 100 % — clic « Tout »
+  → clusters + pins de marque sur toute la carte, sans gel.
+
+Vérifié en conditions réelles (raster, carte pleine taille) : clic Tout
+→ 21 clusters + 23 pins de marque + couche « Concurrents » activée,
+app réactive, zéro erreur, capture d'écran à l'appui. 197/197 tests.
+
+---
+
 ## [v7.03-map-resize-fix] — 2026-07-16
 
 ### 🐛 Concurrents invisibles après la démo — vraie cause trouvée
