@@ -1498,9 +1498,9 @@
       <div class="card" style="padding:14px 16px;margin-bottom:10px;background:linear-gradient(180deg,rgba(30,41,59,.45),rgba(17,24,39,.15))">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.5px">${_t('fin.structure')}</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${debtOn ? '#60a5fa' : 'var(--gray2)'}">
-            <input type="checkbox" ${debtOn ? 'checked' : ''} onchange="window.onFinancingToggle?.(this.checked);setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="accent-color:#60a5fa;width:18px;height:18px">
-            ${debtOn ? _t('fin.debtToggle') : _t('fin.allEquity')}
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${debtOn ? 'var(--gray2)' : '#34d399'}">
+            <input type="checkbox" ${debtOn ? '' : 'checked'} onchange="window.onEquityOnlyToggle?.(this.checked);setTimeout(()=>window._fpMobileFinRefresh?.(),400)" style="accent-color:#34d399;width:18px;height:18px">
+            ${_t('fin.allEquity')}
           </label>
         </div>
         <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">

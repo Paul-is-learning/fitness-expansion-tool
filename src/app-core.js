@@ -4591,7 +4591,25 @@ function onFinancingToggle(checked) {
   });
   const wrap = document.getElementById('fin-sliders-wrap');
   if (wrap) wrap.style.opacity = checked ? '1' : '.35';
+  // v6.91 — garder la case « 100% EQUITY » et son libellé cohérents même
+  // en appel programmatique (le re-render ne recrée pas la case, il patche
+  // seulement les KPI). checked = dette on ⇒ case equity décochée.
+  const eqCb = document.getElementById('finEquityToggle');
+  if (eqCb) eqCb.checked = !checked;
+  const eqLbl = eqCb && eqCb.nextElementSibling;
+  if (eqLbl) eqLbl.style.color = checked ? 'var(--gray2)' : '#34d399';
+  const ratioLbl = document.getElementById('fin-equity-label');
+  if (ratioLbl && !checked) ratioLbl.textContent = '100% / 0%';
 }
+// v6.91 — sélecteur « 100% EQUITY » explicite : COCHÉ = fonds propres seuls,
+// aucun emprunt → les réglages de prêt se désactivent. C'est l'inverse du
+// toggle dette historique (checked = dette on) ; on réutilise sa logique.
+// Avant : la case cochait « dette on » alors que son libellé disait « 100%
+// EQUITY » → cocher pour être en equity activait en fait le prêt (bug signalé).
+function onEquityOnlyToggle(equityOnly) {
+  onFinancingToggle(!equityOnly);
+}
+window.onEquityOnlyToggle = onEquityOnlyToggle;
 function onFinEquitySlider(val) {
   const v = parseInt(val, 10);
   const before = _finGet().equityPct;
@@ -5845,9 +5863,9 @@ function renderCaptageAnalysis(containerId, lat, lng, captageRadius) {
       <div id="financing-block" style="background:#3b82f610;border:1px solid #3b82f630;border-radius:6px;padding:8px;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div style="font-size:8px;font-weight:700;color:#60a5fa">💰 FINANCEMENT — Dette bancaire (global, tous sites)</div>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:8px;color:var(--gray)">
-            <input id="finDebtToggle" type="checkbox" ${on ? 'checked' : ''} onchange="onFinancingToggle(this.checked)" style="accent-color:#60a5fa;cursor:pointer">
-            <span style="font-weight:700;color:${on ? '#60a5fa' : 'var(--gray2)'}">${on ? 'DETTE ON' : '100% EQUITY'}</span>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:8px;color:var(--gray)" title="Coché = 100% fonds propres (aucun emprunt, les réglages de prêt se désactivent). Décoché = financement par dette.">
+            <input id="finEquityToggle" type="checkbox" ${on ? '' : 'checked'} onchange="onEquityOnlyToggle(this.checked)" style="accent-color:#34d399;cursor:pointer">
+            <span style="font-weight:700;color:${on ? 'var(--gray2)' : '#34d399'}">100% EQUITY</span>
           </label>
         </div>
         <div id="fin-sliders-wrap" style="opacity:${on ? '1' : '.35'}">

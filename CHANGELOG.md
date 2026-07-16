@@ -1,6 +1,26 @@
 
 # Changelog
 
+## [v6.91-equity-toggle] — 2026-07-16
+
+### 🐛 Fix : sélecteur « 100% EQUITY » inversé (financement)
+
+La case en tête du bloc Financement affichait « 100% EQUITY » mais
+**cochait en réalité la dette** : l'activer permettait encore de régler
+le prêt (l'inverse de l'attendu).
+
+- La case est désormais un vrai sélecteur **« 100% EQUITY »** :
+  · **Cochée** = 100% fonds propres → aucun emprunt, les 3 réglages de
+    prêt (apport/dette, taux, durée) se **désactivent**, et DETTE /
+    MENSUALITÉ / INTÉRÊTS passent à « — ».
+  · **Décochée** = financement par dette (réf. BP 30/70) → prêt réglable.
+- Même correction sur la vue **mobile** (défaut identique).
+- Case + libellé restent cohérents même en pilotage programmatique.
+
+Vérifié navigateur (les deux sens) + 197/197 tests.
+
+---
+
 ## [v6.90-polish] — 2026-07-16
 
 ### ✨ Polish visuel premium (Apple × Louis Vuitton)
