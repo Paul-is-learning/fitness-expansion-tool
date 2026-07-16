@@ -303,6 +303,9 @@
     closeAllPanels();
     try { window.PresentationMode?.toggle?.(false); } catch {}
     const o = $('fpShowreel'); if (o) { o.classList.remove('on'); setTimeout(() => o.remove(), 500); }
+    // v7.03 — la carte peut avoir été redimensionnée pendant la démo : on la
+    // resynchronise pour que l'Explorer (filtres/marqueurs) reste fonctionnel.
+    try { setTimeout(() => window._fpMap?.invalidateSize?.(true), 400); } catch {}
   }
   window.Showreel = { start, stop };
 

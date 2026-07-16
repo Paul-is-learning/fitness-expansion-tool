@@ -52,7 +52,24 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Assets (même origine + CDN) : stale-while-revalidate
+  // v7.03 — LOGIQUE DE L'APP (même origine : /src/*.js, config.js, data/*) :
+  // RÉSEAU D'ABORD. Un correctif de code arrive ainsi immédiatement au
+  // prochain chargement (fini le « ça marche chez moi mais pas chez le user »
+  // dû au cache). Repli cache uniquement si hors ligne.
+  if (url.origin === location.origin && /\.(js|json)$/.test(url.pathname)) {
+    e.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        if (fresh && fresh.ok) { const c = await caches.open(CACHE); c.put(req, fresh.clone()).catch(() => {}); }
+        return fresh;
+      } catch {
+        return (await caches.match(req)) || new Response('', { status: 504 });
+      }
+    })());
+    return;
+  }
+
+  // Autres assets (même origine statiques + CDN) : stale-while-revalidate
   e.respondWith((async () => {
     const cached = await caches.match(req);
     const refresh = fetch(req).then(async (fresh) => {

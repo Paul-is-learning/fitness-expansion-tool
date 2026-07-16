@@ -1,6 +1,33 @@
 
 # Changelog
 
+## [v7.03-map-resize-fix] — 2026-07-16
+
+### 🐛 Concurrents invisibles après la démo — vraie cause trouvée
+
+Symptôme : sur Explorer, les filtres concurrents « n'avaient aucun effet ».
+Cause racine réelle (diagnostiquée en conditions réelles) : après un
+passage en mode présentation / démo guidée, le conteneur carte restait
+mal dimensionné (0 px). Or le clustering de marqueurs ne rend QUE ce qui
+est dans la fenêtre visible → les concurrents étaient bien ajoutés mais
+jamais affichés. Le badge comptait 90/90, la carte restait vide.
+
+- **Resync de la taille carte** à l'entrée ET à la sortie du mode
+  présentation / showreel (`invalidateSize`) → la carte ne reste plus
+  jamais coincée à 0 px.
+- **Filet dans le filtre** : `applyBrandFilter` resynchronise la taille
+  avant de rendre + active la couche « Concurrents » pour cohérence +
+  accès DOM tous protégés (plus rien ne peut « faire bugger »).
+- **Service Worker en network-first** pour la logique de l'app (src/*.js,
+  config.js, data) : un correctif de code arrive désormais IMMÉDIATEMENT
+  au rechargement, fini le cache qui sert l'ancien code.
+
+Vérifié en conditions réelles (carte dimensionnée) : Tout → 21 clusters
++ 23 pins de marque + 86 concurrents en vue ; cycle présentation → carte
+saine + filtre encore fonctionnel ; zéro erreur. 197/197 tests.
+
+---
+
 ## [v7.02-brandfilter-boot] — 2026-07-16
 
 ### 🐛 Filtre concurrents (Explorer/Concurrence) — corrigé de bout en bout

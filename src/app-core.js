@@ -2057,9 +2057,16 @@ function applyBrandFilter() {
           color: segColor(c.segment), threat: segThreat(c.segment), brand: 'local' }));
   }
   const filtered = lastDisplayedComps.filter(c => brandVisibility[extractBrand(c.name, c.segment)] !== false);
+  // v7.03 — FIX visibilité : markercluster ne rend que ce qui est dans la
+  // fenêtre de la carte. Un état résiduel (présentation / showreel / analyse)
+  // pouvait laisser le conteneur carte à 0 px → filtre « sans effet » (pins
+  // ajoutés mais jamais affichés). On resynchronise la taille AVANT de rendre.
+  try { if (typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize(false); } catch {}
   showCompsOnMap(filtered);
-  buildBrandFilters(lastDisplayedComps);
-  el('compCountBadge').textContent = filtered.length + '/' + lastDisplayedComps.length;
+  // Cohérence : afficher des concurrents = la couche « Concurrents » est active.
+  try { if (filtered.length && typeof layers !== 'undefined') { layers.competitors = true; el('tglCompetitors')?.classList.add('on'); } } catch {}
+  buildBrandFilters();
+  const badge = el('compCountBadge'); if (badge) badge.textContent = filtered.length + '/' + lastDisplayedComps.length;
 }
 
 // ================================================================

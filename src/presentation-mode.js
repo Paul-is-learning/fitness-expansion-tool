@@ -50,6 +50,10 @@
     const on = typeof force === 'boolean' ? force : !document.body.classList.contains('presentation-mode');
     document.body.classList.toggle('presentation-mode', on);
     document.getElementById('fpPresentBtn')?.classList.toggle('on', on);
+    // v7.03 — le mode présentation grossit la typo (zoom) : à l'entrée comme à
+    // la sortie, la carte Leaflet doit recalculer sa taille, sinon elle reste
+    // mal dimensionnée (0 px) et les marqueurs concurrents ne s'affichent plus.
+    try { setTimeout(() => window._fpMap?.invalidateSize?.(true), 360); } catch {}
     if (on && !document.getElementById('fpPresentBanner')) {
       const b = document.createElement('div');
       b.id = 'fpPresentBanner';
