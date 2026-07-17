@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────
+# MODÈLE de workflow GitHub Actions — refresh MENSUEL notes/avis Google.
+#
+# ⚠ À INSTALLER À LA MAIN (1 min) : le token git local n'a pas le scope
+# « workflow », il ne peut pas pousser dans .github/workflows/. Sur GitHub :
+#   Add file → Create new file → nom : .github/workflows/google-places-refresh.yml
+#   → coller ce contenu → Commit.
+# Puis : Settings → Secrets and variables → Actions → New repository secret
+#   Nom : GOOGLE_PLACES_ETL_KEY   Valeur : une clé Google SERVEUR dédiée,
+#   restreinte à Places API (New) + quota bas (ex. 200 req/jour).
+#
+# Coût : ~90 requêtes Text Search PAR MOIS au total (palier gratuit).
+# Sans secret : le job sort proprement sans rien faire.
+# ─────────────────────────────────────────────────────────────────────
+name: google-places-refresh
+on:
+  schedule:
+    - cron: '0 4 1 * *'   # le 1er du mois à 04:00 UTC
+  workflow_dispatch: {}     # lançable à la main depuis l'onglet Actions
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Refresh notes/avis Google (~90 req, 1x/mois)
+        env:
+          GOOGLE_PLACES_ETL_KEY: ${{ secrets.GOOGLE_PLACES_ETL_KEY }}
+        run: node ci/etl-google-places.mjs
+      - name: Commit si changement
+        run: |
+          if git diff --quiet data/competitors-google.json; then
+            echo "Pas de changement — rien à committer."
+          else
+            git config user.name "google-places-bot"
+            git config user.email "bot@isseo-dev.com"
+            git add data/competitors-google.json
+            git commit -m "data: refresh mensuel notes/avis Google concurrents [skip ci]"
+            git push
+          fi
