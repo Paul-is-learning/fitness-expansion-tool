@@ -20,10 +20,19 @@ const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const GOOGLE_API_KEY = 'AIzaSyDPj1aNT8HICzvPOXHSyQtl1oKf3vSu3so';
 const GOOGLE_PLACES_URL = 'https://places.googleapis.com/v1/places';
 const GOOGLE_GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
-const _googleHasKey = () => GOOGLE_API_KEY && GOOGLE_API_KEY !== 'YOUR_GOOGLE_API_KEY';
+// ─── PACK ÉCO GOOGLE (v7.13, décision Paul 2026-07-17) ───────────────
+// INTERRUPTEUR MAÎTRE : false = AUCUN appel Google au runtime. L'app tourne
+// sur les replis gratuits déjà éprouvés en prod (Nominatim pour la recherche/
+// géocodage, OSRM pour les itinéraires, haversine pour la cannibalisation,
+// modèles locaux pour les isochrones). Les notes/avis des concurrents
+// viennent du fichier statique data/competitors-google.json, rafraîchi
+// 1×/mois par le robot GitHub (ci/etl-google-places.mjs).
+// Remettre à true = retour instantané au comportement Google direct.
+const GOOGLE_RUNTIME_ENABLED = false;
+const _googleHasKey = () => GOOGLE_RUNTIME_ENABLED && GOOGLE_API_KEY && GOOGLE_API_KEY !== 'YOUR_GOOGLE_API_KEY';
 const _googleCache = {}; // in-memory cache for session
 const GOOGLE_CACHE_KEY = 'fp_google_cache';
-const GOOGLE_CACHE_TTL = 7 * 24 * 3600 * 1000; // 7 days
+const GOOGLE_CACHE_TTL = 30 * 24 * 3600 * 1000; // 30 jours (était 7 — cadence pack éco)
 
 // Model version — bumped when cached data format changes; triggers cache clear
-const MODEL_VERSION = 'v7.12-demo-rock-solid'
+const MODEL_VERSION = 'v7.13-google-eco'

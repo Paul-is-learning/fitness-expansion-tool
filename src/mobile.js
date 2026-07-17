@@ -273,7 +273,7 @@
     results.innerHTML = `<div class="fp-search-loading">Recherche…</div>`;
 
     try {
-      if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) {
+      if (typeof _googleHasKey === 'undefined' || !_googleHasKey()) {
         throw new Error('no-key');
       }
       const token = _autocompleteSession || newSessionToken();
@@ -2199,7 +2199,7 @@
         sugBox.style.display = 'block';
         sugBox.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--gray2);text-align:center">Recherche…</div>';
         try {
-          if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) throw 'no-key';
+          if (typeof _googleHasKey === 'undefined' || !_googleHasKey()) throw 'no-key';
           const token = lastSession || newSession();
           const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
             method: 'POST',
@@ -2489,7 +2489,7 @@
     }
 
     try {
-      if (typeof GOOGLE_API_KEY === 'undefined' || !GOOGLE_API_KEY) throw new Error('no-key');
+      if (typeof _googleHasKey === 'undefined' || !_googleHasKey()) throw new Error('no-key');
       const token = _addSiteSession || newAddSiteSession();
       const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
         method: 'POST',

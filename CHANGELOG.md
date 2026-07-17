@@ -1,6 +1,42 @@
 
 # Changelog
 
+## [v7.13-google-eco] · 2026-07-17
+
+### 💰 Pack éco Google : ZÉRO appel facturable au runtime (décision Paul)
+
+Audit préalable (3 agents) : 29 points de consommation inventoriés. Les gros
+brûleurs : cannibalisation (N(N-1)/2 appels Routes par affichage de Mes
+sites, sans cache), isochrone voiture (24 appels TRAFFIC_AWARE par clic),
+matrice de distances à chaque analyse, enrichissement ~90 clubs au SKU
+Enterprise. Corrections :
+
+- **Interrupteur maître** GOOGLE_RUNTIME_ENABLED=false (config.js) câblé dans
+  _googleHasKey + les 3 autocompletes mobiles : plus AUCUN appel Google au
+  runtime. Remettre true = retour instantané au comportement d'avant.
+- **Notes/avis concurrents** : fichier statique data/competitors-google.json
+  rafraîchi 1×/mois par robot GitHub (ci/etl-google-places.mjs +
+  google-places-refresh.yml, ~90 req Text Search/mois AU TOTAL, palier
+  gratuit). Nécessite le secret GOOGLE_PLACES_ETL_KEY (clé serveur dédiée à
+  créer par Paul). Sans clé : sortie propre, app inchangée.
+- **OSRM gratuit à la place de Routes API** : matrice de temps de route
+  (1 requête table/analyse, cache localStorage 30j), cannibalisation
+  (préfiltre haversine >6 km = zéro réseau, cache 30j par paire),
+  isochrone voiture (24 rayons sur la polyline réelle, cache 30j par point).
+- TTL du cache Google 7j → 30j (si jamais réactivé).
+
+**Preuves** : test headless interceptant le réseau sur tous les parcours
+(boot, login, concurrents, analyse, Mes sites, recherche, isochrone) :
+**0 requête places/routes/maps.googleapis** · 26 requêtes OSRM gratuites.
+Matrice OSRM vérifiée (minutes réelles 10/7/7/16/10, cache persisté).
+**197/197 assertions** (la baseline tournait déjà sans Google — CI la bloque).
+
+Reste à faire côté Paul (2 min chacun) : créer la clé serveur + secret GitHub
+pour activer le refresh mensuel ; poser des plafonds de quota dans la console
+Google en garde-fou.
+
+---
+
 ## [v7.12-demo-rock-solid] · 2026-07-16
 
 ### 🎯 Démo guidée : halo immobile et ancres structurelles (fini le « en plein vol »)

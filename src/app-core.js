@@ -148,6 +148,36 @@ async function googleNearbyGyms(lat, lng, radiusM) {
   return results;
 }
 
+// ─── v7.13 PACK ÉCO — enrichissement depuis le fichier STATIQUE ────────
+// data/competitors-google.json est rafraîchi 1×/mois par le robot GitHub
+// (ci/etl-google-places.mjs) : ZÉRO appel Google au runtime. Mêmes champs
+// que enrichWithGoogle (gRating/gReviews/gWebsite) → même modèle de capture.
+let _staticGooglePromise = null;
+async function enrichFromStatic(clubs) {
+  try {
+    if (!_staticGooglePromise) {
+      _staticGooglePromise = fetch('data/competitors-google.json')
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+    }
+    const data = await _staticGooglePromise;
+    if (!data || !data.places) return 0;
+    let n = 0;
+    clubs.forEach(c => {
+      const key = c.name.toLowerCase().replace(/\s+/g, '_');
+      const p = data.places[key];
+      if (p) {
+        if (p.rating != null) c.gRating = p.rating;
+        if (p.userRatingCount != null) c.gReviews = p.userRatingCount;
+        if (p.websiteUri) c.gWebsite = p.websiteUri;
+        c.gEnriched = true;
+        n++;
+      }
+    });
+    if (n) console.log(`[Static Google] ${n}/${clubs.length} clubs enrichis (refresh mensuel: ${data.generated_at || 'jamais — lancer le robot'})`);
+    return n;
+  } catch { return 0; }
+}
+
 // Enrich VERIFIED_CLUBS with Google Places data (ratings, reviews, hours)
 async function enrichWithGoogle(clubs) {
   if (!_googleHasKey()) { console.warn('[Google] No API key — skipping enrichment'); return clubs; }
@@ -996,27 +1026,43 @@ function revenueScenarios(popTarget,nbCompetitors,avgPrice,lat,lng) {
   };
 }
 
+// v7.13 pack éco — temps de route par PAIRE de sites : cache localStorage
+// 30 jours (les sites ne bougent pas) + OSRM gratuit. Avant : 1 appel Google
+// par paire À CHAQUE affichage de « Mes sites » (N(N-1)/2, sans cache) —
+// le poste le plus dispendieux de l'app.
+const _ROUTE_PAIR_KEY = 'fp_route_pairs';
+let _routePairs = null;
+function _loadRoutePairs() {
+  if (_routePairs) return _routePairs;
+  try {
+    _routePairs = JSON.parse(localStorage.getItem(_ROUTE_PAIR_KEY) || '{}');
+    const now = Date.now();
+    Object.keys(_routePairs).forEach(k => { if (now - (_routePairs[k].t || 0) > GOOGLE_CACHE_TTL) delete _routePairs[k]; });
+  } catch { _routePairs = {}; }
+  return _routePairs;
+}
+async function _routePairMinutes(a, b) {
+  const k1 = `${a.lat.toFixed(3)},${a.lng.toFixed(3)}`, k2 = `${b.lat.toFixed(3)},${b.lng.toFixed(3)}`;
+  const key = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+  const cache = _loadRoutePairs();
+  if (cache[key] !== undefined && cache[key].m !== undefined) return cache[key].m;
+  const r = await _osrmRoute('car', a, b);
+  if (!r) return null;
+  cache[key] = { m: r.min, t: Date.now() };
+  try { localStorage.setItem(_ROUTE_PAIR_KEY, JSON.stringify(cache)); } catch {}
+  return r.min;
+}
+
 // Cannibalization analysis between sites
 async function cannibalizeRisk(site1,site2) {
   const dist = haversine(site1.lat,site1.lng,site2.lat,site2.lng);
 
-  // Try Google Distance Matrix for real driving time
+  // Temps de route réel (OSRM + cache 30j) — UNIQUEMENT si la paire est
+  // assez proche pour que ça change le verdict : >6 km = risque faible
+  // d'office, aucun appel réseau (préfiltre haversine).
   let driveMins = null;
-  if(_googleHasKey()) {
-    try {
-      const resp = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY,
-          'X-Goog-FieldMask': 'routes.duration' },
-        body: JSON.stringify({
-          origin: { location: { latLng: { latitude: site1.lat, longitude: site1.lng } } },
-          destination: { location: { latLng: { latitude: site2.lat, longitude: site2.lng } } },
-          travelMode: 'DRIVE'
-        })
-      });
-      const data = await resp.json();
-      if(data.routes?.[0]?.duration) driveMins = Math.round(parseInt(data.routes[0].duration.replace('s',''))/60);
-    } catch(e) {}
+  if (dist <= 6000) {
+    try { driveMins = await _routePairMinutes(site1, site2); } catch(e) {}
   }
 
   // Population overlap via CARTIERE
@@ -1467,9 +1513,12 @@ async function analyzePoint(lat,lng,sector) {
 
   // Enrichissement temps de trajet réels — fire-and-forget, borné à 5 s,
   // puis re-render des popups concurrents (sans jamais bloquer le reste).
-  if (_googleHasKey() && comps.length > 0) {
+  // v7.13 pack éco : OSRM (gratuit, cache 30j) par défaut ; Google seulement
+  // si GOOGLE_RUNTIME_ENABLED est remis à true.
+  if (comps.length > 0) {
+    const matrixFn = _googleHasKey() ? googleDistanceMatrix : osrmDriveMatrix;
     Promise.race([
-      Promise.resolve().then(() => googleDistanceMatrix(lat, lng, comps)).catch(() => {}),
+      Promise.resolve().then(() => matrixFn(lat, lng, comps)).catch(() => {}),
       new Promise(r => setTimeout(r, 5000)),
     ]).then(() => { try { displayComps(comps, lat, lng); } catch {} });
   }
@@ -2781,17 +2830,21 @@ async function loadAllCompetitors() {
   document.getElementById('btnLoadComp')?.classList.add('active');
   setStatus('ok',`${comps.length} concurrents charges`);
 
-  // Enrich with Google Places data (async, non-blocking).
-  // Bugfix: only re-render markers if the competitors layer is still on.
-  // Otherwise the async .then() would re-populate the cluster after mobile
-  // had explicitly hidden it (clusters re-appearing at zoom-out = surprise).
-  if (_googleHasKey()) {
-    enrichWithGoogle(comps).then(() => {
-      if (layers.competitors) showCompsOnMap(comps);
-      // v6.69 — snapshot des review counts pour la série temporelle vélocité
-      try { window.ReviewsHistory?.maybeSnapshot?.(comps); } catch {}
-    });
-  }
+  // v7.13 pack éco — notes/avis depuis le fichier STATIQUE d'abord (zéro
+  // appel Google au runtime). Le chemin Google direct ne subsiste que si
+  // GOOGLE_RUNTIME_ENABLED est remis à true (config.js).
+  // Bugfix conservé : ne re-rendre les marqueurs que si la couche est active.
+  enrichFromStatic(comps).then((n) => {
+    if (n > 0 && layers.competitors) showCompsOnMap(comps);
+    // v6.69 — snapshot des review counts pour la série temporelle vélocité
+    try { window.ReviewsHistory?.maybeSnapshot?.(comps); } catch {}
+    if (_googleHasKey()) {
+      enrichWithGoogle(comps).then(() => {
+        if (layers.competitors) showCompsOnMap(comps);
+        try { window.ReviewsHistory?.maybeSnapshot?.(comps); } catch {}
+      });
+    }
+  });
 }
 
 async function genHeatmap() {
@@ -7438,6 +7491,56 @@ async function googleIsochrone(lat, lng, travelMode, timeLimitSec, maxDistOverri
   };
 }
 
+// v7.13 pack éco — isochrone voiture via OSRM (gratuit) + cache 30 jours par
+// point. 24 rayons comme la version Google, mais le point d'arrivée est lu
+// sur la POLYLINE réelle de la route (coupe proportionnelle au temps) —
+// même qualité de forme, zéro crédit. Cache : un point analysé deux fois
+// ne refait aucun appel pendant 30 jours.
+const _ISO_CACHE_KEY = 'fp_iso_cache';
+async function osrmIsochrone(lat, lng, timeLimitSec, maxDistOverride) {
+  const cacheId = `iso_${lat.toFixed(3)}_${lng.toFixed(3)}_${timeLimitSec}`;
+  let store = {};
+  try {
+    store = JSON.parse(localStorage.getItem(_ISO_CACHE_KEY) || '{}');
+    const now = Date.now();
+    Object.keys(store).forEach(k => { if (now - (store[k].t || 0) > GOOGLE_CACHE_TTL) delete store[k]; });
+    if (store[cacheId]) return store[cacheId].g;
+  } catch { store = {}; }
+
+  const DIRECTIONS = 24;
+  const maxDist = maxDistOverride || 0.06;
+  const limitMin = timeLimitSec / 60;
+  const points = [];
+  for (let i = 0; i < DIRECTIONS; i += 6) {
+    const batch = [];
+    for (let jj = i; jj < Math.min(i + 6, DIRECTIONS); jj++) {
+      const angle = (jj * 360 / DIRECTIONS) * Math.PI / 180;
+      const dest = { lat: lat + maxDist * Math.cos(angle), lng: lng + maxDist * Math.sin(angle) };
+      batch.push(_osrmRoute('car', { lat, lng }, dest).then(r => {
+        if (!r || !r.coords || !r.coords.length) return null;
+        if (r.min <= limitMin) { const e = r.coords[r.coords.length - 1]; return { lat: e[0], lng: e[1], dur: r.min * 60 }; }
+        const idx = Math.max(1, Math.min(r.coords.length - 1, Math.floor(r.coords.length * limitMin / r.min)));
+        return { lat: r.coords[idx][0], lng: r.coords[idx][1], dur: timeLimitSec };
+      }).catch(() => null));
+    }
+    (await Promise.all(batch)).forEach(p => { if (p) points.push(p); });
+  }
+  if (points.length < 3) return null;
+  points.sort((a, b) => Math.atan2(a.lng - lng, a.lat - lat) - Math.atan2(b.lng - lng, b.lat - lat));
+  const coords = points.map(p => [p.lng, p.lat]);
+  coords.push(coords[0]);
+  const geojson = {
+    type: 'Feature',
+    properties: { duration: timeLimitSec, mode: 'DRIVE', points: points.length },
+    geometry: { type: 'Polygon', coordinates: [coords] },
+  };
+  try {
+    store[cacheId] = { g: geojson, t: Date.now() };
+    localStorage.setItem(_ISO_CACHE_KEY, JSON.stringify(store));
+  } catch {}
+  return geojson;
+}
+
 // Fallback to ORS if Google fails
 async function fetchIsochroneORS(lat, lng, profile, rangeSeconds) {
   const apiKey = localStorage.getItem('orsKey');
@@ -7667,11 +7770,16 @@ async function drawIsochrone(lat, lng) {
     geojson = transitIsochrone(lat, lng, 10);
     source = `Réseau métro (${geojson?.properties?.stations || 0} stations accessibles)`;
   }
-  // DRIVE: Google Routes API (road network matters)
+  // DRIVE: réseau routier réel — Google si réactivé, sinon OSRM (gratuit)
   else {
     if (_googleHasKey()) {
       geojson = await googleIsochrone(lat, lng, cfg.api, 600, cfg.maxDist);
       if (geojson) { source = 'Google Routes API'; console.log(`[Google Routes] Isochrone DRIVE: ${geojson.properties.points} points`); }
+    }
+    // v7.13 pack éco — OSRM : même méthode 24 rayons, gratuit, cache 30j
+    if (!geojson) {
+      geojson = await osrmIsochrone(lat, lng, 600, cfg.maxDist);
+      if (geojson) { source = `OSRM (${geojson.properties.points} points, cache 30j)`; }
     }
     // Fallback ORS
     if (!geojson && cfg.ors) {
@@ -7697,6 +7805,63 @@ async function drawIsochrone(lat, lng) {
   }
 
   hideLoad();
+}
+
+// ================================================================
+// v7.13 PACK ÉCO — MATRICE DE TEMPS DE ROUTE VIA OSRM (gratuit)
+// Remplace la Route Matrix Google quand GOOGLE_RUNTIME_ENABLED est coupé :
+// 1 requête « table » OSRM par point analysé (40 destinations max/requête),
+// cache localStorage 30 jours par point (grille ~110 m).
+// ================================================================
+const _OSRM_DM_KEY = 'fp_dm_cache';
+let _osrmDmStore = null;
+function _loadOsrmDm() {
+  if (_osrmDmStore) return _osrmDmStore;
+  try {
+    _osrmDmStore = JSON.parse(localStorage.getItem(_OSRM_DM_KEY) || '{}');
+    const now = Date.now();
+    Object.keys(_osrmDmStore).forEach(k => { if (now - (_osrmDmStore[k]._t || 0) > GOOGLE_CACHE_TTL) delete _osrmDmStore[k]; });
+  } catch { _osrmDmStore = {}; }
+  return _osrmDmStore;
+}
+async function osrmDriveMatrix(originLat, originLng, competitors) {
+  if (!competitors.length) return competitors;
+  const store = _loadOsrmDm();
+  const originKey = `dm_${originLat.toFixed(3)}_${originLng.toFixed(3)}`;
+  const apply = (m) => competitors.forEach(c => {
+    const k = `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`;
+    if (m[k]) { c.driveMins = m[k].m; c.driveMeters = m[k].d; }
+  });
+  if (store[originKey]) { apply(store[originKey]); return competitors; }
+  const results = {};
+  for (let i = 0; i < competitors.length; i += 40) {
+    const batch = competitors.slice(i, i + 40);
+    const coords = [`${originLng},${originLat}`, ...batch.map(c => `${c.lng},${c.lat}`)].join(';');
+    const url = `https://routing.openstreetmap.de/routed-car/table/v1/driving/${coords}?sources=0&annotations=duration,distance`;
+    try {
+      const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = ac ? setTimeout(() => ac.abort(), 8000) : null;
+      const r = await fetch(url, { signal: ac ? ac.signal : undefined });
+      if (t) clearTimeout(t);
+      const j = await r.json();
+      const durs = j.durations && j.durations[0];
+      const dists = j.distances && j.distances[0];
+      if (durs) batch.forEach((c, idx) => {
+        const sec = durs[idx + 1];               // index 0 = l'origine elle-même
+        if (sec != null) {
+          const k = `${c.lat.toFixed(4)}_${c.lng.toFixed(4)}`;
+          results[k] = { m: Math.round(sec / 60), d: Math.round((dists && dists[idx + 1]) || 0) };
+        }
+      });
+    } catch {}
+  }
+  if (Object.keys(results).length) {
+    results._t = Date.now();
+    store[originKey] = results;
+    try { localStorage.setItem(_OSRM_DM_KEY, JSON.stringify(store)); } catch {}
+    apply(results);
+  }
+  return competitors;
 }
 
 // ================================================================

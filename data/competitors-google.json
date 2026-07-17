@@ -1,0 +1,5 @@
+{
+  "generated_at": null,
+  "note": "Notes/avis Google des concurrents, rafraîchi 1x/mois par .github/workflows/google-places-refresh.yml (ci/etl-google-places.mjs). Vide tant que le secret GOOGLE_PLACES_ETL_KEY n'est pas configuré — l'app fonctionne alors comme avant (sans notes Google, modèle neutre).",
+  "places": {}
+}
